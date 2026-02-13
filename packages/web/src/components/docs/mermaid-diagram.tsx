@@ -7,6 +7,19 @@ interface MermaidDiagramProps {
   chart: string;
 }
 
+/** Read a CSS custom property value from :root as a resolved color string. */
+function cssVar(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+/** Convert "210 40% 96.1%" → "hsl(210 40% 96.1%)" if it looks like bare HSL values. */
+function toColor(raw: string): string {
+  // Already a full color (hex, rgb, hsl with wrapper, named color, etc.)
+  if (/^(#|rgb|hsl|oklch|oklab|color\(|[a-z]+$)/i.test(raw)) return raw;
+  // Bare HSL channel values from Tailwind ("210 40% 96.1%")
+  return `hsl(${raw})`;
+}
+
 export function MermaidDiagram({ chart }: MermaidDiagramProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [svg, setSvg] = useState<string>('');
@@ -18,28 +31,35 @@ export function MermaidDiagram({ chart }: MermaidDiagramProps) {
 
     async function render() {
       try {
+        // Resolve design-system colors at render time so mermaid can do color math
+        const fg = toColor(cssVar('--foreground'));
+        const mutedFg = toColor(cssVar('--muted-foreground'));
+        const muted = toColor(cssVar('--muted'));
+        const border = toColor(cssVar('--border'));
+        const card = toColor(cssVar('--card'));
+
         const mermaidModule = await import('mermaid');
         const mermaid = mermaidModule.default;
         mermaid.initialize({
           startOnLoad: false,
-          theme: 'neutral',
+          theme: 'base',
           fontFamily: 'inherit',
           flowchart: { curve: 'basis', padding: 16 },
           sequence: { mirrorActors: false, messageMargin: 40 },
           themeVariables: {
-            primaryColor: 'hsl(var(--muted))',
-            primaryBorderColor: 'hsl(var(--border))',
-            primaryTextColor: 'hsl(var(--foreground))',
-            lineColor: 'hsl(var(--border))',
-            secondaryColor: 'hsl(var(--muted))',
-            tertiaryColor: 'hsl(var(--muted))',
-            noteBkgColor: 'hsl(var(--muted))',
-            noteTextColor: 'hsl(var(--muted-foreground))',
-            noteBorderColor: 'hsl(var(--border))',
-            edgeLabelBackground: 'hsl(var(--card))',
-            clusterBkg: 'hsl(var(--muted) / 0.5)',
-            clusterBorder: 'hsl(var(--border))',
-            titleColor: 'hsl(var(--foreground))',
+            primaryColor: muted,
+            primaryBorderColor: border,
+            primaryTextColor: fg,
+            lineColor: border,
+            secondaryColor: muted,
+            tertiaryColor: muted,
+            noteBkgColor: muted,
+            noteTextColor: mutedFg,
+            noteBorderColor: border,
+            edgeLabelBackground: card,
+            clusterBkg: muted,
+            clusterBorder: border,
+            titleColor: fg,
           },
         });
 
@@ -81,7 +101,12 @@ export function MermaidDiagram({ chart }: MermaidDiagramProps) {
       {svg ? (
         <div
           ref={containerRef}
-          className="mermaid-diagram [&_svg]:max-w-full [&_.node_rect]:!rx-[8px] [&_.node_rect]:!ry-[8px] [&_text]:!fill-[hsl(var(--foreground))] [&_.edgeLabel]:!bg-[hsl(var(--card))]"
+          className={cn(
+            'mermaid-diagram [&_svg]:max-w-full',
+            '[&_.node_rect]:rx-[8px] [&_.node_rect]:ry-[8px]',
+            '[&_.label]:!text-[color:var(--foreground)]',
+            '[&_.edgeLabel]:!bg-[color:var(--card)]',
+          )}
           dangerouslySetInnerHTML={{ __html: svg }}
         />
       ) : (

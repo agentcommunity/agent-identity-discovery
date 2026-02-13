@@ -190,6 +190,10 @@ function extractText(node: ReactNode): string {
   if (Array.isArray(node)) return node.map((n: ReactNode) => extractText(n)).join('');
   if (typeof node === 'object' && 'props' in node) {
     const el = node as ReactElement<{ children?: ReactNode }>;
+    // Preserve self-closing HTML elements as text (e.g. <br> in mermaid labels)
+    if (typeof el.type === 'string' && ['br', 'hr', 'wbr'].includes(el.type)) {
+      return `<${el.type}/>`;
+    }
     return extractText(el.props.children);
   }
   return '';
