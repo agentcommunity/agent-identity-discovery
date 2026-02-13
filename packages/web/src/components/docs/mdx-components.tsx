@@ -104,7 +104,10 @@ function MdxP({ children, ...props }: ComponentPropsWithoutRef<'p'>) {
 
 function MdxH1({ children, ...props }: ComponentPropsWithoutRef<'h1'>) {
   return (
-    <h1 className="mt-8 mb-4 text-3xl font-bold tracking-tight text-foreground" {...props}>
+    <h1
+      className="mt-8 mb-4 scroll-mt-20 text-3xl font-bold tracking-tight text-foreground"
+      {...props}
+    >
       {children}
     </h1>
   );
@@ -113,7 +116,7 @@ function MdxH1({ children, ...props }: ComponentPropsWithoutRef<'h1'>) {
 function MdxH2({ children, ...props }: ComponentPropsWithoutRef<'h2'>) {
   return (
     <h2
-      className="mt-12 mb-4 text-2xl font-semibold tracking-tight text-foreground pt-2"
+      className="mt-12 mb-4 scroll-mt-20 pt-2 text-2xl font-semibold tracking-tight text-foreground"
       {...props}
     >
       {children}
@@ -123,7 +126,10 @@ function MdxH2({ children, ...props }: ComponentPropsWithoutRef<'h2'>) {
 
 function MdxH3({ children, ...props }: ComponentPropsWithoutRef<'h3'>) {
   return (
-    <h3 className="mt-8 mb-3 text-xl font-semibold tracking-tight text-foreground" {...props}>
+    <h3
+      className="mt-8 mb-3 scroll-mt-20 text-xl font-semibold tracking-tight text-foreground"
+      {...props}
+    >
       {children}
     </h3>
   );
@@ -131,7 +137,7 @@ function MdxH3({ children, ...props }: ComponentPropsWithoutRef<'h3'>) {
 
 function MdxH4({ children, ...props }: ComponentPropsWithoutRef<'h4'>) {
   return (
-    <h4 className="mt-6 mb-3 text-lg font-semibold text-foreground" {...props}>
+    <h4 className="mt-6 mb-3 scroll-mt-20 text-lg font-semibold text-foreground" {...props}>
       {children}
     </h4>
   );
@@ -139,7 +145,7 @@ function MdxH4({ children, ...props }: ComponentPropsWithoutRef<'h4'>) {
 
 function MdxH5({ children, ...props }: ComponentPropsWithoutRef<'h5'>) {
   return (
-    <h5 className="mt-4 mb-2 text-base font-semibold text-foreground" {...props}>
+    <h5 className="mt-4 mb-2 scroll-mt-20 text-base font-semibold text-foreground" {...props}>
       {children}
     </h5>
   );
@@ -147,7 +153,7 @@ function MdxH5({ children, ...props }: ComponentPropsWithoutRef<'h5'>) {
 
 function MdxH6({ children, ...props }: ComponentPropsWithoutRef<'h6'>) {
   return (
-    <h6 className="mt-4 mb-2 text-sm font-semibold text-foreground" {...props}>
+    <h6 className="mt-4 mb-2 scroll-mt-20 text-sm font-semibold text-foreground" {...props}>
       {children}
     </h6>
   );

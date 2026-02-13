@@ -8,6 +8,7 @@ import { getDocBySlug, getAllDocSlugs } from '@/lib/docs';
 import { mdxComponents } from '@/components/docs/mdx-components';
 import { AiToolbar } from '@/components/docs/ai-toolbar';
 import { Toc } from '@/components/docs/toc';
+import { TocMobile } from '@/components/docs/toc-mobile';
 import { DocsFooter } from '@/components/docs/docs-footer';
 
 interface PageProps {
@@ -71,6 +72,8 @@ export default async function DocPage({ params }: PageProps) {
         {doc.description && <p className="text-lg text-muted-foreground mb-6">{doc.description}</p>}
 
         <AiToolbar slug={slug} rawContent={doc.rawContent} />
+
+        <TocMobile headings={doc.headings} />
 
         <div className="docs-prose">
           <MDXRemote
