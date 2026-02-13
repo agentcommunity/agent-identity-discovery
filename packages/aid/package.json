@@ -14,12 +14,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/agentcommunity/agent-interface-discovery.git",
+    "url": "https://github.com/agentcommunity/agent-identity-discovery.git",
     "directory": "packages/aid"
   },
   "homepage": "https://aid.agentcommunity.org",
   "bugs": {
-    "url": "https://github.com/agentcommunity/agent-interface-discovery/issues"
+    "url": "https://github.com/agentcommunity/agent-identity-discovery/issues"
   },
   "type": "module",
   "exports": {

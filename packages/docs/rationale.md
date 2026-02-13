@@ -6,7 +6,7 @@ icon: material/head-question-outline
 extra_css_class: aid-page
 ---
 
-[View raw markdown](https://github.com/agentcommunity/agent-interface-discovery/raw/main/packages/docs/rationale.md)
+[View raw markdown](https://github.com/agentcommunity/agent-identity-discovery/raw/main/packages/docs/rationale.md)
 
 ## **Agent Identity & Discovery (AID) v1.1: Rationale and Trade-offs**
 

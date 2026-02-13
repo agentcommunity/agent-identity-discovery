@@ -6,10 +6,10 @@
   "author": "Agent Community",
   "repository": {
     "type": "git",
-    "url": "https://github.com/agentcommunity/agent-interface-discovery.git",
+    "url": "https://github.com/agentcommunity/agent-identity-discovery.git",
     "directory": "packages/web"
   },
-  "description": "Web interface for Agent Interface Discovery",
+  "description": "Web interface for Agent Identity Discovery",
   "engines": {
     "node": ">=20.10"
   },

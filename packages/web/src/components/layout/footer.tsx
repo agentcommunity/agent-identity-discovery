@@ -147,7 +147,7 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="https://github.com/agentcommunity/agent-interface-discovery"
+                  href="https://github.com/agentcommunity/agent-identity-discovery"
                   className="text-muted-foreground hover:text-foreground inline-flex items-center transition-all duration-200 hover:translate-x-1 group"
                   target="_blank"
                 >
@@ -157,7 +157,7 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="https://github.com/agentcommunity/agent-interface-discovery/discussions"
+                  href="https://github.com/agentcommunity/agent-identity-discovery/discussions"
                   className="text-muted-foreground hover:text-foreground inline-flex items-center transition-all duration-200 hover:translate-x-1 group"
                   target="_blank"
                 >
@@ -167,7 +167,7 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="https://github.com/agentcommunity/agent-interface-discovery/issues"
+                  href="https://github.com/agentcommunity/agent-identity-discovery/issues"
                   className="text-muted-foreground hover:text-foreground inline-flex items-center transition-all duration-200 hover:translate-x-1 group"
                   target="_blank"
                 >

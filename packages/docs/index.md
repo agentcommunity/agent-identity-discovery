@@ -4,7 +4,7 @@ description: 'The DNS-based discovery protocol for the agentic web.'
 icon: material/dns
 ---
 
-[View raw markdown](https://github.com/agentcommunity/agent-interface-discovery/raw/main/packages/docs/specification.md)
+[View raw markdown](https://github.com/agentcommunity/agent-identity-discovery/raw/main/packages/docs/specification.md)
 
 # Agent Identity & Discovery (AID)
 

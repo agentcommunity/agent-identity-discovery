@@ -10,7 +10,7 @@ public class PkaTests
     private static string RepoRoot()
     {
         var d = new DirectoryInfo(Directory.GetCurrentDirectory());
-        while (d != null && d.Name != "agent-interface-discovery") d = d.Parent;
+        while (d != null && d.Name != "agent-identity-discovery") d = d.Parent;
         return d?.FullName ?? Directory.GetCurrentDirectory();
     }
 

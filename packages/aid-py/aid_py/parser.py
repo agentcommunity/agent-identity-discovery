@@ -1,7 +1,7 @@
 # MIT License
 # Copyright (c) 2025 Agent Community
 # Author: Agent Community
-# Repository: https://github.com/agentcommunity/agent-interface-discovery
+# Repository: https://github.com/agentcommunity/agent-identity-discovery
 """AID record parser and validator (Python).
 
 Mirrors the TypeScript reference implementation in `packages/aid/src/parser.ts`.

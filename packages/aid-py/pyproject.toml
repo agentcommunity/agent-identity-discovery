@@ -13,8 +13,8 @@ requires-python = ">=3.8"
 dependencies = ["dnspython>=2.6.0", "idna>=3.6"]
 
 [project.urls]
-Homepage = "https://github.com/agentcommunity/agent-interface-discovery"
-Repository = "https://github.com/agentcommunity/agent-interface-discovery"
+Homepage = "https://github.com/agentcommunity/agent-identity-discovery"
+Repository = "https://github.com/agentcommunity/agent-identity-discovery"
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]

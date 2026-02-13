@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "Agent Identity & Discovery (AID) – parser and generated constants for Rust"
 license = "MIT"
-repository = "https://github.com/agentcommunity/agent-interface-discovery"
+repository = "https://github.com/agentcommunity/agent-identity-discovery"
 readme = "README.md"
 
 [lib]

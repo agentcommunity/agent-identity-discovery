@@ -10,7 +10,7 @@ tags:
   - '2025-08-31'
 ---
 
-[View raw markdown](https://github.com/agentcommunity/agent-interface-discovery/raw/main/packages/docs/specification.md)
+[View raw markdown](https://github.com/agentcommunity/agent-identity-discovery/raw/main/packages/docs/specification.md)
 
 # **Agent Identity & Discovery (AID) — v1.1.0**
 

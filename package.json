@@ -1,5 +1,5 @@
 {
-  "name": "agent-interface-discovery",
+  "name": "agent-identity-discovery",
   "private": true,
   "version": "0.0.0",
   "type": "commonjs",
@@ -8,7 +8,7 @@
   "author": "Agent Community",
   "repository": {
     "type": "git",
-    "url": "https://github.com/agentcommunity/agent-interface-discovery.git"
+    "url": "https://github.com/agentcommunity/agent-identity-discovery.git"
   },
   "engines": {
     "node": ">=20.10",

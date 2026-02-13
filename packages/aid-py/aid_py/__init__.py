@@ -1,7 +1,7 @@
 # MIT License
 # Copyright (c) 2025 Agent Community
 # Author: Agent Community
-# Repository: https://github.com/agentcommunity/agent-interface-discovery
+# Repository: https://github.com/agentcommunity/agent-identity-discovery
 """Agent Identity & Discovery (AID) – Python library.
 
 This is a **work-in-progress** implementation providing the same high-level API as the

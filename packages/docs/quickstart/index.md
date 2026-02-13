@@ -14,17 +14,17 @@ Fast track for using Agent Identity & Discovery.
 
 AID provides libraries and tools for multiple languages and use cases:
 
-| Package                                                                                                            | Purpose                                          | Language   | Status                                                     |
-| ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------ | ---------- | ---------------------------------------------------------- |
-| **[@agentcommunity/aid](https://www.npmjs.com/package/@agentcommunity/aid)**                                       | Core discovery library                           | TypeScript | ✅ Published                                               |
-| **[@agentcommunity/aid-engine](https://www.npmjs.com/package/@agentcommunity/aid-engine)**                         | Pure business logic (discovery, validation, PKA) | TypeScript | ✅ Published                                               |
-| **[@agentcommunity/aid-doctor](https://www.npmjs.com/package/@agentcommunity/aid-doctor)**                         | CLI validation & generation (wraps aid-engine)   | Node.js    | ✅ Published                                               |
-| **[aid-discovery (Python)](https://pypi.org/project/aid-discovery/)**                                              | Python discovery library                         | Python     | 🔜 Published (not yet community-owned; transfer planned)   |
-| **[aid-go](https://github.com/agentcommunity/agent-interface-discovery/tree/main/packages/aid-go)**                | Go discovery library                             | Go         | ✅ Published                                               |
-| **AID Web Workbench**                                                                                              | Interactive generator & resolver                 | Web        | 🌐 [Try it live](https://aid.agentcommunity.org/workbench) |
-| **[aid-rs (Rust)](https://github.com/agentcommunity/agent-interface-discovery/tree/main/packages/aid-rs)**         | Parser + discovery (opt. PKA)                    | Rust       | ✅ In repo                                                 |
-| **[aid-dotnet (.NET)](https://github.com/agentcommunity/agent-interface-discovery/tree/main/packages/aid-dotnet)** | Parser + discovery + PKA + WK                    | .NET       | ✅ In repo                                                 |
-| **[aid-java (Java)](https://github.com/agentcommunity/agent-interface-discovery/tree/main/packages/aid-java)**     | Parser + discovery + PKA + WK                    | Java       | ✅ In repo                                                 |
+| Package                                                                                                           | Purpose                                          | Language   | Status                                                     |
+| ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | ---------- | ---------------------------------------------------------- |
+| **[@agentcommunity/aid](https://www.npmjs.com/package/@agentcommunity/aid)**                                      | Core discovery library                           | TypeScript | ✅ Published                                               |
+| **[@agentcommunity/aid-engine](https://www.npmjs.com/package/@agentcommunity/aid-engine)**                        | Pure business logic (discovery, validation, PKA) | TypeScript | ✅ Published                                               |
+| **[@agentcommunity/aid-doctor](https://www.npmjs.com/package/@agentcommunity/aid-doctor)**                        | CLI validation & generation (wraps aid-engine)   | Node.js    | ✅ Published                                               |
+| **[aid-discovery (Python)](https://pypi.org/project/aid-discovery/)**                                             | Python discovery library                         | Python     | 🔜 Published (not yet community-owned; transfer planned)   |
+| **[aid-go](https://github.com/agentcommunity/agent-identity-discovery/tree/main/packages/aid-go)**                | Go discovery library                             | Go         | ✅ Published                                               |
+| **AID Web Workbench**                                                                                             | Interactive generator & resolver                 | Web        | 🌐 [Try it live](https://aid.agentcommunity.org/workbench) |
+| **[aid-rs (Rust)](https://github.com/agentcommunity/agent-identity-discovery/tree/main/packages/aid-rs)**         | Parser + discovery (opt. PKA)                    | Rust       | ✅ In repo                                                 |
+| **[aid-dotnet (.NET)](https://github.com/agentcommunity/agent-identity-discovery/tree/main/packages/aid-dotnet)** | Parser + discovery + PKA + WK                    | .NET       | ✅ In repo                                                 |
+| **[aid-java (Java)](https://github.com/agentcommunity/agent-identity-discovery/tree/main/packages/aid-java)**     | Parser + discovery + PKA + WK                    | Java       | ✅ In repo                                                 |
 
 ---
 
@@ -212,7 +212,7 @@ except AidError as e:
 Install the library:
 
 ```bash
-go get -u github.com/agentcommunity/agent-interface-discovery/aid-go
+go get -u github.com/agentcommunity/agent-identity-discovery/aid-go
 ```
 
 Then use the `Discover` function:
@@ -225,7 +225,7 @@ import (
     "log"
     "time"
 
-    "github.com/agentcommunity/agent-interface-discovery/aid-go"
+    "github.com/agentcommunity/agent-identity-discovery/aid-go"
 )
 
 func main() {
@@ -243,7 +243,7 @@ func main() {
 }
 ```
 
-> **📖 More Details:** See the [Go package README](https://github.com/agentcommunity/agent-interface-discovery/tree/main/packages/aid-go) for advanced usage, error handling, and API reference.
+> **📖 More Details:** See the [Go package README](https://github.com/agentcommunity/agent-identity-discovery/tree/main/packages/aid-go) for advanced usage, error handling, and API reference.
 
 ## Doctor CLI in CI
 

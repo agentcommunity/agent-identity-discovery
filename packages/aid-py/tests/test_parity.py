@@ -1,7 +1,7 @@
 # MIT License
 # Copyright (c) 2025 Agent Community
 # Author: Agent Community
-# Repository: https://github.com/agentcommunity/agent-interface-discovery
+# Repository: https://github.com/agentcommunity/agent-identity-discovery
 """Cross-language parity test (Python).
 Parses the shared golden fixtures and ensures output matches expected.
 """

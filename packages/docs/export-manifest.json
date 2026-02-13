@@ -4,13 +4,13 @@
   "files": [
     {
       "path": "index.md",
-      "bytes": 4985,
-      "sha256": "5d802cf78dbc488b4de85fbda5945a09424c9f314ca209a9dc0692bad6c940c0"
+      "bytes": 4984,
+      "sha256": "32058b48f223d710c57147cb706cb65b21dcc2f734bb9f34440b66520aeb8bf6"
     },
     {
       "path": "quickstart/index.md",
-      "bytes": 10499,
-      "sha256": "ac97376adbe4d040e1fc1a388ae5ef6dbddd4d0a7f64f45df4e64393587ecfff"
+      "bytes": 10485,
+      "sha256": "2374334f565762977f588a7c7f367c63ce42806928aeab8e7812c327284c85cf"
     },
     {
       "path": "quickstart/quickstart_a2a.md",
@@ -29,8 +29,8 @@
     },
     {
       "path": "quickstart/quickstart_go.md",
-      "bytes": 1860,
-      "sha256": "a8b9c70361f0697b712fd1d9775e8a7dac868225133950dbc0d27bee7eca240d"
+      "bytes": 1858,
+      "sha256": "c22d7ebc350e0c307fa666e3c7409819b71317bec0fb423cea13787d7cad4487"
     },
     {
       "path": "quickstart/quickstart_java.md",
@@ -64,8 +64,8 @@
     },
     {
       "path": "rationale.md",
-      "bytes": 14142,
-      "sha256": "1a53a8375ade6f5db9659aec55a752414f04578a5f4345f0108001b9411439a8"
+      "bytes": 14141,
+      "sha256": "6242bf34e28c64441ff983bcebdb074100068fb24538b13f19abc519bda4babd"
     },
     {
       "path": "Reference/discovery_api.md",
@@ -104,8 +104,8 @@
     },
     {
       "path": "specification.md",
-      "bytes": 16917,
-      "sha256": "512835123f09f1b0cbcb73bf1cd996a4eb485bcd87eafc6ec53cb8240c989256"
+      "bytes": 16916,
+      "sha256": "05868b938262943e53b38762df97d2b5f108735366ef41d0e649737397fdbf58"
     },
     {
       "path": "Tooling/aid_doctor.md",
@@ -124,9 +124,9 @@
     },
     {
       "path": "versioning.md",
-      "bytes": 2871,
-      "sha256": "b40c3ead25ddea2e536e51bfd367d5367be0c606550db76ea8c363df5a39d0ff"
+      "bytes": 2870,
+      "sha256": "ea57009572679042dd6605770cffef2748d8f1d8efd37e9e7c7fd29437197f67"
     }
   ],
-  "aggregateSha256": "33f0e7348b848c951e9d0c38b64a67fc399ecf2707e0752b2f3495a14bd4e7b2"
+  "aggregateSha256": "78ec9bde3c77aedefc650e1fc24bb9c1b37be823d17a0fe85d11395641bd4628"
 }

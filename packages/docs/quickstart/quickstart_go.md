@@ -9,7 +9,7 @@ icon: material/language-go
 ## Install
 
 ```bash
-go get -u github.com/agentcommunity/agent-interface-discovery/aid-go
+go get -u github.com/agentcommunity/agent-identity-discovery/aid-go
 ```
 
 ## Discover by Domain
@@ -22,7 +22,7 @@ import (
     "log"
     "time"
 
-    aid "github.com/agentcommunity/agent-interface-discovery/aid-go"
+    aid "github.com/agentcommunity/agent-identity-discovery/aid-go"
 )
 
 func main() {

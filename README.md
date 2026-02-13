@@ -3,14 +3,14 @@
 <div align="center">
   <p><strong>DNS for Agents: Type a domain. Connect to its agent. Instantly.</strong></p>
   <p>
-    <a href="https://github.com/agentcommunity/agent-interface-discovery/actions/workflows/ci.yml">
-      <img src="https://github.com/agentcommunity/agent-interface-discovery/actions/workflows/ci.yml/badge.svg" alt="Build Status" />
+    <a href="https://github.com/agentcommunity/agent-identity-discovery/actions/workflows/ci.yml">
+      <img src="https://github.com/agentcommunity/agent-identity-discovery/actions/workflows/ci.yml/badge.svg" alt="Build Status" />
     </a>
     <a href="https://aid.agentcommunity.org/workbench">
       <img src="https://img.shields.io/badge/Demo-Try%20AID%20Workbench-brightgreen?style=flat&logo=rocket" alt="Demo AID Workbench" />
     </a>
-    <a href="https://img.shields.io/github/package-json/v/agentcommunity/agent-interface-discovery?style=flat&label=AID%20Version&color=orange">
-      <img src="https://img.shields.io/github/package-json/v/agentcommunity/agent-interface-discovery?style=flat&label=AID%20Version&color=orange" alt="AID Version" />
+    <a href="https://img.shields.io/github/package-json/v/agentcommunity/agent-identity-discovery?style=flat&label=AID%20Version&color=orange">
+      <img src="https://img.shields.io/github/package-json/v/agentcommunity/agent-identity-discovery?style=flat&label=AID%20Version&color=orange" alt="AID Version" />
     </a>
     <a href="https://www.npmjs.com/package/@agentcommunity/aid">
       <img src="https://img.shields.io/npm/v/@agentcommunity/aid.svg?color=blue" alt="npm version" />
@@ -18,7 +18,7 @@
     <a href="https://pypi.org/project/aid-discovery/">
       <img src="https://img.shields.io/pypi/v/aid-discovery.svg?color=blue" alt="PyPI version" />
     </a>
-    <a href="https://github.com/agentcommunity/agent-interface-discovery/blob/main/LICENSE">
+    <a href="https://github.com/agentcommunity/agent-identity-discovery/blob/main/LICENSE">
       <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" />
     </a>
     <a href="https://github.com/orgs/agentcommunity/discussions">
@@ -89,7 +89,7 @@ graph TD
 
 > Documentation authority: `/packages/docs` in this repository is the canonical source. `docs.agentcommunity.org` is a downstream rendered consumer of these files.
 
-**GitHub Repository**: [github.com/agentcommunity/agent-interface-discovery](https://github.com/agentcommunity/agent-interface-discovery) - Source code, issues, and community discussions.
+**GitHub Repository**: [github.com/agentcommunity/agent-identity-discovery](https://github.com/agentcommunity/agent-identity-discovery) - Source code, issues, and community discussions.
 
 ### Using the Libraries
 
@@ -151,14 +151,14 @@ except AidError as e:
 <summary><strong>Go</strong></summary>
 
 ```bash
-go get -u github.com/agentcommunity/agent-interface-discovery/aid-go
+go get -u github.com/agentcommunity/agent-identity-discovery/aid-go
 ```
 
 ```go
 import (
 	"fmt"
 	"log"
-	"github.com/agentcommunity/agent-interface-discovery/aid-go"
+	"github.com/agentcommunity/agent-identity-discovery/aid-go"
 )
 
 func main() {
@@ -186,7 +186,7 @@ This repository uses a PNPM/Turborepo monorepo structure. It contains the full s
 | [**@agentcommunity/aid-doctor**](https://www.npmjs.com/package/@agentcommunity/aid-doctor)           | Public  | Official CLI for checking, validating, and generating AID records (wraps aid-engine) |
 | [**@agentcommunity/aid-conformance**](https://www.npmjs.com/package/@agentcommunity/aid-conformance) | Public  | Conformance suite exporting fixtures and a CLI runner                                |
 | [**aid-discovery (Python)**](https://pypi.org/project/aid-discovery/)                                | Public  | Official Python library                                                              |
-| [**aid-go**](https://pkg.go.dev/github.com/agentcommunity/agent-interface-discovery/aid-go)          | Public  | Official Go library                                                                  |
+| [**aid-go**](https://pkg.go.dev/github.com/agentcommunity/agent-identity-discovery/aid-go)           | Public  | Official Go library                                                                  |
 | [**aid-rs (Rust)**](./packages/aid-rs)                                                               | Public  | Parser + discovery (handshake behind feature flag)                                   |
 | [**aid-dotnet (.NET)**](./packages/aid-dotnet)                                                       | Public  | Parser + discovery + PKA + well-known                                                |
 | [**aid-java (Java)**](./packages/aid-java)                                                           | Public  | Parser + discovery + PKA + well-known                                                |
@@ -197,7 +197,7 @@ This repository uses a PNPM/Turborepo monorepo structure. It contains the full s
 ### Project Structure
 
 ```
-agent-interface-discovery/
+agent-identity-discovery/
 ├── protocol/                  # Protocol constants (YAML source of truth)
 ├── scripts/                   # Code generation and utility scripts
 ├── packages/
@@ -255,8 +255,8 @@ The AID CLI follows a **clean architecture pattern** with clear separation of co
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/agentcommunity/agent-interface-discovery.git
-cd agent-interface-discovery
+git clone https://github.com/agentcommunity/agent-identity-discovery.git
+cd agent-identity-discovery
 
 # 2. Install dependencies
 pnpm install

@@ -73,7 +73,7 @@ export function Header() {
     { name: 'Docs', href: 'https://docs.agentcommunity.org/aid', external: true },
     {
       name: 'GitHub',
-      href: 'https://github.com/agentcommunity/agent-interface-discovery',
+      href: 'https://github.com/agentcommunity/agent-identity-discovery',
       external: true,
     },
   ];

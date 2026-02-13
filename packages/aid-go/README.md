@@ -1,8 +1,8 @@
 # aid-go
 
-> Official Go implementation of the [Agent Identity & Discovery (AID)](https://github.com/agentcommunity/agent-interface-discovery) specification.
+> Official Go implementation of the [Agent Identity & Discovery (AID)](https://github.com/agentcommunity/agent-identity-discovery) specification.
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/agentcommunity/agent-interface-discovery/aid-go.svg)](https://pkg.go.dev/github.com/agentcommunity/agent-interface-discovery/aid-go)
+[![Go Reference](https://pkg.go.dev/badge/github.com/agentcommunity/agent-identity-discovery/aid-go.svg)](https://pkg.go.dev/github.com/agentcommunity/agent-identity-discovery/aid-go)
 [![Go 1.23+](https://img.shields.io/badge/go-1.23+-blue.svg)](https://golang.org/dl/)
 
 AID enables you to discover AI agents by domain name using DNS TXT records. Type a domain, get the agent's endpoint and protocol - that's it.
@@ -10,7 +10,7 @@ AID enables you to discover AI agents by domain name using DNS TXT records. Type
 ## Installation
 
 ```bash
-go get -u github.com/agentcommunity/agent-interface-discovery/aid-go
+go get -u github.com/agentcommunity/agent-identity-discovery/aid-go
 ```
 
 ## Quick Start
@@ -23,7 +23,7 @@ import (
     "log"
     "time"
 
-    "github.com/agentcommunity/agent-interface-discovery/aid-go"
+    "github.com/agentcommunity/agent-identity-discovery/aid-go"
 )
 
 func main() {
@@ -157,7 +157,7 @@ import (
     "fmt"
     "time"
 
-    "github.com/agentcommunity/agent-interface-discovery/aid-go"
+    "github.com/agentcommunity/agent-identity-discovery/aid-go"
 )
 
 func main() {
@@ -192,7 +192,7 @@ import (
     "fmt"
     "log"
 
-    "github.com/agentcommunity/agent-interface-discovery/aid-go"
+    "github.com/agentcommunity/agent-identity-discovery/aid-go"
 )
 
 func main() {
@@ -216,7 +216,7 @@ package main
 import (
     "fmt"
 
-    "github.com/agentcommunity/agent-interface-discovery/aid-go"
+    "github.com/agentcommunity/agent-identity-discovery/aid-go"
 )
 
 func main() {
@@ -248,7 +248,7 @@ import (
     "fmt"
     "time"
 
-    "github.com/agentcommunity/agent-interface-discovery/aid-go"
+    "github.com/agentcommunity/agent-identity-discovery/aid-go"
 )
 
 func main() {
@@ -266,7 +266,7 @@ func main() {
 
 ## Development
 
-This package is part of the [AID monorepo](https://github.com/agentcommunity/agent-interface-discovery). To run tests:
+This package is part of the [AID monorepo](https://github.com/agentcommunity/agent-identity-discovery). To run tests:
 
 ```bash
 # From the monorepo root
@@ -284,7 +284,7 @@ go test -v ./...
 
 ## License
 
-MIT - see [LICENSE](https://github.com/agentcommunity/agent-interface-discovery/blob/main/LICENSE) for details.
+MIT - see [LICENSE](https://github.com/agentcommunity/agent-identity-discovery/blob/main/LICENSE) for details.
 
 ## v1.1 Notes (PKA + Fallback)
 

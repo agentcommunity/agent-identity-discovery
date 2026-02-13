@@ -14,7 +14,7 @@
 
 ### Monorepo Organization
 ```
-agent-interface-discovery/
+agent-identity-discovery/
 ├── protocol/constants.yml          # Single source of truth for all constants
 ├── packages/
 │   ├── aid/                        # Core TypeScript library (published)

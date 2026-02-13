@@ -5,7 +5,7 @@
   "author": "Agent Community",
   "repository": {
     "type": "git",
-    "url": "https://github.com/agentcommunity/agent-interface-discovery.git",
+    "url": "https://github.com/agentcommunity/agent-identity-discovery.git",
     "directory": "packages/aid-py"
   },
   "private": true,

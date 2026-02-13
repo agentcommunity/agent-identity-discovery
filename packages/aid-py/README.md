@@ -1,6 +1,6 @@
 # aid-discovery (Python)
 
-> Official Python implementation of the [Agent Identity & Discovery (AID)](https://github.com/agentcommunity/agent-interface-discovery) specification.
+> Official Python implementation of the [Agent Identity & Discovery (AID)](https://github.com/agentcommunity/agent-identity-discovery) specification.
 
 [![PyPI version](https://img.shields.io/pypi/v/aid-discovery.svg?color=blue)](https://pypi.org/project/aid-discovery/)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
@@ -158,7 +158,7 @@ See the documentation “Quick Start → PKA handshake expectations” for heade
 
 ## Development
 
-This package is part of the [AID monorepo](https://github.com/agentcommunity/agent-interface-discovery). To run tests:
+This package is part of the [AID monorepo](https://github.com/agentcommunity/agent-identity-discovery). To run tests:
 
 ```bash
 # From the monorepo root
@@ -171,4 +171,4 @@ python -m pytest tests/
 
 ## License
 
-MIT - see [LICENSE](https://github.com/agentcommunity/agent-interface-discovery/blob/main/LICENSE) for details.
+MIT - see [LICENSE](https://github.com/agentcommunity/agent-identity-discovery/blob/main/LICENSE) for details.

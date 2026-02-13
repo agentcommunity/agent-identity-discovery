@@ -14,7 +14,7 @@ Built by the team at [agentcommunity.org](https://agentcommunity.org).
 
 - **Website**: [aid.agentcommunity.org](https://aid.agentcommunity.org)
 - **Docs**: [docs.agentcommunity.org/aid](https://docs.agentcommunity.org/aid)
-- **GitHub**: [github.com/agentcommunity/agent-interface-discovery](https://github.com/agentcommunity/agent-interface-discovery)
+- **GitHub**: [github.com/agentcommunity/agent-identity-discovery](https://github.com/agentcommunity/agent-identity-discovery)
 
 ## What is AID?
 
