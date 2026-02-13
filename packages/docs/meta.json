@@ -1,0 +1,8 @@
+{
+  "pages": ["index", "specification", "rationale", "security", "versioning"],
+  "groups": [
+    { "slug": "quickstart", "title": "Quick Start" },
+    { "slug": "Reference", "title": "Reference" },
+    { "slug": "Tooling", "title": "Tooling" }
+  ]
+}

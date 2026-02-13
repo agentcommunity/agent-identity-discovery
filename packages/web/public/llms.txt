@@ -1,0 +1,45 @@
+# Agent Identity & Discovery (AID) Documentation
+# https://aid.agentcommunity.org/docs
+
+## Overview
+> AID is a DNS-based discovery protocol for the agentic web.
+> Given a domain, query _agent.<domain> TXT record to find its agent endpoint.
+
+## Documentation Pages
+
+- [Agent Identity & Discovery](/docs): Overview and introduction
+- [Specification](/docs/specification): Full protocol specification (v1.1)
+- [Design Rationale](/docs/rationale): Why AID was designed this way
+- [Security](/docs/security): Security considerations
+- [Versioning](/docs/versioning): Protocol versioning strategy
+
+### Quick Start
+- [Quick Start Overview](/docs/quickstart): Getting started guide
+- [TypeScript / Node.js](/docs/quickstart/quickstart_ts): Node.js SDK
+- [Go](/docs/quickstart/quickstart_go): Go SDK
+- [Python](/docs/quickstart/quickstart_python): Python SDK
+- [Rust](/docs/quickstart/quickstart_rust): Rust SDK
+- [Java](/docs/quickstart/quickstart_java): Java SDK
+- [.NET](/docs/quickstart/quickstart_dotnet): .NET SDK
+- [Browser](/docs/quickstart/quickstart_browser): Browser SDK
+- [MCP Protocol](/docs/quickstart/quickstart_mcp): MCP integration
+- [A2A Protocol](/docs/quickstart/quickstart_a2a): A2A integration
+- [OpenAPI](/docs/quickstart/quickstart_openapi): OpenAPI integration
+
+### Reference
+- [Discovery API](/docs/Reference/discovery_api): API reference
+- [Protocols](/docs/Reference/protocols): Supported protocols
+- [Identity & PKA](/docs/Reference/identity_pka): Public key attestation
+- [Well-Known JSON](/docs/Reference/well_known_json): .well-known fallback
+- [Troubleshooting](/docs/Reference/troubleshooting): Common issues
+- [What's New](/docs/Reference/whats_new): Changelog
+
+### Tooling
+- [aid-doctor CLI](/docs/Tooling/aid_doctor): CLI diagnostic tool
+- [aid-engine](/docs/Tooling/aid_engine): Core business logic engine
+- [Conformance Suite](/docs/Tooling/conformance): Testing conformance
+
+## Raw Markdown API
+Each page is available as raw markdown at /api/docs/{slug}
+Example: /api/docs/specification
+Add ?format=json for structured JSON with title, description, content, and headings.

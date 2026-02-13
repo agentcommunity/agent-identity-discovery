@@ -1,0 +1,11 @@
+{
+  "title": "Reference",
+  "pages": [
+    "discovery_api",
+    "protocols",
+    "identity_pka",
+    "well_known_json",
+    "troubleshooting",
+    "whats_new"
+  ]
+}

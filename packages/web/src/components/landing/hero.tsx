@@ -126,7 +126,7 @@ export function Hero() {
               asChild
               className="group shadow-soft hover:shadow-soft-md transition-all duration-300 hover:scale-105"
             >
-              <Link href="https://docs.agentcommunity.org/aid/specification">
+              <Link href="/docs/specification">
                 Read the Specification
                 <ExternalLink className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </Link>

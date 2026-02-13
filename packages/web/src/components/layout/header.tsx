@@ -70,7 +70,7 @@ export function Header() {
   }, [pathname]);
 
   const navigation = [
-    { name: 'Docs', href: 'https://docs.agentcommunity.org/aid', external: true },
+    { name: 'Docs', href: '/docs', external: false },
     {
       name: 'GitHub',
       href: 'https://github.com/agentcommunity/agent-identity-discovery',

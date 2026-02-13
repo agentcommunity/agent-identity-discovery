@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { PkaKeyGenerator } from '@/components/ui/pka-key-generator';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
@@ -35,14 +36,9 @@ export function SecurityFields({ pka, kid, onChange }: SecurityFieldsProps) {
       </div>
       <p className="text-xs text-muted-foreground">
         Learn more about PKA in{' '}
-        <a
-          href="https://docs.agentcommunity.org/aid/Reference/identity_pka"
-          target="_blank"
-          rel="noreferrer"
-          className="underline"
-        >
+        <Link href="/docs/Reference/identity_pka" className="underline">
           the docs
-        </a>
+        </Link>
         . Private key is generated locally and not saved by the app.
       </p>
       <Collapsible>
