@@ -14,7 +14,7 @@
     "node": ">=20.10"
   },
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "pnpm -w exec eslint --max-warnings 0 packages/web/src packages/web/next.config.js packages/web/postcss.config.js packages/web/tailwind.config.js packages/web/vitest.config.ts",
