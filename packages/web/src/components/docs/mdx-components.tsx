@@ -9,24 +9,21 @@ function isInternalHref(href: string | undefined): boolean {
 }
 
 function MdxLink({ href, children, ...props }: ComponentPropsWithoutRef<'a'>) {
+  // Heading anchor links (from rehype-autolink-headings) should not have underline
+  const isHeadingAnchor = typeof href === 'string' && href.startsWith('#');
+  const linkClass = isHeadingAnchor
+    ? 'no-underline text-inherit hover:text-foreground transition-colors'
+    : 'font-medium text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground transition-colors';
+
   if (isInternalHref(href)) {
     return (
-      <Link
-        href={href ?? '#'}
-        className="font-medium text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground transition-colors"
-      >
+      <Link href={href ?? '#'} className={linkClass}>
         {children}
       </Link>
     );
   }
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="font-medium text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground transition-colors"
-      {...props}
-    >
+    <a href={href} target="_blank" rel="noopener noreferrer" className={linkClass} {...props}>
       {children}
     </a>
   );
@@ -116,7 +113,7 @@ function MdxH1({ children, ...props }: ComponentPropsWithoutRef<'h1'>) {
 function MdxH2({ children, ...props }: ComponentPropsWithoutRef<'h2'>) {
   return (
     <h2
-      className="mt-10 mb-4 text-2xl font-semibold tracking-tight text-foreground border-b border-border pb-2"
+      className="mt-12 mb-4 text-2xl font-semibold tracking-tight text-foreground pt-2"
       {...props}
     >
       {children}

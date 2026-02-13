@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Menu, X } from 'lucide-react';
+import { BookOpen, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DocsSidebar } from './docs-sidebar';
 import type { Navigation } from '@/lib/docs';
@@ -18,12 +18,12 @@ export function DocsLayout({ navigation, children }: DocsLayoutProps) {
     <div className="flex flex-1 min-h-0">
       {/* Mobile sidebar toggle */}
       <Button
-        variant="ghost"
+        variant="default"
         size="icon"
         onClick={() => setSidebarOpen(!sidebarOpen)}
-        className="fixed bottom-4 right-4 z-50 lg:hidden h-10 w-10 rounded-full shadow-soft-lg bg-background border border-border"
+        className="fixed bottom-4 right-4 z-50 lg:hidden h-10 w-10 rounded-full shadow-soft-lg"
       >
-        {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        {sidebarOpen ? <X className="h-5 w-5" /> : <BookOpen className="h-5 w-5" />}
         <span className="sr-only">Toggle docs sidebar</span>
       </Button>
 

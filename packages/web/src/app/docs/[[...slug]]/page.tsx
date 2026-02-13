@@ -8,6 +8,7 @@ import { getDocBySlug, getAllDocSlugs } from '@/lib/docs';
 import { mdxComponents } from '@/components/docs/mdx-components';
 import { AiToolbar } from '@/components/docs/ai-toolbar';
 import { Toc } from '@/components/docs/toc';
+import { DocsFooter } from '@/components/docs/docs-footer';
 
 interface PageProps {
   params: Promise<{ slug?: string[] }>;
@@ -27,10 +28,24 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const doc = getDocBySlug(slug);
   if (!doc) return {};
 
+  const ogSlug = slug === 'index' ? '' : slug;
+  const ogUrl = `/api/og/docs?title=${encodeURIComponent(doc.title)}&description=${encodeURIComponent(doc.description)}&slug=${encodeURIComponent(ogSlug)}`;
+
   return {
     title: doc.title,
     description: doc.description,
     alternates: { canonical: `/docs${slug === 'index' ? '' : `/${slug}`}` },
+    openGraph: {
+      title: doc.title,
+      description: doc.description,
+      images: [{ url: ogUrl, width: 1200, height: 630, alt: doc.title }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: doc.title,
+      description: doc.description,
+      images: [ogUrl],
+    },
   };
 }
 
@@ -69,6 +84,8 @@ export default async function DocPage({ params }: PageProps) {
             components={mdxComponents}
           />
         </div>
+
+        <DocsFooter />
       </article>
 
       {/* TOC — right sidebar on desktop */}
