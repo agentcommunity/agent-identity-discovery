@@ -1,8 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { GeistMono } from 'geist/font/mono';
 import { GeistSans } from 'geist/font/sans';
-import { Toaster } from 'sonner';
-import { Header } from '@/components/layout/header';
 import {
   getMetadataBase,
   getSiteUrl,
@@ -132,11 +130,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           suppressHydrationWarning
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
         />
-        <div className="flex h-dvh flex-col overflow-hidden">
-          <Header />
-          <main className="flex-1 min-h-0 overflow-y-auto">{children}</main>
-        </div>
-        <Toaster />
+        {children}
       </body>
     </html>
   );

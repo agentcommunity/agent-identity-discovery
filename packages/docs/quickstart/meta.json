@@ -1,0 +1,16 @@
+{
+  "title": "Quick Start",
+  "pages": [
+    "index",
+    "quickstart_ts",
+    "quickstart_go",
+    "quickstart_python",
+    "quickstart_rust",
+    "quickstart_java",
+    "quickstart_dotnet",
+    "quickstart_browser",
+    "quickstart_mcp",
+    "quickstart_a2a",
+    "quickstart_openapi"
+  ]
+}
