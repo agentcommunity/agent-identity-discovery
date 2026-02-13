@@ -1,6 +1,8 @@
-import type { ComponentPropsWithoutRef } from 'react';
+import type { ComponentPropsWithoutRef, ReactElement, ReactNode } from 'react';
 import Link from 'next/link';
 import { Callout } from './callout';
+import { HeadingLink } from './heading-link';
+import { MermaidDiagram } from './mermaid-diagram';
 
 /** Detect whether a URL is internal (starts with / or #). */
 function isInternalHref(href: string | undefined): boolean {
@@ -102,64 +104,108 @@ function MdxP({ children, ...props }: ComponentPropsWithoutRef<'p'>) {
   );
 }
 
-function MdxH1({ children, ...props }: ComponentPropsWithoutRef<'h1'>) {
+function MdxH1({ children, id, ...props }: ComponentPropsWithoutRef<'h1'>) {
   return (
     <h1
-      className="mt-8 mb-4 scroll-mt-20 text-3xl font-bold tracking-tight text-foreground"
+      id={id}
+      className="group mt-8 mb-4 scroll-mt-20 text-3xl font-bold tracking-tight text-foreground"
       {...props}
     >
       {children}
+      <HeadingLink id={id} />
     </h1>
   );
 }
 
-function MdxH2({ children, ...props }: ComponentPropsWithoutRef<'h2'>) {
+function MdxH2({ children, id, ...props }: ComponentPropsWithoutRef<'h2'>) {
   return (
     <h2
-      className="mt-12 mb-4 scroll-mt-20 pt-2 text-2xl font-semibold tracking-tight text-foreground"
+      id={id}
+      className="group mt-12 mb-4 scroll-mt-20 pt-2 text-2xl font-semibold tracking-tight text-foreground"
       {...props}
     >
       {children}
+      <HeadingLink id={id} />
     </h2>
   );
 }
 
-function MdxH3({ children, ...props }: ComponentPropsWithoutRef<'h3'>) {
+function MdxH3({ children, id, ...props }: ComponentPropsWithoutRef<'h3'>) {
   return (
     <h3
-      className="mt-8 mb-3 scroll-mt-20 text-xl font-semibold tracking-tight text-foreground"
+      id={id}
+      className="group mt-8 mb-3 scroll-mt-20 text-xl font-semibold tracking-tight text-foreground"
       {...props}
     >
       {children}
+      <HeadingLink id={id} />
     </h3>
   );
 }
 
-function MdxH4({ children, ...props }: ComponentPropsWithoutRef<'h4'>) {
+function MdxH4({ children, id, ...props }: ComponentPropsWithoutRef<'h4'>) {
   return (
-    <h4 className="mt-6 mb-3 scroll-mt-20 text-lg font-semibold text-foreground" {...props}>
+    <h4
+      id={id}
+      className="group mt-6 mb-3 scroll-mt-20 text-lg font-semibold text-foreground"
+      {...props}
+    >
       {children}
+      <HeadingLink id={id} />
     </h4>
   );
 }
 
-function MdxH5({ children, ...props }: ComponentPropsWithoutRef<'h5'>) {
+function MdxH5({ children, id, ...props }: ComponentPropsWithoutRef<'h5'>) {
   return (
-    <h5 className="mt-4 mb-2 scroll-mt-20 text-base font-semibold text-foreground" {...props}>
+    <h5
+      id={id}
+      className="group mt-4 mb-2 scroll-mt-20 text-base font-semibold text-foreground"
+      {...props}
+    >
       {children}
+      <HeadingLink id={id} />
     </h5>
   );
 }
 
-function MdxH6({ children, ...props }: ComponentPropsWithoutRef<'h6'>) {
+function MdxH6({ children, id, ...props }: ComponentPropsWithoutRef<'h6'>) {
   return (
-    <h6 className="mt-4 mb-2 scroll-mt-20 text-sm font-semibold text-foreground" {...props}>
+    <h6
+      id={id}
+      className="group mt-4 mb-2 scroll-mt-20 text-sm font-semibold text-foreground"
+      {...props}
+    >
       {children}
+      <HeadingLink id={id} />
     </h6>
   );
 }
 
+/** Extract text content from React children recursively. */
+function extractText(node: ReactNode): string {
+  if (typeof node === 'string') return node;
+  if (typeof node === 'number') return String(node);
+  if (!node) return '';
+  if (Array.isArray(node)) return node.map((n: ReactNode) => extractText(n)).join('');
+  if (typeof node === 'object' && 'props' in node) {
+    const el = node as ReactElement<{ children?: ReactNode }>;
+    return extractText(el.props.children);
+  }
+  return '';
+}
+
 function MdxPre({ children, ...props }: ComponentPropsWithoutRef<'pre'>) {
+  // Detect mermaid code blocks: <pre><code class="language-mermaid">...</code></pre>
+  if (children && typeof children === 'object' && 'props' in children) {
+    const child = children as ReactElement<{ className?: string; children?: ReactNode }>;
+    const className = child.props.className ?? '';
+    if (typeof className === 'string' && className.includes('language-mermaid')) {
+      const chart = extractText(child.props.children);
+      return <MermaidDiagram chart={chart} />;
+    }
+  }
+
   return (
     <pre
       className="my-4 overflow-x-auto rounded-lg border border-border bg-muted p-4 text-sm"
