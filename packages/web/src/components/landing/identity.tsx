@@ -55,9 +55,7 @@ export function Identity() {
                     </ul>
                     <div>
                       <Button variant="outline" asChild>
-                        <Link href="https://docs.agentcommunity.org/aid/Reference/identity_pka">
-                          Learn more
-                        </Link>
+                        <Link href="/docs/Reference/identity_pka">Learn more</Link>
                       </Button>
                     </div>
                   </div>

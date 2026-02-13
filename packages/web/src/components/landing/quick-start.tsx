@@ -2,6 +2,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Compass, Rocket, ShieldCheck } from 'lucide-react';
@@ -185,31 +186,13 @@ export function QuickStart() {
                   />
                   <div className="flex flex-wrap gap-2 justify-center">
                     <Button variant="ghost" asChild className="text-sm">
-                      <a
-                        href="https://docs.agentcommunity.org/aid/quickstart/index"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Quick Start Guide
-                      </a>
+                      <Link href="/docs/quickstart">Quick Start Guide</Link>
                     </Button>
                     <Button variant="ghost" asChild className="text-sm">
-                      <a
-                        href="https://docs.agentcommunity.org/aid/specification"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Specification
-                      </a>
+                      <Link href="/docs/specification">Specification</Link>
                     </Button>
                     <Button variant="ghost" asChild className="text-sm">
-                      <a
-                        href="https://docs.agentcommunity.org/aid/Tooling/aid_doctor"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        aid-doctor CLI
-                      </a>
+                      <Link href="/docs/Tooling/aid_doctor">aid-doctor CLI</Link>
                     </Button>
                   </div>
                 </div>
@@ -224,40 +207,16 @@ export function QuickStart() {
                   </div>
                   <div className="flex flex-wrap gap-2 justify-center">
                     <Button variant="ghost" asChild className="text-sm">
-                      <a
-                        href="https://docs.agentcommunity.org/aid/Tooling/aid_doctor"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        aid-doctor CLI
-                      </a>
+                      <Link href="/docs/Tooling/aid_doctor">aid-doctor CLI</Link>
                     </Button>
                     <Button variant="ghost" asChild className="text-sm">
-                      <a
-                        href="https://docs.agentcommunity.org/aid/Tooling/aid_engine"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Engine Docs
-                      </a>
+                      <Link href="/docs/Tooling/aid_engine">Engine Docs</Link>
                     </Button>
                     <Button variant="ghost" asChild className="text-sm">
-                      <a
-                        href="https://docs.agentcommunity.org/aid/Tooling/conformance"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Conformance Suite
-                      </a>
+                      <Link href="/docs/Tooling/conformance">Conformance Suite</Link>
                     </Button>
                     <Button variant="ghost" asChild className="text-sm">
-                      <a
-                        href="https://docs.agentcommunity.org/aid/Reference/identity_pka"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        PKA Identity
-                      </a>
+                      <Link href="/docs/Reference/identity_pka">PKA Identity</Link>
                     </Button>
                   </div>
                 </div>
@@ -267,14 +226,9 @@ export function QuickStart() {
 
           {/* Docs link */}
           <div className="mt-8 text-center">
-            <a
-              href="https://docs.agentcommunity.org/aid"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm font-medium text-primary hover:underline"
-            >
-              Need more? Read the full Quick Start guide ↗︎
-            </a>
+            <Link href="/docs" className="text-sm font-medium text-primary hover:underline">
+              Need more? Read the full Quick Start guide →
+            </Link>
           </div>
         </div>
       </div>
