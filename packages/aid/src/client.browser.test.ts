@@ -63,9 +63,12 @@ describe('Browser client', () => {
   });
 
   describe('protocol resolution', () => {
-    it('queries underscore and then base when protocol is specified', async () => {
+    it('queries underscore, plain, and then base when protocol is specified', async () => {
       const dohResponses: Record<string, unknown> = {
         'https://cloudflare-dns.com/dns-query?name=_agent._mcp.example.com&type=TXT': {
+          Status: 2 /* NXDOMAIN */,
+        },
+        'https://cloudflare-dns.com/dns-query?name=_agent.mcp.example.com&type=TXT': {
           Status: 2 /* NXDOMAIN */,
         },
         'https://cloudflare-dns.com/dns-query?name=_agent.example.com&type=TXT': {
@@ -100,11 +103,11 @@ describe('Browser client', () => {
         expect.any(Object),
       );
       expect(g.fetch).toHaveBeenCalledWith(
-        'https://cloudflare-dns.com/dns-query?name=_agent.example.com&type=TXT',
+        'https://cloudflare-dns.com/dns-query?name=_agent.mcp.example.com&type=TXT',
         expect.any(Object),
       );
-      expect(g.fetch).not.toHaveBeenCalledWith(
-        'https://cloudflare-dns.com/dns-query?name=_agent.mcp.example.com&type=TXT',
+      expect(g.fetch).toHaveBeenCalledWith(
+        'https://cloudflare-dns.com/dns-query?name=_agent.example.com&type=TXT',
         expect.any(Object),
       );
 

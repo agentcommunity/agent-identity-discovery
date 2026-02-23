@@ -64,17 +64,17 @@ The record **MUST** be a single string of semicolon-delimited `key=value` pairs.
 
 Clients **MUST** recognize single-letter lowercase aliases for all keys. A record **MUST NOT** include both a full key and its alias. Key comparisons are case-insensitive.
 
-| Key       | Alias | Requirement  | Description                                                                                           | Example                            |
-| --------- | ----- | ------------ | ----------------------------------------------------------------------------------------------------- | ---------------------------------- |
-| `version` | `v`   | **Required** | The specification version. For v1 it **MUST** be `aid1`.                                              | `v=aid1`                           |
-| `uri`     | `u`   | **Required** | An absolute `https://` URL for a remote agent, or a package/locator for local agents. See Appendix B. | `u=https://api.example.com/mcp`    |
-| `proto`   | `p`   | **Required** | The protocol token from Appendix B.                                                                   | `p=mcp`                            |
-| `auth`    | `a`   | Recommended  | An authentication hint token from Appendix A.                                                         | `a=pat`                            |
-| `desc`    | `s`   | Optional     | Short, human-readable text (≤ 60 UTF-8 bytes) for UI display.                                         | `s=Primary AI Gateway`             |
-| `docs`    | `d`   | Optional     | Absolute `https://` URL to human-readable documentation.                                              | `d=https://docs.example.com/agent` |
-| `dep`     | `e`   | Optional     | ISO 8601 UTC timestamp indicating deprecation.                                                        | `e=2026-01-01T00:00:00Z`           |
-| `pka`     | `k`   | Optional     | Multibase-encoded Ed25519 public key for endpoint proof. Requires `kid` when present.                 | `k=z...`                           |
-| `kid`     | `i`   | Conditional  | 1–6 char rotation id `[a-z0-9]`. Required when `pka` is present.                                      | `i=g1`                             |
+| Key     | Alias | Requirement  | Description                                                                                           | Example                            |
+| ------- | ----- | ------------ | ----------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| `v`     | `-`   | **Required** | The specification version. For v1 it **MUST** be `aid1`.                                              | `v=aid1`                           |
+| `uri`   | `u`   | **Required** | An absolute `https://` URL for a remote agent, or a package/locator for local agents. See Appendix B. | `u=https://api.example.com/mcp`    |
+| `proto` | `p`   | **Required** | The protocol token from Appendix B.                                                                   | `p=mcp`                            |
+| `auth`  | `a`   | Recommended  | An authentication hint token from Appendix A.                                                         | `a=pat`                            |
+| `desc`  | `s`   | Optional     | Short, human-readable text (≤ 60 UTF-8 bytes) for UI display.                                         | `s=Primary AI Gateway`             |
+| `docs`  | `d`   | Optional     | Absolute `https://` URL to human-readable documentation.                                              | `d=https://docs.example.com/agent` |
+| `dep`   | `e`   | Optional     | ISO 8601 UTC timestamp indicating deprecation.                                                        | `e=2026-01-01T00:00:00Z`           |
+| `pka`   | `k`   | Optional     | Multibase-encoded Ed25519 public key for endpoint proof. Requires `kid` when present.                 | `k=z...`                           |
+| `kid`   | `i`   | Conditional  | 1–6 char rotation id `[a-z0-9]`. Required when `pka` is present.                                      | `i=g1`                             |
 
 ### **2.2. Examples**
 
@@ -108,7 +108,7 @@ An AID Client, when given a `<domain>`, **MUST** perform these steps:
 
 1.  Normalize domain. If the domain contains non-ASCII characters, convert it to its Punycode A-label representation ([RFC5890]).
 2.  DNS lookup. Query the `TXT` record for `_agent.<domain>`. If no record is found or the lookup fails, the client MAY attempt a `.well-known` fallback (Appendix E). If both fail, stop with an error.
-3.  Parse and validate. Parse the record's `key=value` pairs. Key comparisons **MUST** be case-insensitive. The record is invalid if it lacks `v=aid1` and both a `uri` (`u`) and a protocol (`proto` or `p`). Clients **MUST** recognize single-letter aliases for all keys.
+3.  Parse and validate. Parse the record's `key=value` pairs. Key comparisons **MUST** be case-insensitive. The record is invalid if it lacks `v=aid1`, or if it lacks either a `uri` (`u`) or a protocol (`proto` or `p`). Clients **MUST** recognize single-letter aliases for all keys.
 4.  Optional metadata. If `docs` (`d`) is present, clients MAY display it. If `dep` (`e`) is in the future, clients SHOULD warn. If `dep` is in the past, clients SHOULD fail gracefully.
 5.  Endpoint proof. If `pka` (`k`) is present, clients **MUST** perform the handshake in Appendix D. Use HTTP Message Signatures (RFC 9421) with Ed25519. Clients SHOULD warn on downgrade if a previously present `pka` is removed.
 6.  Return result. If validation succeeds, return the discovered details. If the client does not support the discovered protocol token, it **MUST** fail with the appropriate error code.
@@ -140,7 +140,7 @@ _agent._a2a.example.com. 300 IN TXT "v=aid1;p=a2a;uri=..."
 **Client behavior:**
 
 - By default, clients query the base `_agent.<domain>`.
-- When a specific protocol is explicitly requested (by the application), clients **MAY** first query the protocol-specific subdomain `_agent._<proto>.<domain>` and, if not found, fall back to the base record.
+- When a specific protocol is explicitly requested (by the application), clients **MAY** query in this order: `_agent._<proto>.<domain>`, then `_agent.<proto>.<domain>`, then the base record `_agent.<domain>`.
 - Providers that publish only the base record remain fully compliant.
 
 ---

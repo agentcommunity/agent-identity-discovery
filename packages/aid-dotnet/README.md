@@ -6,9 +6,9 @@ Minimal .NET library for Agent Identity & Discovery (AID) parsing, discovery, an
 - No external runtime dependencies
 - DNS-first discovery included via DNS-over-HTTPS (DoH)
 
-## v1.1 Notes (PKA + .well-known)
+## v1.2 Notes (PKA + .well-known)
 
-This library supports the v1.1 fields `pka`/`kid` and the PKA handshake (Ed25519 HTTP Message Signatures). It also includes a guarded `.well-known` fallback helper for environments where DNS is restricted.
+This library supports the v1.2 fields `pka`/`kid` and the PKA handshake (Ed25519 HTTP Message Signatures). It also includes a guarded `.well-known` fallback helper for environments where DNS is restricted.
 
 - Multibase public key: `pka` uses base58btc (`z...`).
 - Handshake: verifies required covered fields, `created` ±300s, HTTP `Date` ±300s, `alg="ed25519"`, `keyid` matches `kid`.
@@ -92,4 +92,4 @@ If the initial request to a discovered URI returns a redirect to a different ori
 
 ## More on PKA
 
-See the documentation “Quick Start → PKA handshake expectations” for the exact header coverage, algorithm, timestamps, and key format enforced by v1.1.
+See the documentation “Quick Start → PKA handshake expectations” for the exact header coverage, algorithm, timestamps, and key format enforced by v1.2.

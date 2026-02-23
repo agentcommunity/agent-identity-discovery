@@ -132,6 +132,47 @@ const verifyVersionAlignment = async (repoRoot) => {
     mismatches.push(`AGENTS.md mismatch: expected heading "### v${minor} notes (Final)"`);
   }
 
+  const legacyVersionRowPattern = /\|\s*`version`\s*\|\s*`v`\s*\|/m;
+  if (legacyVersionRowPattern.test(specContent)) {
+    mismatches.push(
+      'Specification mismatch: packages/docs/specification.md uses legacy "version" field row; canonical key is "v"',
+    );
+  }
+
+  const canonicalVRowPattern = /\|\s*`v`\s*\|[^|]*\|\s*\*\*Required\*\*/m;
+  if (!canonicalVRowPattern.test(specContent)) {
+    mismatches.push(
+      'Specification mismatch: packages/docs/specification.md key table must contain required canonical "v" field',
+    );
+  }
+
+  const docsThatMustTrackMinor = [
+    path.join('packages', 'docs', 'Reference', 'discovery_api.md'),
+    path.join('packages', 'docs', 'Reference', 'well_known_json.md'),
+    path.join('packages', 'docs', 'Reference', 'identity_pka.md'),
+    path.join('packages', 'docs', 'quickstart', 'index.md'),
+    path.join('packages', 'docs', 'Tooling', 'aid_doctor.md'),
+    path.join('packages', 'docs', 'rationale.md'),
+  ];
+  const [major, minorNumberRaw] = minor.split('.');
+  const minorNumber = Number.parseInt(minorNumberRaw, 10);
+  if (Number.isFinite(minorNumber) && minorNumber > 0) {
+    const staleMinorPattern = new RegExp(`v${major}\\.${minorNumber - 1}(?:\\.\\d+)?`, 'i');
+    const docsContent = await Promise.all(
+      docsThatMustTrackMinor.map(async (relativePath) => ({
+        relativePath,
+        content: await readUtf8(path.join(repoRoot, relativePath)),
+      })),
+    );
+    for (const entry of docsContent) {
+      if (staleMinorPattern.test(entry.content)) {
+        mismatches.push(
+          `Docs version mismatch: ${entry.relativePath} still references a prior minor series`,
+        );
+      }
+    }
+  }
+
   return mismatches;
 };
 

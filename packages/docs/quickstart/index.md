@@ -167,7 +167,7 @@ const { record } = await discover('supabase.agentcommunity.org');
 console.log(`Found ${record.proto} agent at ${record.uri}`);
 ```
 
-#### PKA handshake expectations (v1.1)
+#### PKA handshake expectations (v1.2)
 
 Clients perform an Ed25519 HTTP Message Signatures handshake when a record includes `pka`/`kid`. Implementations enforce:
 

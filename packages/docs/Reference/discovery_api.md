@@ -4,15 +4,15 @@ description: 'Cross-language discover() options and behaviors'
 icon: material/magnify-scan
 ---
 
-# Discovery API (v1.1)
+# Discovery API (v1.2)
 
 Cross-language parity for AID `discover()` wrappers with consistent security and fallback behavior.
 
 ## Common behaviors
 
 - IDNA: Normalize domains to A-label (Punycode) before DNS.
-- DNS-first: Query `_agent.<domain>`. When `protocol` is specified, try `_agent._<proto>.<domain>` then `_agent.<proto>.<domain>` before base.
-- TXT parsing: Enforce v1.1 record rules (aliases, schemes, metadata constraints).
+- DNS-first: Without `protocol`, query `_agent.<domain>`. With `protocol`, query `_agent._<proto>.<domain>`, then `_agent.<proto>.<domain>`, then `_agent.<domain>`.
+- TXT parsing: Enforce v1.2 record rules (aliases, schemes, metadata constraints).
 - PKA: When `pka`/`kid` present, perform Ed25519 HTTP Message Signatures handshake with exact covered fields set.
 - Well-known fallback: Only on `ERR_NO_RECORD` or `ERR_DNS_LOOKUP_FAILED`. HTTPS JSON, ≤64KB, ~2s timeout, no redirects. Successful fallback uses `TTL=300`.
 - Redirect policy: Do not auto-follow redirects for handshake or well-known.
@@ -43,7 +43,7 @@ Cross-language parity for AID `discover()` wrappers with consistent security and
 ## Notes
 
 - Loopback relax: allowed only for `.well-known` fallback and only on loopback hosts; env/flag gated per language (never for TXT).
-- Rust PKA is behind the `handshake` feature; enable it to run handshake verification.
+- Rust enables PKA handshake and `.well-known` fallback by default. `default-features = false` is available for minimal/parser-only builds.
 - Test your implementation using the [aid-doctor CLI](../Tooling/aid_doctor.md) tool for real-world validation.
 
 ## See also

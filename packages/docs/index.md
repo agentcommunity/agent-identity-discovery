@@ -46,7 +46,7 @@ The entire mechanism is a single DNS lookup. It's simple, decentralized, and bui
 1.  **Publish:** A provider (e.g., `supabase.com`) adds one `TXT` record to their DNS at a standard location: `_agent.supabase.com`.
 2.  **Discover:** A client, given `supabase.com`, makes a single DNS query for the `TXT` record at that address.
 3.  **Connect:** The record contains the agent's `uri`. The client uses it to connect directly.
-4.  **Verify:** If a public key (`pka`) is present, the client performs a quick cryptographic handshake to prove the server's identity, ensuring a secure connection. (Optional)
+4.  **Verify:** If a public key (`pka`) is present, the client performs a cryptographic handshake to prove the server's identity before use.
 
 [Try this flow now](https://aid.agentcommunity.org/workbench)
 

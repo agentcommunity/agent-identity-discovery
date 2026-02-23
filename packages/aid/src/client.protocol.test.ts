@@ -10,11 +10,14 @@ describe('Client protocol resolution', () => {
     vi.restoreAllMocks();
   });
 
-  it('queries underscore and then base when protocol is specified', async () => {
+  it('queries underscore, plain, and then base when protocol is specified', async () => {
     const { query } = await import('dns-query');
     (query as any).mockImplementation(async ({ question }: { question: { name: string } }) => {
       if (question.name === '_agent._mcp.example.com') {
         // Simulate no record found for the protocol-specific query
+        return { rcode: 'NXDOMAIN', answers: [] };
+      }
+      if (question.name === '_agent.mcp.example.com') {
         return { rcode: 'NXDOMAIN', answers: [] };
       }
       if (question.name === '_agent.example.com') {
@@ -42,13 +45,13 @@ describe('Client protocol resolution', () => {
     );
     expect(query).toHaveBeenCalledWith(
       expect.objectContaining({
-        question: expect.objectContaining({ name: '_agent.example.com' }),
+        question: expect.objectContaining({ name: '_agent.mcp.example.com' }),
       }),
       expect.any(Object),
     );
-    expect(query).not.toHaveBeenCalledWith(
+    expect(query).toHaveBeenCalledWith(
       expect.objectContaining({
-        question: expect.objectContaining({ name: '_agent.mcp.example.com' }),
+        question: expect.objectContaining({ name: '_agent.example.com' }),
       }),
       expect.any(Object),
     );

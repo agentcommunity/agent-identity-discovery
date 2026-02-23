@@ -142,10 +142,7 @@ public final class Parser {
         throw new AidError("ERR_INVALID_TXT", "dep MUST be an ISO 8601 UTC timestamp (e.g., 2026-01-01T00:00:00Z)");
       }
       try {
-        java.time.Instant dep = java.time.Instant.parse(depVal);
-        if (dep.isBefore(java.time.Instant.now())) {
-          throw new AidError("ERR_INVALID_TXT", "Record is deprecated as of " + depVal);
-        }
+        java.time.Instant.parse(depVal);
       } catch (java.time.format.DateTimeParseException e) {
         throw new AidError("ERR_INVALID_TXT", "dep MUST be an ISO 8601 UTC timestamp (e.g., 2026-01-01T00:00:00Z)");
       }

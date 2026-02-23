@@ -4,7 +4,7 @@ description: 'Canonical JSON payload, client guardrails, and TTL policy'
 icon: material/file-code
 ---
 
-# .well-known JSON (v1.1)
+# .well-known JSON (v1.2)
 
 Clients may fall back to a JSON document at `/.well-known/agent` only when DNS discovery fails with `ERR_NO_RECORD` or `ERR_DNS_LOOKUP_FAILED`.
 

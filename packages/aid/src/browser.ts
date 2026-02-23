@@ -63,7 +63,7 @@ export interface DiscoveryOptions {
   protocol?: string;
   /** Custom DNS-over-HTTPS provider URL (default: Cloudflare) */
   dohProvider?: string;
-  /** Enable .well-known fallback on ERR_NO_RECORD (default: true) */
+  /** Enable .well-known fallback on ERR_NO_RECORD or ERR_DNS_LOOKUP_FAILED (default: true) */
   wellKnownFallback?: boolean;
   /** Timeout for .well-known fetch in milliseconds (default: 2000) */
   wellKnownTimeoutMs?: number;
@@ -219,7 +219,7 @@ async function queryTxtRecordsDoH(
 
     if (!response.ok) {
       throw new AidError(
-        'ERR_SECURITY',
+        'ERR_DNS_LOOKUP_FAILED',
         `DoH query failed: ${response.status} ${response.statusText}`,
       );
     }
@@ -253,13 +253,16 @@ async function queryTxtRecordsDoH(
 
     if (error instanceof Error) {
       if (error.name === 'AbortError') {
-        throw new AidError('ERR_SECURITY', `DNS query timeout for ${queryName}`);
+        throw new AidError('ERR_DNS_LOOKUP_FAILED', `DNS query timeout for ${queryName}`);
       }
 
-      throw new AidError('ERR_SECURITY', `DNS query failed for ${queryName}: ${error.message}`);
+      throw new AidError(
+        'ERR_DNS_LOOKUP_FAILED',
+        `DNS query failed for ${queryName}: ${error.message}`,
+      );
     }
 
-    throw new AidError('ERR_SECURITY', `DNS query failed for ${queryName}: ${error}`);
+    throw new AidError('ERR_DNS_LOOKUP_FAILED', `DNS query failed for ${queryName}: ${error}`);
   }
 }
 
@@ -319,20 +322,34 @@ export async function discover(
   };
 
   const runDns = async (): Promise<DiscoveryResult> => {
-    // If protocol is explicitly requested, try that first, then fall back to base
-    if (protocol) {
-      const underscoreName = constructQueryName(domain, protocol, true);
+    if (!protocol) {
+      return tryQuery(constructQueryName(domain));
+    }
+
+    // Protocol requested: try underscore form, plain form, then base.
+    const names = [
+      constructQueryName(domain, protocol, true),
+      constructQueryName(domain, protocol, false),
+      constructQueryName(domain),
+    ];
+
+    let lastNoRecord: AidError | null = null;
+    for (const name of names) {
       try {
-        return await tryQuery(underscoreName);
+        return await tryQuery(name);
       } catch (error) {
-        if (!(error instanceof AidError) || error.errorCode !== 'ERR_NO_RECORD') {
-          throw error;
+        if (error instanceof AidError && error.errorCode === 'ERR_NO_RECORD') {
+          lastNoRecord = error;
+          continue;
         }
-        // Fall through to base query
+        throw error;
       }
     }
-    // Base query
-    return tryQuery(constructQueryName(domain));
+
+    throw (
+      lastNoRecord ??
+      new AidError('ERR_NO_RECORD', `No valid AID record found for ${constructQueryName(domain)}`)
+    );
   };
 
   try {
@@ -341,7 +358,7 @@ export async function discover(
     if (
       wellKnownFallback &&
       error instanceof AidError &&
-      (error.errorCode === 'ERR_NO_RECORD' || error.errorCode === 'ERR_SECURITY') // ERR_SECURITY can be a timeout
+      (error.errorCode === 'ERR_NO_RECORD' || error.errorCode === 'ERR_DNS_LOOKUP_FAILED')
     ) {
       try {
         const { record, queryName } = await fetchWellKnown(domain, wellKnownTimeoutMs);

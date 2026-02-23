@@ -8,14 +8,14 @@ extra_css_class: aid-page
 
 [View raw markdown](https://github.com/agentcommunity/agent-identity-discovery/raw/main/packages/docs/Understand/rationale.md)
 
-## **Agent Identity & Discovery (AID) v1.1: Rationale and Trade-offs**
+## **Agent Identity & Discovery (AID) v1.2: Rationale and Trade-offs**
 
 **Date:** 31 August 2025
-**Document Status:** Companion to the AID v1.1 Specification
+**Document Status:** Companion to the AID v1.2 Specification
 
 ### **1. Introduction**
 
-This document provides the rationale behind the design decisions in the Agent Identity & Discovery (AID) v1.1 specification. A technical specification defines _what_ a standard is; this document explains _why_ it is that way. It outlines the core philosophy, highlights the protocol's strengths, defines its intentional limitations, and discusses the alternatives that were considered and rejected. Understanding these trade-offs is crucial for implementers, critics, and future contributors to the standard.
+This document provides the rationale behind the design decisions in the Agent Identity & Discovery (AID) v1.2 specification. A technical specification defines _what_ a standard is; this document explains _why_ it is that way. It outlines the core philosophy, highlights the protocol's strengths, defines its intentional limitations, and discusses the alternatives that were considered and rejected. Understanding these trade-offs is crucial for implementers, critics, and future contributors to the standard.
 
 ### **2. Core Philosophy: Pragmatism, Simplicity, and Decentralization**
 
@@ -71,12 +71,12 @@ A successful standard is defined as much by the problems it _doesn't_ solve as b
 - **Full `aid.json` Manifest:** While powerful for describing complex local and remote implementations, the manifest-based approach was deemed too burdensome for a v1 standard. It required providers to host and maintain a JSON file, and clients to implement a significantly more complex resolution and validation logic. The new `proto=local` feature captures 80% of the manifest's value with 20% of the complexity.
 - **DNS `SRV` or `HTTPS/SVCB` Records:** These are technically more "correct" for service discovery. However, they lack the universal, simple configuration support of `TXT` records in many DNS providers' dashboards. Furthermore, client-side resolver support is not yet ubiquitous. For v1, `TXT` offers the path of least resistance to adoption, with a clear migration path to `SRV`/`HTTPS` in the future.
 - **Centralized Registry:** A central "Agent Store" or registry was rejected as it violates the principle of decentralization, creates a single point of failure, and introduces a gatekeeper to the ecosystem. DNS is the world's most successful decentralized registry, and AID leverages it directly.
-- **Full Pkarr-style DHT Resolution:** We deeply admire the [Pkarr](https://pkarr.org/) project for its commitment to decentralized, censorship-resistant identity via a DHT. However, for AID's v1.1 goal of creating a minimal, immediately deployable bootstrap layer, requiring clients to implement DHT lookups and interact with relays was deemed too high a barrier to entry. Our `pka` key adopts Pkarr's core philosophy of key-as-identity but uses the existing DNS infrastructure to deliver it, staying true to our tenet of embracing existing, universal infrastructure.
+- **Full Pkarr-style DHT Resolution:** We deeply admire the [Pkarr](https://pkarr.org/) project for its commitment to decentralized, censorship-resistant identity via a DHT. However, for AID's v1.2 goal of creating a minimal, immediately deployable bootstrap layer, requiring clients to implement DHT lookups and interact with relays was deemed too high a barrier to entry. Our `pka` key adopts Pkarr's core philosophy of key-as-identity but uses the existing DNS infrastructure to deliver it, staying true to our tenet of embracing existing, universal infrastructure.
 - **DNS-First, with a Pragmatic `.well-known` Fallback**
   - **Why DNS is Primary:** DNS remains the superior tool for service discovery. It is faster, more efficient (a single UDP packet vs. a full TCP/TLS handshake), and allows for cryptographic verification of the record itself via DNSSEC.
   - **Why `.well-known` was Added:** We recognize that developers often do not control their domain's DNS records. Forcing them to file a ticket with an IT department creates friction. The `.well-known` fallback provides a crucial on-ramp, allowing a developer to implement AID by simply adding a file to their application's webroot, which is entirely within their control. This pragmatic choice drastically lowers the barrier to adoption.
 
-### **6. Discovery vs Identity (and PKA in v1.1)**
+### **6. Discovery vs Identity (and PKA in v1.2)**
 
 Discovery answers “where and how do I connect?” Identity answers “am I really talking to who DNS pointed me to?” AID v1 keeps these responsibilities separate by design, then offers PKA as an optional, cryptographic proof to harden discovery without changing DNS.
 

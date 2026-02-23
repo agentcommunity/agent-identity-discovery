@@ -44,10 +44,12 @@ def test_discover_success(monkey_resolver):  # pylint: disable=unused-argument
 
 def test_discover_protocol_specific_success_on_base(monkeypatch):
     import dns.resolver
+    calls = []
 
     def _fake_resolve(name, rdtype, lifetime=5.0):
+        calls.append(name)
         if name == "_agent.example.com":
-            # Base record has the desired protocol
+            # Base record is used after protocol-specific names are exhausted
             return _FakeAnswer(["v=aid1;uri=https://api.example.com/mcp;proto=mcp"], 333)
         # No other records should be needed
         raise dns.resolver.NXDOMAIN()
@@ -57,6 +59,7 @@ def test_discover_protocol_specific_success_on_base(monkeypatch):
     assert record["proto"] == "mcp"
     assert record["uri"] == "https://api.example.com/mcp"
     assert ttl == 333
+    assert calls == ["_agent._mcp.example.com", "_agent.mcp.example.com", "_agent.example.com"]
 
 def test_discover_protocol_specific_fallback_to_subdomain(monkeypatch):
     import dns.resolver
@@ -79,9 +82,13 @@ def test_discover_protocol_specific_fallback_to_subdomain(monkeypatch):
 
 def test_discover_fallback_to_base(monkeypatch):
     import dns.resolver
+    calls = []
 
     def _fake_resolve(name, rdtype, lifetime=5.0):
+        calls.append(name)
         if name == "_agent._mcp.example.com":
+            raise dns.resolver.NXDOMAIN()
+        if name == "_agent.mcp.example.com":
             raise dns.resolver.NXDOMAIN()
         if name == "_agent.example.com":
             return _FakeAnswer(["v=aid1;uri=https://fallback.com;p=a2a"], 555)
@@ -92,6 +99,7 @@ def test_discover_fallback_to_base(monkeypatch):
     assert record["proto"] == "a2a"
     assert record["uri"] == "https://fallback.com"
     assert ttl == 555
+    assert calls == ["_agent._mcp.example.com", "_agent.mcp.example.com", "_agent.example.com"]
 
 
 def test_discover_no_record(monkeypatch):

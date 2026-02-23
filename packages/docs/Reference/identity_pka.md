@@ -1,6 +1,6 @@
 ---
 title: 'Identity & PKA'
-description: 'Optional endpoint proof and rotation for AID v1.1'
+description: 'Endpoint proof and rotation for AID v1.2'
 icon: material/shield-lock-outline
 ---
 

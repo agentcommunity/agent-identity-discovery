@@ -133,7 +133,7 @@ aid-doctor pka verify --key <z...>
 
 - DNSSEC: presence via DoH RRSIG probe (informational)
 - TLS: first-hop redirect policy enforced; cert issuer/SAN/dates/days remaining (warns if < 21 days).
-- PKA: Performs full cryptographic handshake per spec v1.1.
+- PKA: Performs full cryptographic handshake per spec v1.2.
 - Downgrade: warns if a domain previously had `pka`/`kid` and now removed or changed (`--check-downgrade` flag required).
 
 ---

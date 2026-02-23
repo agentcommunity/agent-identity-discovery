@@ -22,8 +22,8 @@ Built by the team at [agentcommunity.org](https://agentcommunity.org).
 
 Rust crate for Agent Identity & Discovery (AID) parsing and generated constants.
 
-- Parser by default; optional PKA handshake behind a feature flag.
-- No runtime dependencies for the parser; handshake uses `reqwest`, `ed25519-dalek`, `bs58`, `httpdate`.
+- Parser and discovery with PKA handshake enabled by default.
+- For parser-only builds, disable default features.
 
 ## Install
 
@@ -79,13 +79,20 @@ fn main() -> Result<(), aid_rs::AidError> {
 }
 ```
 
-### v1.1 (PKA) – optional handshake
+### v1.2 (PKA) – enabled by default
 
-Enable the `handshake` feature to verify endpoint control when a record includes `pka`/`kid`.
+`handshake` is in default features to ensure spec-aligned verification when a record includes `pka`/`kid`.
 
 ```toml
 [dependencies]
-aid-rs = { path = "../aid-rs", features = ["handshake"] }
+aid-rs = { path = "../aid-rs" }
+```
+
+For parser-only/minimal builds:
+
+```toml
+[dependencies]
+aid-rs = { path = "../aid-rs", default-features = false }
 ```
 
 ```rust

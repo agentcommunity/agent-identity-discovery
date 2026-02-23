@@ -333,57 +333,42 @@ export async function discover(
   const baseName = constructQueryName(domain);
 
   const runDns = async (): Promise<DiscoveryResult> => {
-    // Canonical: base _agent.<domain> query
-    // If protocol is explicitly requested, attempt protocol-specific subdomains afterwards
-    if (!protocol) {
-      return await Promise.race([
-        queryOnce(baseName),
+    const queryWithTimeout = async (queryName: string): Promise<DiscoveryResult> =>
+      await Promise.race([
+        queryOnce(queryName),
         new Promise<never>((_, reject) =>
           setTimeout(
             () =>
-              reject(new AidError('ERR_DNS_LOOKUP_FAILED', `DNS query timeout for ${baseName}`)),
+              reject(new AidError('ERR_DNS_LOOKUP_FAILED', `DNS query timeout for ${queryName}`)),
             timeout,
           ),
         ),
       ]);
+
+    // Canonical: base _agent.<domain> query when no protocol is requested.
+    if (!protocol) {
+      return await queryWithTimeout(baseName);
     }
 
-    // Protocol explicitly requested: try underscore form first, then fall back to base
+    // Protocol requested: try underscore form, then plain form, then base.
     const protoNameUnderscore = constructQueryName(domain, protocol, true);
+    const protoNamePlain = constructQueryName(domain, protocol, false);
+    const queryNames = [protoNameUnderscore, protoNamePlain, baseName];
+    let lastNoRecord: AidError | null = null;
 
-    // 1) underscore form
-    try {
-      return await Promise.race([
-        queryOnce(protoNameUnderscore),
-        new Promise<never>((_, reject) =>
-          setTimeout(
-            () =>
-              reject(
-                new AidError(
-                  'ERR_DNS_LOOKUP_FAILED',
-                  `DNS query timeout for ${protoNameUnderscore}`,
-                ),
-              ),
-            timeout,
-          ),
-        ),
-      ]);
-    } catch (error) {
-      if (!(error instanceof AidError) || error.errorCode !== 'ERR_NO_RECORD') {
+    for (const queryName of queryNames) {
+      try {
+        return await queryWithTimeout(queryName);
+      } catch (error) {
+        if (error instanceof AidError && error.errorCode === 'ERR_NO_RECORD') {
+          lastNoRecord = error;
+          continue;
+        }
         throw error;
       }
     }
 
-    // 2) fallback to base
-    return await Promise.race([
-      queryOnce(baseName),
-      new Promise<never>((_, reject) =>
-        setTimeout(
-          () => reject(new AidError('ERR_DNS_LOOKUP_FAILED', `DNS query timeout for ${baseName}`)),
-          timeout,
-        ),
-      ),
-    ]);
+    throw lastNoRecord ?? new AidError('ERR_NO_RECORD', `No TXT record found for ${baseName}`);
   };
 
   try {

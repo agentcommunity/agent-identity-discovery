@@ -22,7 +22,7 @@ hickory-resolver = { version = "0.24", default-features = false, features = ["to
 idna = "0.5"
 
 [features]
-default = []
+default = ["handshake"]
 handshake = ["base64", "bs58", "ed25519-dalek", "httpdate", "reqwest", "serde_json"]
 
 [dev-dependencies]

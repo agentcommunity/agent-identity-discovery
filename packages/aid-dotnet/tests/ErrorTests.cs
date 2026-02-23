@@ -37,6 +37,13 @@ public class ErrorTests
     }
 
     [Fact]
+    public void RemoteHttpLoopbackIsRejected()
+    {
+        var ex = Assert.Throws<AidError>(() => Aid.Parse("v=aid1;uri=http://localhost:8080/mcp;proto=mcp"));
+        Assert.Equal("ERR_INVALID_TXT", ex.ErrorCode);
+    }
+
+    [Fact]
     public void LocalInvalidScheme()
     {
         var ex = Assert.Throws<AidError>(() => Aid.Parse("v=aid1;uri=foo://bar;proto=local"));
