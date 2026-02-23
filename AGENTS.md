@@ -75,7 +75,7 @@ Mirrored for Web (back-compat): `packages/web/src/generated/spec.ts`.
 
 * Edit `protocol/examples.yml` only for example records.
 * Examples are generated for both Terraform deployment and Web UI.
-* Includes PKA keys and v1.1 features across all examples.
+* Includes PKA keys and v1.2 features across all examples.
 
 Generated files:
 - Terraform: `showcase/terraform/examples.tf`
@@ -91,10 +91,10 @@ LOCAL_URI_SCHEMES
 RawAidRecord
 ```
 
-### v1.1 notes (Proposed)
+### v1.2 notes (Final)
 
-- Changes are tracked in `tracking/SPEC_1.1_extension.md.md`.
-- Docs updated in `packages/docs/specification.md` (status: Proposed).
+- Release baseline: `packages/docs/specification.md` is v1.2.0.
+- Contract baseline: `protocol/constants.yml` schemaVersion is 1.2.0.
 - New keys: `docs` (`d`), `dep` (`e`), `pka` (`k`), `kid` (`i`).
 - Aliases: clients must accept single-letter keys for all fields.
 - PKA: if `pka` is present, clients must perform the handshake (RFC 9421 + Ed25519).

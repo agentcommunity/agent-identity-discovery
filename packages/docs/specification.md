@@ -6,17 +6,17 @@ icon: material/file-document-outline
 extra_css_class: aid-page
 
 tags:
-  - v1.1
-  - '2025-08-31'
+  - v1.2
+  - '2026-02-06'
 ---
 
 [View raw markdown](https://github.com/agentcommunity/agent-identity-discovery/raw/main/packages/docs/specification.md)
 
-# **Agent Identity & Discovery (AID) — v1.1.0**
+# **Agent Identity & Discovery (AID) — v1.2.0**
 
 _Minimal, DNS-first agent bootstrap standard_
 
-**Date:** 31 August 2025
+**Date:** 6 February 2026
 **Editor:** Agent Community
 **Status:** Final
 
@@ -90,13 +90,13 @@ _agent.example.com. 300 IN TXT "v=aid1;u=https://api.example.com/mcp;p=mcp;a=pat
 _agent.grafana.com. 300 IN TXT "v=aid1;u=docker:grafana/mcp:latest;p=local;a=pat;s=Run Grafana agent locally"
 ```
 
-**Remote MCP with PKA and metadata (v1.1):**
+**Remote MCP with PKA and metadata (v1.2):**
 
 ```text
 _agent.example.com. 300 IN TXT "v=aid1;p=mcp;u=https://api.example.com/mcp;k=z7rW8rTq8o4mM6vVf7w1k3m4uQn9p2YxCAbcDeFgHiJ;i=g1;d=https://docs.example.com/agent;e=2026-01-01T00:00:00Z;s=Secure AI Gateway"
 ```
 
-**Local Zeroconf (v1.1):**
+**Local Zeroconf (v1.2):**
 
 ```text
 _agent.local.test. 300 IN TXT "v=aid1;p=zeroconf;u=zeroconf:_mcp._tcp;s=Local Dev Agent"
