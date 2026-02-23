@@ -10,12 +10,12 @@ import { getAidVersion, fetchAidVersion } from '@/lib/utils';
 
 /* ---------- cycling domain text ---------- */
 const DOMAINS = [
-  'magic.agent',
-  'solo.agent',
-  'assist.agent',
-  'ops.agent',
-  'relay.agent',
-  'scout.agent',
+  'example.com',
+  'acme.com',
+  'northwind.com',
+  'globex.com',
+  'contoso.com',
+  'fabrikam.com',
 ];
 
 function useCyclingText(items: string[], intervalMs = 2400) {
@@ -101,7 +101,7 @@ export function Hero() {
           >
             <span className="select-none">_agent.</span>
             <span
-              className={`inline-block min-w-[8ch] transition-all duration-300 ${domain.isTransitioning ? 'opacity-0 translate-y-1' : 'opacity-100 translate-y-0'} text-foreground font-semibold`}
+              className={`inline-block min-w-[13ch] transition-all duration-300 ${domain.isTransitioning ? 'opacity-0 translate-y-1' : 'opacity-100 translate-y-0'} text-foreground font-semibold`}
             >
               {domain.value}
             </span>
