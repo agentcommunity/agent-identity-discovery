@@ -15,16 +15,18 @@ fn canonicalize_to_txt(obj: &serde_json::Map<String, serde_json::Value>) -> Stri
             .filter(|s| !s.is_empty())
     };
 
+    // Canonical TXT emission uses short keys for byte budget.
+    // Parsing still accepts long keys (`version`, `proto`, etc.) for compatibility.
     let mut parts: Vec<String> = Vec::new();
-    if let Some(v) = get_str("v") { parts.push(format!("v={}", v)); }
-    if let Some(u) = get_str("uri").or_else(|| get_str("u")) { parts.push(format!("uri={}", u)); }
-    if let Some(p) = get_str("proto").or_else(|| get_str("p")) { parts.push(format!("proto={}", p)); }
-    if let Some(a) = get_str("auth").or_else(|| get_str("a")) { parts.push(format!("auth={}", a)); }
-    if let Some(s) = get_str("desc").or_else(|| get_str("s")) { parts.push(format!("desc={}", s)); }
-    if let Some(d) = get_str("docs").or_else(|| get_str("d")) { parts.push(format!("docs={}", d)); }
-    if let Some(e) = get_str("dep").or_else(|| get_str("e")) { parts.push(format!("dep={}", e)); }
-    if let Some(k) = get_str("pka").or_else(|| get_str("k")) { parts.push(format!("pka={}", k)); }
-    if let Some(i) = get_str("kid").or_else(|| get_str("i")) { parts.push(format!("kid={}", i)); }
+    if let Some(v) = get_str("v").or_else(|| get_str("version")) { parts.push(format!("v={}", v)); }
+    if let Some(u) = get_str("uri").or_else(|| get_str("u")) { parts.push(format!("u={}", u)); }
+    if let Some(p) = get_str("proto").or_else(|| get_str("p")) { parts.push(format!("p={}", p)); }
+    if let Some(a) = get_str("auth").or_else(|| get_str("a")) { parts.push(format!("a={}", a)); }
+    if let Some(s) = get_str("desc").or_else(|| get_str("s")) { parts.push(format!("s={}", s)); }
+    if let Some(d) = get_str("docs").or_else(|| get_str("d")) { parts.push(format!("d={}", d)); }
+    if let Some(e) = get_str("dep").or_else(|| get_str("e")) { parts.push(format!("e={}", e)); }
+    if let Some(k) = get_str("pka").or_else(|| get_str("k")) { parts.push(format!("k={}", k)); }
+    if let Some(i) = get_str("kid").or_else(|| get_str("i")) { parts.push(format!("i={}", i)); }
     parts.join(";")
 }
 

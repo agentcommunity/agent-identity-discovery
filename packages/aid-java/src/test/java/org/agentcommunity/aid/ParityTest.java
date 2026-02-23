@@ -50,6 +50,11 @@ public class ParityTest {
     assertAidError("ERR_INVALID_TXT", () -> Parser.parse("uri=https://x;proto=mcp"));
     // Unsupported version
     assertAidError("ERR_INVALID_TXT", () -> Parser.parse("v=aid2;uri=https://x;proto=mcp"));
+    // Long-key compatibility for version
+    AidRecord compat = Parser.parse("version=aid1;uri=https://x;proto=mcp");
+    assertEquals("aid1", compat.v);
+    // v + version duplication
+    assertAidError("ERR_INVALID_TXT", () -> Parser.parse("v=aid1;version=aid1;uri=https://x;proto=mcp"));
     // Unsupported protocol
     assertAidError("ERR_UNSUPPORTED_PROTO", () -> Parser.parse("v=aid1;uri=https://x;proto=unknown"));
     // Both proto and p

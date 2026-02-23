@@ -133,8 +133,8 @@ The canonical location for discovery is the base record: `_agent.<domain>`. Prov
 **Examples:**
 
 ```dns
-_agent._mcp.example.com. 300 IN TXT "v=aid1;p=mcp;uri=..."
-_agent._a2a.example.com. 300 IN TXT "v=aid1;p=a2a;uri=..."
+_agent._mcp.example.com. 300 IN TXT "v=aid1;p=mcp;u=..."
+_agent._a2a.example.com. 300 IN TXT "v=aid1;p=a2a;u=..."
 ```
 
 **Client behavior:**

@@ -10,6 +10,19 @@ describe('AID Parser v1.1 extensions', () => {
     expect(rec.proto).toBe('mcp');
   });
 
+  it('accepts long-key compatibility for version/proto', () => {
+    const txt = 'version=aid1;u=https://api.example.com/mcp;proto=mcp';
+    const rec = parse(txt);
+    expect(rec.v).toBe('aid1');
+    expect(rec.proto).toBe('mcp');
+  });
+
+  it('rejects version+v duplicates', () => {
+    const dup = 'version=aid1;v=aid1;u=https://api.example.com/mcp;p=mcp';
+    expect(() => parse(dup)).toThrow(AidError);
+    expect(() => parse(dup)).toThrow('Cannot specify both "version" and "v" fields');
+  });
+
   it('rejects alias+full duplicates (uri+u)', () => {
     const dup = 'v=aid1;uri=https://api.example.com/mcp;u=https://api.example.com/mcp;p=mcp';
     expect(() => parse(dup)).toThrow(AidError);
@@ -48,4 +61,3 @@ describe('AID Parser v1.1 extensions', () => {
     expect(() => parse(bad)).toThrow('kid is required when pka is present');
   });
 });
-

@@ -55,7 +55,7 @@ aid-doctor generate \
 This outputs the exact TXT record content you need:
 
 ```
-v=aid1;uri=https://api.my-cool-saas.com/agent/v1;p=mcp;desc=My Cool SaaS AI
+v=aid1;u=https://api.my-cool-saas.com/agent/v1;p=mcp;s=My Cool SaaS AI
 ```
 
 **Plus validation:** The CLI automatically validates your record format, URI scheme, and protocol tokens before generating.
@@ -78,7 +78,7 @@ You need two things:
 The AID record is a single string of `key=value` pairs.
 
 ```
-v=aid1;uri=https://api.my-cool-saas.com/agent/v1;p=mcp;desc=My Cool SaaS AI
+v=aid1;u=https://api.my-cool-saas.com/agent/v1;p=mcp;s=My Cool SaaS AI
 ```
 
 > **Tip:** Use our [**Live Generator**](https://aid.agentcommunity.org/workbench) to create this string and avoid typos!

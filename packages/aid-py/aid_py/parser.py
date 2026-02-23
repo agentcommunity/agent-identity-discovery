@@ -102,6 +102,13 @@ def _is_valid_local_uri(uri: str) -> bool:
 def validate_record(raw: RawAidRecord) -> AidRecord:
     """Validate a raw record dict and return a typed record."""
 
+    # Canonical wire key is `v`, but we accept `version` for compatibility.
+    if "version" in raw and "v" in raw:
+        raise AidError("ERR_INVALID_TXT", 'Cannot specify both "version" and "v" fields')
+    if "version" in raw and "v" not in raw:
+        raw = dict(raw)
+        raw["v"] = raw["version"]
+
     # Required fields
     if "v" not in raw:
         raise AidError("ERR_INVALID_TXT", "Missing required field: v")

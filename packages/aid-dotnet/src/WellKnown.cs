@@ -10,7 +10,9 @@ public static class WellKnown
     {
         static string? GetStr(JsonElement root, string k)
             => root.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
-        var v = GetStr(obj, "v");
+        // Canonical TXT emission uses short keys for byte budget.
+        // Parsing still accepts long keys (`version`, `proto`, etc.) for compatibility.
+        var v = GetStr(obj, "v") ?? GetStr(obj, "version");
         var uri = GetStr(obj, "uri") ?? GetStr(obj, "u");
         var proto = GetStr(obj, "proto") ?? GetStr(obj, "p");
         var auth = GetStr(obj, "auth") ?? GetStr(obj, "a");
@@ -21,14 +23,14 @@ public static class WellKnown
         var kid = GetStr(obj, "kid") ?? GetStr(obj, "i");
         var sb = new StringBuilder();
         if (v != null) sb.Append($"v={v};");
-        if (uri != null) sb.Append($"uri={uri};");
-        if (proto != null) sb.Append($"proto={proto};");
-        if (!string.IsNullOrEmpty(auth)) sb.Append($"auth={auth};");
-        if (!string.IsNullOrEmpty(desc)) sb.Append($"desc={desc};");
-        if (!string.IsNullOrEmpty(docs)) sb.Append($"docs={docs};");
-        if (!string.IsNullOrEmpty(dep)) sb.Append($"dep={dep};");
-        if (!string.IsNullOrEmpty(pka)) sb.Append($"pka={pka};");
-        if (!string.IsNullOrEmpty(kid)) sb.Append($"kid={kid};");
+        if (uri != null) sb.Append($"u={uri};");
+        if (proto != null) sb.Append($"p={proto};");
+        if (!string.IsNullOrEmpty(auth)) sb.Append($"a={auth};");
+        if (!string.IsNullOrEmpty(desc)) sb.Append($"s={desc};");
+        if (!string.IsNullOrEmpty(docs)) sb.Append($"d={docs};");
+        if (!string.IsNullOrEmpty(dep)) sb.Append($"e={dep};");
+        if (!string.IsNullOrEmpty(pka)) sb.Append($"k={pka};");
+        if (!string.IsNullOrEmpty(kid)) sb.Append($"i={kid};");
         return sb.ToString().TrimEnd(';');
     }
 

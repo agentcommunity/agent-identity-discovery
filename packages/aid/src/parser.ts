@@ -36,7 +36,8 @@ export function canonicalizeRaw(json: Record<string, unknown>): RawAidRecord {
   const getStr = (k: string) =>
     typeof json[k] === 'string' ? (json[k] as string).trim() : undefined;
   // Only set fields when defined to comply with exactOptionalPropertyTypes
-  const v = getStr('v');
+  // Canonical wire key is `v`, but we still accept `version` for backward compatibility.
+  const v = getStr('v') ?? getStr('version');
   if (v !== undefined) out.v = v;
   const uri = getStr('uri') ?? getStr('u');
   if (uri !== undefined) out.uri = uri;
@@ -74,6 +75,7 @@ export function parseRawRecord(txtRecord: string): RawAidRecord {
   let sawK = false;
   let sawI = false;
   let sawP = false;
+  let sawV = false;
 
   // Split by semicolon and process each pair
   const pairs = txtRecord
@@ -95,12 +97,23 @@ export function parseRawRecord(txtRecord: string): RawAidRecord {
     }
 
     if (key in record) {
+      if (key === 'v' && sawV) {
+        throw new AidError('ERR_INVALID_TXT', 'Cannot specify both "version" and "v" fields');
+      }
       throw new AidError('ERR_INVALID_TXT', `Duplicate key: ${key}`);
     }
 
     // Handle known keys (case-insensitive)
     switch (key) {
       case 'v':
+        if (sawV)
+          throw new AidError('ERR_INVALID_TXT', 'Cannot specify both "version" and "v" fields');
+        record.v = value;
+        break;
+      case 'version':
+        if (record.v)
+          throw new AidError('ERR_INVALID_TXT', 'Cannot specify both "version" and "v" fields');
+        sawV = true;
         record.v = value;
         break;
       case 'uri':

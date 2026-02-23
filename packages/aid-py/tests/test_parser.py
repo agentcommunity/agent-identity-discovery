@@ -39,6 +39,19 @@ def test_missing_version():
         parse(txt)
 
 
+def test_version_compatibility():
+    txt = "version=aid1;u=https://api.example.com/mcp;proto=mcp"
+    record = parse(txt)
+    assert record["v"] == "aid1"
+    assert record["proto"] == "mcp"
+
+
+def test_version_duplicate_rejected():
+    txt = "v=aid1;version=aid1;u=https://api.example.com/mcp;p=mcp"
+    with pytest.raises(AidError, match="Cannot specify both \"version\" and \"v\""):
+        parse(txt)
+
+
 def test_invalid_proto():
     txt = "v=aid1;uri=https://api.example.com/mcp;proto=unknown"
     with pytest.raises(AidError):

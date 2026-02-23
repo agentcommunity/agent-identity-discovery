@@ -56,7 +56,7 @@ await discover('example.com', { wellKnownTimeoutMs: 2000 });
 ```ts
 import { parse } from '@agentcommunity/aid';
 
-const rec = parse('v=aid1;uri=https://api.example.com/mcp;proto=mcp;desc=Example');
+const rec = parse('v=aid1;u=https://api.example.com/mcp;p=mcp;s=Example');
 console.log(rec.proto, rec.uri);
 ```
 

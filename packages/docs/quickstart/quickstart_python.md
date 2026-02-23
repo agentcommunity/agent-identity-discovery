@@ -51,7 +51,7 @@ rec, ttl = discover(
 
 ```python
 from aid_py import parse
-rec = parse("v=aid1;uri=https://api.example.com/mcp;proto=mcp;desc=Example")
+rec = parse("v=aid1;u=https://api.example.com/mcp;p=mcp;s=Example")
 print(rec.uri)
 ```
 

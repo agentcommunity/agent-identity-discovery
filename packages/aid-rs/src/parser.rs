@@ -24,6 +24,7 @@ fn is_supported_auth(token: &str) -> bool {
 
 pub fn parse(txt: &str) -> Result<AidRecord, AidError> {
     let mut v: Option<String> = None;
+    let mut version: Option<String> = None;
     let mut uri: Option<String> = None;
     let mut proto: Option<String> = None;
     let mut p: Option<String> = None;
@@ -48,7 +49,7 @@ pub fn parse(txt: &str) -> Result<AidRecord, AidError> {
             return Err(AidError::invalid_txt(format!("Empty key or value in pair: {}", pair)));
         }
         match key.as_str() {
-            "v" | "uri" | "u" | "proto" | "p" | "auth" | "a" | "desc" | "s" | "docs" | "d" | "dep" | "e" | "pka" | "k" | "kid" | "i" => {
+            "v" | "version" | "uri" | "u" | "proto" | "p" | "auth" | "a" | "desc" | "s" | "docs" | "d" | "dep" | "e" | "pka" | "k" | "kid" | "i" => {
                 if seen.contains(&key) { return Err(AidError::invalid_txt(format!("Duplicate key: {}", key))); }
                 seen.insert(key.clone());
             }
@@ -56,6 +57,7 @@ pub fn parse(txt: &str) -> Result<AidRecord, AidError> {
         }
         match key.as_str() {
             "v" => v = Some(value),
+            "version" => version = Some(value),
             "uri" | "u" => {
                 if uri.is_none() { uri = Some(value) } else { return Err(AidError::invalid_txt("Cannot specify both \"uri\" and \"u\"")); }
             }
@@ -83,7 +85,11 @@ pub fn parse(txt: &str) -> Result<AidRecord, AidError> {
         }
     }
 
-    let v = v.ok_or_else(|| AidError::invalid_txt("Missing required field: v"))?;
+    // Canonical wire key is `v`, but we accept `version` for compatibility.
+    if v.is_some() && version.is_some() {
+        return Err(AidError::invalid_txt("Cannot specify both \"version\" and \"v\" fields"));
+    }
+    let v = v.or(version).ok_or_else(|| AidError::invalid_txt("Missing required field: v"))?;
     if v != SPEC_VERSION {
         return Err(AidError::invalid_txt(format!("Unsupported version: {}. Expected: {}", v, SPEC_VERSION)));
     }

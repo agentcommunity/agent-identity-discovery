@@ -121,11 +121,9 @@ const data: AidGeneratorData = {
   kid: 'g1',
 };
 
-// Full keys: v=aid1;uri=...;proto=...
-const fullRecord = buildTxtRecordVariant(data, false);
-
-// Aliases (smaller): v=aid1;u=...;p=...
-const aliasRecord = buildTxtRecordVariant(data, true);
+// Canonical TXT output is short-key form in both calls: v=aid1;u=...;p=...
+const shortRecordA = buildTxtRecordVariant(data, false);
+const shortRecordB = buildTxtRecordVariant(data, true);
 ```
 
 ### Validation

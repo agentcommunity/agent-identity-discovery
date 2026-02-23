@@ -58,7 +58,19 @@ public static class Aid
 
     private static AidRecord ValidateRecord(Dictionary<string, string> raw)
     {
-        if (!raw.TryGetValue("v", out var v))
+        // Canonical wire key is `v`, but we accept `version` for compatibility.
+        var hasV = raw.TryGetValue("v", out var v);
+        var hasVersion = raw.TryGetValue("version", out var version);
+        if (hasV && hasVersion)
+        {
+            throw new AidError(nameof(Constants.ERR_INVALID_TXT), "Cannot specify both \"version\" and \"v\" fields");
+        }
+        if (!hasV && hasVersion)
+        {
+            v = version;
+            hasV = true;
+        }
+        if (!hasV)
         {
             throw new AidError(nameof(Constants.ERR_INVALID_TXT), "Missing required field: v");
         }

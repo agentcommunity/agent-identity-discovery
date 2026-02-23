@@ -12,16 +12,16 @@ describe('AID Engine Generator', () => {
   };
 
   describe('buildTxtRecordVariant', () => {
-    it('should build record with full keys when useAliases=false', () => {
+    it('should build record with canonical short keys when useAliases=false', () => {
       const record = buildTxtRecordVariant(sampleData, false);
-      expect(record).toContain('v=aid1'); // Version always uses alias
-      expect(record).toContain('uri=https://api.example.com/agent');
-      expect(record).toContain('proto=mcp');
-      expect(record).toContain('auth=pat');
-      expect(record).toContain('desc=Example Agent');
+      expect(record).toContain('v=aid1');
+      expect(record).toContain('u=https://api.example.com/agent');
+      expect(record).toContain('p=mcp');
+      expect(record).toContain('a=pat');
+      expect(record).toContain('s=Example Agent');
     });
 
-    it('should build record with aliases when useAliases=true', () => {
+    it('should build record with canonical short keys when useAliases=true', () => {
       const record = buildTxtRecordVariant(sampleData, true);
       expect(record).toContain('v=aid1');
       expect(record).toContain('u=https://api.example.com/agent');
@@ -37,9 +37,9 @@ describe('AID Engine Generator', () => {
         proto: 'mcp',
       };
       const record = buildTxtRecordVariant(minimalData, false);
-      expect(record).toContain('v=aid1'); // Version always uses alias
-      expect(record).toContain('uri=https://test.com/api');
-      expect(record).toContain('proto=mcp');
+      expect(record).toContain('v=aid1');
+      expect(record).toContain('u=https://test.com/api');
+      expect(record).toContain('p=mcp');
       expect(record).not.toContain('auth=');
       expect(record).not.toContain('desc=');
     });
@@ -53,9 +53,9 @@ describe('AID Engine Generator', () => {
         desc: '',
       };
       const record = buildTxtRecordVariant(dataWithEmptyOptionals, false);
-      expect(record).toContain('v=aid1'); // Version always uses alias
-      expect(record).toContain('uri=https://test.com/api');
-      expect(record).toContain('proto=mcp');
+      expect(record).toContain('v=aid1');
+      expect(record).toContain('u=https://test.com/api');
+      expect(record).toContain('p=mcp');
       expect(record).not.toContain('auth=');
       expect(record).not.toContain('desc=');
     });

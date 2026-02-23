@@ -41,7 +41,7 @@ await Discovery.DiscoverAsync("example.com", new DiscoveryOptions { WellKnownTim
 ```csharp
 using AidDiscovery;
 
-var rec = Aid.Parse("v=aid1;uri=https://api.example.com/mcp;proto=mcp;desc=Example");
+var rec = Aid.Parse("v=aid1;u=https://api.example.com/mcp;p=mcp;s=Example");
 Console.WriteLine($"proto={rec.Proto}, uri={rec.Uri}");
 ```
 

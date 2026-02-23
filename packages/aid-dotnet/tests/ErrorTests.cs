@@ -23,6 +23,21 @@ public class ErrorTests
     }
 
     [Fact]
+    public void VersionLongKeyCompatibility()
+    {
+        var rec = Aid.Parse("version=aid1;u=https://api.example.com/mcp;proto=mcp");
+        Assert.Equal("aid1", rec.V);
+        Assert.Equal("mcp", rec.Proto);
+    }
+
+    [Fact]
+    public void VersionAndVDuplicateRejected()
+    {
+        var ex = Assert.Throws<AidError>(() => Aid.Parse("v=aid1;version=aid1;u=https://api.example.com/mcp;p=mcp"));
+        Assert.Equal("ERR_INVALID_TXT", ex.ErrorCode);
+    }
+
+    [Fact]
     public void BothProtoAndAlias()
     {
         var ex = Assert.Throws<AidError>(() => Aid.Parse("v=aid1;uri=https://x;proto=mcp;p=mcp"));

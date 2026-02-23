@@ -48,4 +48,11 @@ fn invalid_cases_error_codes() {
     let long_desc = "a".repeat(61);
     let err = parse(&format!("v=aid1;uri=https://x;p=mcp;desc={}", long_desc)).unwrap_err();
     assert_eq!(err.error_code, "ERR_INVALID_TXT");
+
+    let rec = parse("version=aid1;u=https://x;proto=mcp").unwrap();
+    assert_eq!(rec.v, "aid1");
+    assert_eq!(rec.proto, "mcp");
+
+    let err = parse("v=aid1;version=aid1;u=https://x;p=mcp").unwrap_err();
+    assert_eq!(err.error_code, "ERR_INVALID_TXT");
 }

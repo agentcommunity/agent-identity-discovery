@@ -182,11 +182,11 @@ export const validateGeneratorPayload = (payload: unknown): GeneratorValidationR
       pka: data.pka,
       kid: data.kid,
     };
-    const fullTxt = buildTxtRecordVariant(engineData, false);
+    // Canonical TXT output is short-key only. Keep legacy toggle for compatibility.
     const aliasTxt = buildTxtRecordVariant(engineData, true);
-    txt = data.useAliases ? aliasTxt : fullTxt;
+    txt = aliasTxt;
     txtBytes = safeByteLength(txt);
-    suggestAliases = safeByteLength(aliasTxt) <= safeByteLength(fullTxt);
+    suggestAliases = true;
 
     if (txtBytes > 255) {
       warnings.push({ code: 'WARN_TXT_BYTES', message: 'TXT record exceeds 255 bytes' });

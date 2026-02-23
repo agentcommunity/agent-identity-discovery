@@ -33,6 +33,7 @@ public final class Parser {
       }
       // Only store known keys; ignore unknown for fwd-compat
       switch (key) {
+        case "version":
         case "v":
         case "uri":
         case "u":
@@ -61,7 +62,13 @@ public final class Parser {
 
   public static AidRecord validateRecord(Map<String, String> raw) {
     // Required fields
-    if (!raw.containsKey("v")) {
+    boolean hasV = raw.containsKey("v");
+    boolean hasVersion = raw.containsKey("version");
+    if (hasV && hasVersion) {
+      throw new AidError("ERR_INVALID_TXT", "Cannot specify both \"version\" and \"v\" fields");
+    }
+    String version = hasV ? raw.get("v") : (hasVersion ? raw.get("version") : null);
+    if (version == null) {
       throw new AidError("ERR_INVALID_TXT", "Missing required field: v");
     }
     boolean hasUri = raw.containsKey("uri");
@@ -82,7 +89,6 @@ public final class Parser {
       throw new AidError("ERR_INVALID_TXT", "Missing required field: proto (or p)");
     }
 
-    String version = raw.get("v");
     if (!Constants.SPEC_VERSION.equals(version)) {
       throw new AidError(
           "ERR_INVALID_TXT",

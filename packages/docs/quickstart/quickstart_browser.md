@@ -37,7 +37,7 @@ await discover('example.com', { dohProvider: 'https://dns.google/dns-query' });
 
 ```ts
 import { parse } from '@agentcommunity/aid';
-console.log(parse('v=aid1;uri=https://api.example.com/mcp;proto=mcp').uri);
+console.log(parse('v=aid1;u=https://api.example.com/mcp;p=mcp').uri);
 ```
 
 Security

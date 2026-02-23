@@ -47,9 +47,18 @@ func ValidateRecord(raw map[string]string) (AidRecord, error) {
         return "", false, nil
     }
 
+	// Canonical wire key is `v`, but we accept `version` for compatibility.
+	v, hasV := get("v")
+	version, hasVersion := get("version")
+	if hasV && hasVersion {
+		return AidRecord{}, newAidError("ERR_INVALID_TXT", "Cannot specify both \"version\" and \"v\"")
+	}
+	if !hasV && hasVersion {
+		v = version
+		hasV = true
+	}
 	// required fields v, uri, proto/p
-	v, ok := get("v")
-	if !ok {
+	if !hasV {
 		return AidRecord{}, newAidError("ERR_INVALID_TXT", "Missing required field: v")
 	}
 	if v != SpecVersion {
