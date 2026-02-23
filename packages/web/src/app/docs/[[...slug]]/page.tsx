@@ -61,7 +61,7 @@ export default async function DocPage({ params }: PageProps) {
     <div className="flex">
       {/* Article */}
       <article
-        className="flex-1 min-w-0 max-w-3xl mx-auto px-6 py-8 lg:px-8"
+        className="flex-1 min-w-0 max-w-5xl mx-auto px-6 py-8 lg:px-8"
         itemScope
         itemType="https://schema.org/TechArticle"
       >

@@ -44,7 +44,7 @@ Cross-language parity for AID `discover()` wrappers with consistent security and
 
 - Loopback relax: allowed only for `.well-known` fallback and only on loopback hosts; env/flag gated per language (never for TXT).
 - Rust PKA is behind the `handshake` feature; enable it to run handshake verification.
-- Test your implementation using the [aid-doctor CLI](../aid_doctor.md) tool for real-world validation.
+- Test your implementation using the [aid-doctor CLI](../Tooling/aid_doctor.md) tool for real-world validation.
 
 ## See also
 

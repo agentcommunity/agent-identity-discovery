@@ -98,10 +98,4 @@ For libraries in other languages (including Rust/.NET/Java WIP), see the [Packag
 
 ---
 
-!!! info "Implementation Files" - [Generated spec types](../protocol/spec.ts) - [TypeScript constants](../packages/aid/src/constants.ts)
-
-**See also:**
-
-- [General Quick Start](./index.md)
-- [MCP Quick Start](./quickstart_mcp.md)
-- [A2A Quick Start](./quickstart_a2a.md)
+**Next:** [MCP Guide](quickstart_mcp.md) | [A2A Guide](quickstart_a2a.md) | [Protocols & Auth](../Reference/protocols.md)

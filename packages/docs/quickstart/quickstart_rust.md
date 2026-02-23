@@ -75,17 +75,6 @@ Notes
 - TTL from DNS is respected; successful `.well-known` fallback uses TTL=300.
 - PKA handshake (when `pka`/`kid` are present) requires enabling the `handshake` feature.
 
-## See also
+---
 
-- [Quick Start index](./index.md)
-- [TypeScript / Node.js](./quickstart_ts.md)
-- [Browser](./quickstart_browser.md)
-- [Go](./quickstart_go.md)
-- [Python](./quickstart_python.md)
-- [Java](./quickstart_java.md)
-- [.NET](./quickstart_dotnet.md)
-- [Protocols & Auth Tokens](../Reference/protocols.md)
-- [Troubleshooting](../Reference/troubleshooting.md)
-- [Conformance](../Tooling/conformance.md)
-
-!!! info "Implementation Files" - [Generated constants](../packages/aid-rs/src/constants_gen.rs)
+**Next:** [Go](quickstart_go.md) | [Protocols & Auth](../Reference/protocols.md) | [Troubleshooting](../Reference/troubleshooting.md)

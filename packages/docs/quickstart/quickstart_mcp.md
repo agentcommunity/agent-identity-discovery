@@ -89,10 +89,4 @@ connectToMcpServer('supabase.agentcommunity.org');
 
 ---
 
-!!! info "Implementation Files" - [Generated spec types](../protocol/spec.ts) - [TypeScript constants](../packages/aid/src/constants.ts)
-
-**See also:**
-
-- [General Quick Start](./index.md)
-- [A2A Quick Start](./quickstart_a2a.md)
-- [OpenAPI Quick Start](./quickstart_openapi.md)
+**Next:** [A2A Guide](quickstart_a2a.md) | [OpenAPI Guide](quickstart_openapi.md) | [Protocols & Auth](../Reference/protocols.md)

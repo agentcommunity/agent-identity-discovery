@@ -207,7 +207,6 @@ const result = await runCheck('example.com', {
 
 ## See also
 
-- [aid-doctor CLI](../Tooling/aid_doctor.md) – Command-line interface using this library
-- [@agentcommunity/aid](../../packages/aid/) – Main library with additional utilities
+- [aid-doctor CLI](aid_doctor.md) – Command-line interface using this library
 - [Specification](../specification.md) – Full AID protocol specification
 - [Discovery API](../Reference/discovery_api.md) – Cross-language discovery patterns

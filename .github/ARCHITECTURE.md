@@ -9,13 +9,15 @@
 ```
 packages/
 ├── aid/                    # Core TypeScript library (published to npm)
+├── aid-engine/            # Pure business logic library (published to npm)
 ├── aid-doctor/            # CLI validation and generation tool (published to npm)
 ├── aid-py/               # Python SDK (published to PyPI as aid-discovery)
 ├── aid-go/               # Go SDK (module)
 ├── aid-rs/               # Rust SDK (parser + discovery, feature-gated handshake)
 ├── aid-dotnet/           # .NET SDK (parser + discovery + PKA)
 ├── aid-java/             # Java SDK (parser + discovery + PKA)
-├── web/                  # Next.js web interface (private)
+├── docs/                 # Markdown documentation (rendered by web at /docs)
+├── web/                  # Next.js web interface + docs renderer (private)
 └── e2e-tests/            # End-to-end tests against live records (private)
 
 # NOTE: The official Python package is currently published at https://pypi.org/project/aid-discovery/ and is not yet community-owned. Community transfer is planned.
@@ -311,6 +313,22 @@ A thin command-line interface that orchestrates the engine:
 - `keys.ts` – PKA key generation and filesystem storage (side-effectful)
 - `cache.ts` – Cache persistence to `~/.aid/cache.json` (side-effectful)
 - `index.ts` – Package entry point
+
+## 📖 Documentation Architecture
+
+Documentation lives in `packages/docs/` as markdown files with YAML frontmatter, rendered by the Next.js app at `/docs`.
+
+**Navigation**: Driven by `meta.json` files at each level. Root `meta.json` defines top-level pages and groups; each group directory has its own `meta.json` with page ordering.
+
+**Sections**:
+
+- **Root**: Landing page (`index.md`) and specification
+- **Understand**: Concepts, rationale, FAQ, comparison guides
+- **Quick Start**: 11 language and protocol-specific guides
+- **Reference**: Protocols, discovery API, PKA, security, versioning, troubleshooting
+- **Tooling**: aid-doctor CLI, aid-engine library, conformance suite
+
+**Rendering features**: MDX via `next-mdx-remote`, frontmatter-driven metadata (title, description, icon), admonitions (`!!! type`), mermaid diagrams (client-side rendered), scroll-spy TOC, heading copy-links, and raw markdown API at `/api/docs/[slug]`.
 
 ## 🔄 CI/CD Architecture
 

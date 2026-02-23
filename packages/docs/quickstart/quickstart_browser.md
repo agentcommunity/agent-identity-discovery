@@ -46,16 +46,6 @@ Security
 - Description is limited to 60 UTF-8 bytes.
 - `proto` must be one of supported tokens.
 
-## See also
+---
 
-- [Quick Start index](./index.md)
-- [TypeScript / Node.js](./quickstart_ts.md)
-- [Go](./quickstart_go.md)
-- [Python](./quickstart_python.md)
-- [Java](./quickstart_java.md)
-- [.NET](./quickstart_dotnet.md)
-- [Protocols & Auth Tokens](../Reference/protocols.md)
-- [Troubleshooting](../Reference/troubleshooting.md)
-- [Conformance](../Tooling/conformance.md)
-
-!!! info "Implementation Files" - [Generated constants](../packages/aid/src/constants.ts) - [Generated spec types](../protocol/spec.ts)
+**Next:** [TypeScript / Node.js](quickstart_ts.md) | [Protocols & Auth](../Reference/protocols.md) | [Troubleshooting](../Reference/troubleshooting.md)

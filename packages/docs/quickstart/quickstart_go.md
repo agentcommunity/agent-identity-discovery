@@ -63,16 +63,6 @@ fmt.Println(rec.URI)
 
 Errors map to symbolic codes (e.g., `ERR_NO_RECORD`) and numeric codes (1000..1005).
 
-## See also
+---
 
-- [Quick Start index](./index.md)
-- [TypeScript / Node.js](./quickstart_ts.md)
-- [Browser](./quickstart_browser.md)
-- [Python](./quickstart_python.md)
-- [Java](./quickstart_java.md)
-- [.NET](./quickstart_dotnet.md)
-- [Protocols & Auth Tokens](../Reference/protocols.md)
-- [Troubleshooting](../Reference/troubleshooting.md)
-- [Conformance](../Tooling/conformance.md)
-
-!!! info "Implementation Files" - [Generated constants](../packages/aid-go/constants_gen.go)
+**Next:** [Python](quickstart_python.md) | [Protocols & Auth](../Reference/protocols.md) | [Troubleshooting](../Reference/troubleshooting.md)

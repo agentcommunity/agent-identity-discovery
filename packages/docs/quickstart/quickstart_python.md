@@ -60,16 +60,6 @@ Notes
 - PKA handshake runs automatically when `pka`/`kid` are present.
 - Package is published on PyPI as `aid-discovery`.
 
-## See also
+---
 
-- [Quick Start index](./index.md)
-- [TypeScript / Node.js](./quickstart_ts.md)
-- [Browser](./quickstart_browser.md)
-- [Go](./quickstart_go.md)
-- [Java](./quickstart_java.md)
-- [.NET](./quickstart_dotnet.md)
-- [Protocols & Auth Tokens](../Reference/protocols.md)
-- [Troubleshooting](../Reference/troubleshooting.md)
-- [Conformance](../Tooling/conformance.md)
-
-!!! info "Implementation Files" - [Generated constants](../packages/aid-py/aid_py/constants.py)
+**Next:** [Go](quickstart_go.md) | [Protocols & Auth](../Reference/protocols.md) | [Troubleshooting](../Reference/troubleshooting.md)

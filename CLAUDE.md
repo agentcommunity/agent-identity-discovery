@@ -43,6 +43,7 @@ pnpm -C packages/aid-doctor build && node packages/aid-doctor/dist/cli.js check 
 
 - **Protocol constants**: `protocol/constants.yml` - edit this, then run `pnpm gen`
 - **Specification docs**: `packages/docs/specification.md`
+- **Documentation**: `packages/docs/` — rendered by `packages/web` at `/docs`. Navigation driven by `meta.json` files. Sections: Understand, Quick Start, Reference, Tooling.
 
 ### Package Structure
 
@@ -56,7 +57,8 @@ pnpm -C packages/aid-doctor build && node packages/aid-doctor/dist/cli.js check 
 | `packages/aid-rs` | Rust SDK |
 | `packages/aid-dotnet` | .NET SDK |
 | `packages/aid-java` | Java SDK |
-| `packages/web` | Next.js workbench UI |
+| `packages/docs` | Markdown documentation (rendered by web at `/docs`) |
+| `packages/web` | Next.js workbench UI + docs renderer |
 | `packages/e2e-tests` | E2E tests against live domains |
 
 ### Key Architecture Decisions

@@ -64,7 +64,7 @@ _agent.example.com. 300 IN TXT "v=aid1;p=mcp;u=https://api.example.com/mcp;k=z7r
 - Store the private key securely; plan rotation via `kid`.
 - Monitor for downgrade: if you remove `k`, expect client warnings.
 - Document your contact/docs URL via `d` (docs) and deprecation timeline via `e` (dep) as needed.
-- Use the [aid-doctor CLI](../aid_doctor.md) `pka` commands to generate and verify PKA keys.
+- Use the [aid-doctor CLI](../Tooling/aid_doctor.md) `pka` commands to generate and verify PKA keys.
 
 ## Why PKA Instead of a DID Scheme?
 
@@ -83,5 +83,5 @@ In short, PKA provides the most critical value of a DID—a verifiable, decentra
 ## See also
 
 - Spec appendix: [PKA Handshake](../specification.md#appendix-d-pka-handshake-normative)
-- [Security Best Practices](../security.md)
-- [Rationale](../rationale.md)
+- [Security Best Practices](security.md)
+- [Rationale](../Understand/rationale.md)

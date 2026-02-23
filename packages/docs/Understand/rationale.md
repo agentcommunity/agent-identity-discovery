@@ -6,7 +6,7 @@ icon: material/head-question-outline
 extra_css_class: aid-page
 ---
 
-[View raw markdown](https://github.com/agentcommunity/agent-identity-discovery/raw/main/packages/docs/rationale.md)
+[View raw markdown](https://github.com/agentcommunity/agent-identity-discovery/raw/main/packages/docs/Understand/rationale.md)
 
 ## **Agent Identity & Discovery (AID) v1.1: Rationale and Trade-offs**
 
@@ -108,8 +108,9 @@ AID v1 is a deliberately focused and pragmatic standard. It provides a simple, r
 
 **Next Steps:**
 
-- [Quick Start Guide](quickstart/index.md)
-- [Blog: The Missing MX Record](blog/missing_record.md)
+- [Quick Start Guide](../quickstart/index.md)
+- [Specification](../specification.md)
+- [Security Best Practices](../Reference/security.md)
 
 ---
 

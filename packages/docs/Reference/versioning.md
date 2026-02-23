@@ -6,7 +6,7 @@ icon: material/git
 extra_css_class: aid-page
 ---
 
-[View raw markdown](https://github.com/agentcommunity/agent-identity-discovery/raw/main/packages/docs/versioning.md)
+[View raw markdown](https://github.com/agentcommunity/agent-identity-discovery/raw/main/packages/docs/Reference/versioning.md)
 
 # Versioning and Changelog
 
@@ -25,15 +25,36 @@ The `v` key within an AID `TXT` record (e.g., `v=aid1`) signifies the **major ve
 The AID specification and its surrounding tooling (libraries, validators) are versioned using Git tags in the official repository.
 
 - **Major Versions (e.g., v2.0.0):** Reserved for breaking changes to the protocol, requiring a new `v` key (e.g., `v=aid2`). These will be accompanied by a major update to the documentation.
-- **Minor Versions (e.g., v1.1.0):** Reserved for new, non-breaking features that are backward-compatible. For example, adding a new _optional_ key to the `TXT` record would be a minor release. Implementers can adopt these features at their own pace.
+- **Minor Versions (e.g., v1.2.0):** Reserved for new, non-breaking features that are backward-compatible. For example, adding a new _optional_ key to the `TXT` record would be a minor release. Implementers can adopt these features at their own pace.
 - **Patch Versions (e.g., v1.0.1):** Used for clarifications, typo fixes, and documentation improvements that do not change the protocol's behavior. These are backward-compatible by definition.
 
-## Changelog
+## Version History
 
-A detailed, human-readable changelog will be maintained for each release. The changelog documents all changes, big or small, providing a clear history of the standard's evolution.
+### v1.1.0 — August 2025
 
-You can find the full changelog here:
-[**View the Official Changelog**](changelog.md)
+- **Public Key Attestation (PKA):** Optional Ed25519 endpoint proof via HTTP Message Signatures (RFC 9421)
+- **Key aliases:** Single-letter aliases for all TXT record keys (`v`, `p`, `u`, `s`, `a`, `d`, `e`, `k`, `i`) for byte efficiency
+- **Metadata keys:** `docs`/`d` for documentation URL, `dep`/`e` for deprecation timestamp
+- **Protocol extensions:** Added `grpc`, `graphql`, `websocket`, `zeroconf`, and `ucp` protocol tokens
+- **`.well-known` fallback:** JSON-based fallback at `/.well-known/agent` for providers without DNS control
+- **Protocol-specific subdomains:** Non-normative guidance for `_agent._<proto>.<domain>`
+
+### v1.0.0 — Initial Release
+
+- Core TXT record format at `_agent.<domain>` with `v`, `uri`, `proto`, `auth`, `desc` keys
+- Discovery algorithm with DNS lookup, parsing, and validation
+- Error codes: `ERR_DNS_LOOKUP_FAILED`, `ERR_NO_RECORD`, `ERR_INVALID_TXT`, `ERR_UNSUPPORTED_PROTO`, `ERR_SECURITY`
+- Protocol tokens: `mcp`, `a2a`, `openapi`, `local`
+- Auth hints: `none`, `apikey`, `pat`, `basic`, `mtls`, `oauth2_code`, `oauth2_device`, `custom`
+
+### Documentation Updates — August 2025
+
+- v1.1 docs finalized: aliases, metadata, protocol extensions, `.well-known` fallback, and PKA
+- New page: [Identity & PKA](identity_pka.md) with ELI5 and technical details
+- New page: [aid-doctor CLI](../Tooling/aid_doctor.md) — Complete guide to the validation and generation tool
+- New section: [Understand](../Understand/concepts.md) — Concepts, FAQ, and comparison guides
+
+For full technical changes, see the [Specification](../specification.md).
 
 ## Our Philosophy on Stability
 
