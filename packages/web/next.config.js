@@ -26,6 +26,14 @@ const nextConfig = {
       },
     ];
   },
+  webpack: (config) => {
+    // Watch packages/docs for HMR during development
+    config.watchOptions = {
+      ...config.watchOptions,
+      ignored: ['**/node_modules/**', '!**/packages/docs/**'],
+    };
+    return config;
+  },
 };
 
 module.exports = nextConfig;
