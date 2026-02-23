@@ -61,7 +61,7 @@ console.log('Agent:', record.proto, record.uri);
 - `AidError` – error class exposing `code` (numeric) and `errorCode` (symbol)
 - Constants and types exported from `@agentcommunity/aid`
 
-## v1.1 Notes (PKA + .well-known)
+## v1.2 Notes (PKA + .well-known)
 
 - New fields: `pka` (`k`) and `kid` (`i`). When a record includes `pka`, the client performs a Public Key for Agent (PKA) handshake using HTTP Message Signatures (Ed25519).
 - `pka` is a multibase string using base58btc (`z...`) of the raw 32‑byte Ed25519 public key.
