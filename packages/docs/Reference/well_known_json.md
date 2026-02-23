@@ -47,7 +47,7 @@ The document mirrors TXT keys and supports single-letter aliases (`v,u,p,s,a,d,e
 
 - Use `ERR_FALLBACK_FAILED` for fetch/validation failures.
 - PKA rules still apply if `k`/`i` are present (see PKA handshake expectations).
-- Test your `.well-known` implementation using the [aid-doctor CLI](../aid_doctor.md) with the `--dump-well-known` flag.
+- Test your `.well-known` implementation using the [aid-doctor CLI](../Tooling/aid_doctor.md) with the `--dump-well-known` flag.
 
 ## See also
 

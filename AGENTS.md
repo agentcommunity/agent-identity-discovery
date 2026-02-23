@@ -26,8 +26,12 @@ Single source of truth for humans and coding agents. Subprojects can override wi
 │  ├─ aid-java/       # Java SDK
 │  ├─ web/            # Workbench UI
 │  └─ aid-doctor/     # CLI
-├─ packages/docs/
-│  └─ specification.md
+├─ packages/docs/            # Documentation (rendered at /docs by web)
+│  ├─ specification.md
+│  ├─ Understand/            # Concepts, rationale, FAQ, comparison
+│  ├─ quickstart/            # 11 language/protocol guides
+│  ├─ Reference/             # API, protocols, security, versioning
+│  └─ Tooling/               # aid-doctor, aid-engine, conformance
 └─ packages/web/
    └─ WORKBENCH_COMPONENTS.md
 ```
@@ -118,7 +122,7 @@ pnpm -C packages/aid-doctor dev
 pnpm i -g @agentcommunity/aid-doctor && aid-doctor check <domain>
 ```
 
-For complete CLI documentation, see the [aid-doctor CLI Reference](packages/docs/Reference/aid_doctor.md).
+For complete CLI documentation, see the [aid-doctor CLI Reference](packages/docs/Tooling/aid_doctor.md).
 
 ## Code style
 

@@ -65,7 +65,13 @@ export function MermaidDiagram({ chart }: MermaidDiagramProps) {
 
         const { svg: rendered } = await mermaid.render(`mermaid_${uniqueId}`, chart.trim());
         if (!cancelled) {
-          setSvg(rendered);
+          // Strip the fixed width/height so the SVG scales to fill its container
+          // while preserving the viewBox for correct aspect ratio
+          const scaled = rendered
+            .replace(/(<svg[^>]*)\s+width="[^"]*"/, '$1')
+            .replace(/(<svg[^>]*)\s+height="[^"]*"/, '$1')
+            .replace(/(<svg[^>]*?)(\s*>)/, '$1 width="100%"$2');
+          setSvg(scaled);
           setError('');
         }
       } catch (error_) {
@@ -102,7 +108,7 @@ export function MermaidDiagram({ chart }: MermaidDiagramProps) {
         <div
           ref={containerRef}
           className={cn(
-            'mermaid-diagram [&_svg]:max-w-full',
+            'mermaid-diagram w-full',
             '[&_.node_rect]:rx-[8px] [&_.node_rect]:ry-[8px]',
             '[&_.label]:!text-[color:var(--foreground)]',
             '[&_.edgeLabel]:!bg-[color:var(--card)]',

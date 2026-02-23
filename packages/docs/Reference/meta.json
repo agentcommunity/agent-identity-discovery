@@ -1,11 +1,12 @@
 {
   "title": "Reference",
   "pages": [
-    "discovery_api",
     "protocols",
+    "discovery_api",
     "identity_pka",
     "well_known_json",
-    "troubleshooting",
-    "whats_new"
+    "security",
+    "versioning",
+    "troubleshooting"
   ]
 }
