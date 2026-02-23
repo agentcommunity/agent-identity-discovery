@@ -2,7 +2,7 @@
 # This file defines all constants, types, and tokens used in the AID v1.x specification
 # Generated code in all languages should derive from this file
 
-schemaVersion: '1.1.0'
+schemaVersion: '1.2.0'
 
 # Specification version that must be present in all AID records
 specVersion: 'aid1'

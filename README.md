@@ -33,7 +33,7 @@ It uses a single DNS `TXT` record to make any agent service—whether it speaks 
 
 **Built by the team at [agentcommunity.org](https://agentcommunity.org)**
 
-### v1.1 Highlights
+### v1.2 Highlights
 
 - ✅ **DNS-first discovery** with optional protocol-specific subdomains (`_agent._<proto>.<domain>`)
 - ✅ **Well-known fallback** (HTTPS-only, JSON, ≤64KB, ~2s timeout, no redirects; TTL=300 on success)
@@ -298,9 +298,9 @@ The single source of truth for all protocol constants is `protocol/constants.yml
     ```
     Commit the changes to `protocol/constants.yml` along with all the newly generated files. The CI pipeline will fail if they are not in sync.
 
-### v1.1 Release Status: ✅ READY
+### v1.2 Release Status: ✅ READY
 
-**Implementation Complete** - All v1.1 features implemented across 6+ languages with comprehensive testing. CLI enhanced with advanced features.
+**Implementation Complete** - All v1.2 features implemented across 6+ languages with comprehensive testing. CLI enhanced with advanced features.
 
 **Ready for Release:**
 
