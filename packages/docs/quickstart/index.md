@@ -60,6 +60,8 @@ v=aid1;uri=https://api.my-cool-saas.com/agent/v1;p=mcp;desc=My Cool SaaS AI
 
 **Plus validation:** The CLI automatically validates your record format, URI scheme, and protocol tokens before generating.
 
+> **Key reference:** AID records use single-letter keys for compactness. `v`=version, `u`=uri, `p`=protocol, `a`=auth, `s`=description, `d`=docs url, `e`=deprecation, `k`=public key, `i`=key id. You don't need to memorize these — the CLI and [Live Generator](https://aid.agentcommunity.org/workbench) handle it for you. See the [full key table](../specification.md#record-format) for details.
+
 ### Option B: Manual Generation
 
 If you prefer to craft the record manually:
@@ -119,6 +121,8 @@ nslookup -q=TXT _agent.my-cool-saas.com
 ---
 
 ## Part 2: For Clients (Discovering an Agent)
+
+> All SDKs parse the short wire keys (`v`, `u`, `p`, …) into descriptive field names (`proto`, `uri`, `desc`, …) so your code reads naturally.
 
 Now let's write code to find an agent. We provide libraries in several languages to make this trivial.
 
