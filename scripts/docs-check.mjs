@@ -152,7 +152,7 @@ const verifyVersionAlignment = async (repoRoot) => {
     path.join('packages', 'docs', 'Reference', 'identity_pka.md'),
     path.join('packages', 'docs', 'quickstart', 'index.md'),
     path.join('packages', 'docs', 'Tooling', 'aid_doctor.md'),
-    path.join('packages', 'docs', 'rationale.md'),
+    path.join('packages', 'docs', 'Understand', 'rationale.md'),
   ];
   const [major, minorNumberRaw] = minor.split('.');
   const minorNumber = Number.parseInt(minorNumberRaw, 10);
