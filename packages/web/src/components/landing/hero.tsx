@@ -10,12 +10,12 @@ import { getAidVersion, fetchAidVersion } from '@/lib/utils';
 
 /* ---------- cycling domain text ---------- */
 const DOMAINS = [
-  'magic.agent',
-  'solo.agent',
-  'assist.agent',
-  'ops.agent',
-  'relay.agent',
-  'scout.agent',
+  'example.com',
+  'acme.com',
+  'northwind.com',
+  'globex.com',
+  'contoso.com',
+  'fabrikam.com',
 ];
 
 function useCyclingText(items: string[], intervalMs = 2400) {
@@ -97,15 +97,15 @@ export function Hero() {
           {/* cycling domain */}
           <div
             ref={domain.ref}
-            className="mx-auto mb-10 inline-flex items-center gap-2 font-mono text-sm md:text-base text-muted-foreground/70 animate-fade-in-up"
+            className="mx-auto mb-10 inline-grid grid-cols-[auto_13ch_auto] items-center gap-1.5 text-sm md:text-base text-muted-foreground/70 animate-fade-in-up"
           >
-            <span className="select-none">_agent.</span>
+            <span className="select-none font-mono">_agent.</span>
             <span
-              className={`inline-block min-w-[8ch] transition-all duration-300 ${domain.isTransitioning ? 'opacity-0 translate-y-1' : 'opacity-100 translate-y-0'} text-foreground font-semibold`}
+              className={`inline-block font-mono text-left transition-all duration-300 ${domain.isTransitioning ? 'opacity-0 translate-y-1' : 'opacity-100 translate-y-0'} text-foreground font-semibold`}
             >
               {domain.value}
             </span>
-            <span className="select-none text-muted-foreground/40">TXT &rarr;</span>
+            <span className="select-none font-mono text-muted-foreground/40">TXT &rarr;</span>
           </div>
 
           <div className="flex flex-col gap-4 sm:flex-row sm:justify-center mb-12 animate-fade-in-up">
@@ -126,7 +126,7 @@ export function Hero() {
               asChild
               className="group shadow-soft hover:shadow-soft-md transition-all duration-300 hover:scale-105"
             >
-              <Link href="https://docs.agentcommunity.org/aid/specification">
+              <Link href="/docs/specification">
                 Read the Specification
                 <ExternalLink className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </Link>

@@ -26,8 +26,12 @@ Single source of truth for humans and coding agents. Subprojects can override wi
 │  ├─ aid-java/       # Java SDK
 │  ├─ web/            # Workbench UI
 │  └─ aid-doctor/     # CLI
-├─ packages/docs/
-│  └─ specification.md
+├─ packages/docs/            # Documentation (rendered at /docs by web)
+│  ├─ specification.md
+│  ├─ Understand/            # Concepts, rationale, FAQ, comparison
+│  ├─ quickstart/            # 11 language/protocol guides
+│  ├─ Reference/             # API, protocols, security, versioning
+│  └─ Tooling/               # aid-doctor, aid-engine, conformance
 └─ packages/web/
    └─ WORKBENCH_COMPONENTS.md
 ```
@@ -75,7 +79,7 @@ Mirrored for Web (back-compat): `packages/web/src/generated/spec.ts`.
 
 * Edit `protocol/examples.yml` only for example records.
 * Examples are generated for both Terraform deployment and Web UI.
-* Includes PKA keys and v1.1 features across all examples.
+* Includes PKA keys and v1.2 features across all examples.
 
 Generated files:
 - Terraform: `showcase/terraform/examples.tf`
@@ -91,10 +95,10 @@ LOCAL_URI_SCHEMES
 RawAidRecord
 ```
 
-### v1.1 notes (Proposed)
+### v1.2 notes (Final)
 
-- Changes are tracked in `tracking/SPEC_1.1_extension.md.md`.
-- Docs updated in `packages/docs/specification.md` (status: Proposed).
+- Release baseline: `packages/docs/specification.md` is v1.2.0.
+- Contract baseline: `protocol/constants.yml` schemaVersion is 1.2.0.
 - New keys: `docs` (`d`), `dep` (`e`), `pka` (`k`), `kid` (`i`).
 - Aliases: clients must accept single-letter keys for all fields.
 - PKA: if `pka` is present, clients must perform the handshake (RFC 9421 + Ed25519).
@@ -118,7 +122,7 @@ pnpm -C packages/aid-doctor dev
 pnpm i -g @agentcommunity/aid-doctor && aid-doctor check <domain>
 ```
 
-For complete CLI documentation, see the [aid-doctor CLI Reference](packages/docs/Reference/aid_doctor.md).
+For complete CLI documentation, see the [aid-doctor CLI Reference](packages/docs/Tooling/aid_doctor.md).
 
 ## Code style
 

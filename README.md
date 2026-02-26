@@ -33,7 +33,7 @@ It uses a single DNS `TXT` record to make any agent service—whether it speaks 
 
 **Built by the team at [agentcommunity.org](https://agentcommunity.org)**
 
-### v1.1 Highlights
+### v1.2 Highlights
 
 - ✅ **DNS-first discovery** with optional protocol-specific subdomains (`_agent._<proto>.<domain>`)
 - ✅ **Well-known fallback** (HTTPS-only, JSON, ≤64KB, ~2s timeout, no redirects; TTL=300 on success)
@@ -83,11 +83,11 @@ graph TD
 | Resource                   | Link                                                                   | Description                                                                                                                                                                    |
 | :------------------------- | :--------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Interactive Workbench**  | **[aid.agentcommunity.org](https://aid.agentcommunity.org)**           | The best way to see the protocol in action with a live resolver and generator.                                                                                                 |
-| **Official Documentation** | **[docs.agentcommunity.org/aid](https://docs.agentcommunity.org/aid)** | Read the full specification, guides, and API reference.                                                                                                                        |
+| **Official Documentation** | **[aid.agentcommunity.org/docs](https://aid.agentcommunity.org/docs)** | Specification, quick start guides, reference, and tooling docs.                                                                                                                |
 | **Command-Line Tool**      | `npm install -g @agentcommunity/aid-doctor`                            | The quickest way to check, validate, generate, and save AID records. Built on @agentcommunity/aid-engine with draft saving, PKA key generation, and comprehensive diagnostics. |
 | **Examples Guide**         | **[EXAMPLES.md](./EXAMPLES.md)**                                       | Complete guide to the examples system: how examples are defined, generated, and used across DNS, UI, and testing.                                                              |
 
-> Documentation authority: `/packages/docs` in this repository is the canonical source. `docs.agentcommunity.org` is a downstream rendered consumer of these files.
+> Documentation authority: `/packages/docs` in this repository is the canonical source, rendered at [aid.agentcommunity.org/docs](https://aid.agentcommunity.org/docs).
 
 **GitHub Repository**: [github.com/agentcommunity/agent-identity-discovery](https://github.com/agentcommunity/agent-identity-discovery) - Source code, issues, and community discussions.
 
@@ -209,7 +209,8 @@ agent-identity-discovery/
 │   ├── aid-rs/                # Rust library (parser + discovery; handshake feature)
 │   ├── aid-dotnet/            # .NET library (parser + discovery + PKA)
 │   ├── aid-java/              # Java library (parser + discovery + PKA)
-│   ├── web/                   # Next.js web workbench
+│   ├── docs/                  # Markdown documentation (rendered at /docs)
+│   ├── web/                   # Next.js web workbench + docs renderer
 │   ├── e2e-tests/             # End-to-end tests
 │   └── (test-runners)/        # Internal test runners for Go/Python
 ├── tracking/                  # Development progress tracking (PHASE_*.md)
@@ -298,9 +299,9 @@ The single source of truth for all protocol constants is `protocol/constants.yml
     ```
     Commit the changes to `protocol/constants.yml` along with all the newly generated files. The CI pipeline will fail if they are not in sync.
 
-### v1.1 Release Status: ✅ READY
+### v1.2 Release Status: ✅ READY
 
-**Implementation Complete** - All v1.1 features implemented across 6+ languages with comprehensive testing. CLI enhanced with advanced features.
+**Implementation Complete** - All v1.2 features implemented across 6+ languages with comprehensive testing. CLI enhanced with advanced features.
 
 **Ready for Release:**
 

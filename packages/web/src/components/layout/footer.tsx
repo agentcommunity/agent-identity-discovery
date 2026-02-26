@@ -23,7 +23,7 @@ export function Footer() {
                 <ul className="space-y-1">
                   <li>
                     <Link
-                      href="https://docs.agentcommunity.org/aid/quickstart"
+                      href="/docs/quickstart"
                       className="text-muted-foreground hover:text-foreground transition-all duration-200 hover:translate-x-1"
                     >
                       Quick Start
@@ -31,7 +31,7 @@ export function Footer() {
                   </li>
                   <li>
                     <Link
-                      href="https://docs.agentcommunity.org/aid/specification"
+                      href="/docs/specification"
                       className="text-muted-foreground hover:text-foreground transition-all duration-200 hover:translate-x-1"
                     >
                       Specification
@@ -39,7 +39,7 @@ export function Footer() {
                   </li>
                   <li>
                     <Link
-                      href="https://docs.agentcommunity.org/aid/rationale"
+                      href="/docs/rationale"
                       className="text-muted-foreground hover:text-foreground transition-all duration-200 hover:translate-x-1"
                     >
                       Design Rationale
@@ -54,7 +54,7 @@ export function Footer() {
                 <ul className="space-y-1">
                   <li>
                     <Link
-                      href="https://docs.agentcommunity.org/aid/quickstart/quickstart_ts"
+                      href="/docs/quickstart/quickstart_ts"
                       className="text-muted-foreground hover:text-foreground transition-all duration-200 hover:translate-x-1"
                     >
                       TypeScript
@@ -62,7 +62,7 @@ export function Footer() {
                   </li>
                   <li>
                     <Link
-                      href="https://docs.agentcommunity.org/aid/quickstart/quickstart_go"
+                      href="/docs/quickstart/quickstart_go"
                       className="text-muted-foreground hover:text-foreground transition-all duration-200 hover:translate-x-1"
                     >
                       Go
@@ -70,7 +70,7 @@ export function Footer() {
                   </li>
                   <li>
                     <Link
-                      href="https://docs.agentcommunity.org/aid/quickstart/quickstart_python"
+                      href="/docs/quickstart/quickstart_python"
                       className="text-muted-foreground hover:text-foreground transition-all duration-200 hover:translate-x-1"
                     >
                       Python
@@ -78,7 +78,7 @@ export function Footer() {
                   </li>
                   <li>
                     <Link
-                      href="https://docs.agentcommunity.org/aid/Tooling/aid_doctor"
+                      href="/docs/Tooling/aid_doctor"
                       className="text-muted-foreground hover:text-foreground transition-all duration-200 hover:translate-x-1"
                     >
                       CLI Tool
@@ -93,37 +93,37 @@ export function Footer() {
               </p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
                 <Link
-                  href="https://docs.agentcommunity.org/aid/Reference/discovery_api"
+                  href="/docs/Reference/discovery_api"
                   className="text-muted-foreground hover:text-foreground transition-all duration-200 hover:translate-x-1"
                 >
                   Discovery API
                 </Link>
                 <Link
-                  href="https://docs.agentcommunity.org/aid/Reference/identity_pka"
+                  href="/docs/Reference/identity_pka"
                   className="text-muted-foreground hover:text-foreground transition-all duration-200 hover:translate-x-1"
                 >
                   Identity & PKA
                 </Link>
                 <Link
-                  href="https://docs.agentcommunity.org/aid/Reference/protocols"
+                  href="/docs/Reference/protocols"
                   className="text-muted-foreground hover:text-foreground transition-all duration-200 hover:translate-x-1"
                 >
                   Protocols
                 </Link>
                 <Link
-                  href="https://docs.agentcommunity.org/aid/security"
+                  href="/docs/security"
                   className="text-muted-foreground hover:text-foreground transition-all duration-200 hover:translate-x-1"
                 >
                   Security
                 </Link>
                 <Link
-                  href="https://docs.agentcommunity.org/aid/Reference/troubleshooting"
+                  href="/docs/Reference/troubleshooting"
                   className="text-muted-foreground hover:text-foreground transition-all duration-200 hover:translate-x-1"
                 >
                   Troubleshooting
                 </Link>
                 <Link
-                  href="https://docs.agentcommunity.org/aid/versioning"
+                  href="/docs/versioning"
                   className="text-muted-foreground hover:text-foreground transition-all duration-200 hover:translate-x-1"
                 >
                   Versioning

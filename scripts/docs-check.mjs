@@ -15,16 +15,16 @@ const REFERENCE_FILES = [
 ];
 
 const REQUIRED_DOCS = [
-  'index.md',
-  'specification.md',
-  'security.md',
-  'rationale.md',
-  'versioning.md',
-  'Reference/discovery_api.md',
-  'Reference/identity_pka.md',
-  'Reference/protocols.md',
-  'Reference/troubleshooting.md',
-  'Tooling/aid_doctor.md',
+  ['index.md'],
+  ['specification.md'],
+  ['security.md', 'Reference/security.md'],
+  ['rationale.md', 'Understand/rationale.md'],
+  ['versioning.md', 'Reference/versioning.md'],
+  ['Reference/discovery_api.md'],
+  ['Reference/identity_pka.md'],
+  ['Reference/protocols.md'],
+  ['Reference/troubleshooting.md'],
+  ['Tooling/aid_doctor.md'],
 ];
 
 const fileExists = async (filePath) => {
@@ -34,6 +34,105 @@ const fileExists = async (filePath) => {
   } catch {
     return false;
   }
+};
+
+const readUtf8 = async (filePath) => fs.readFile(filePath, 'utf8');
+
+const readJson = async (filePath) => JSON.parse(await readUtf8(filePath));
+
+const extractVersion = (content, regex, label) => {
+  const match = content.match(regex);
+  if (!match || !match[1]) {
+    throw new Error(`Unable to read ${label}`);
+  }
+  return match[1];
+};
+
+const minorOf = (version) => version.split('.').slice(0, 2).join('.');
+
+const verifyVersionAlignment = async (repoRoot) => {
+  const mismatches = [];
+
+  const specPath = path.join(repoRoot, 'packages', 'docs', 'specification.md');
+  const constantsPath = path.join(repoRoot, 'protocol', 'constants.yml');
+  const rootReadmePath = path.join(repoRoot, 'README.md');
+  const aidReadmePath = path.join(repoRoot, 'packages', 'aid', 'README.md');
+  const agentsPath = path.join(repoRoot, 'AGENTS.md');
+
+  const [specContent, constantsContent, rootReadme, aidReadme, agentsContent] = await Promise.all([
+    readUtf8(specPath),
+    readUtf8(constantsPath),
+    readUtf8(rootReadmePath),
+    readUtf8(aidReadmePath),
+    readUtf8(agentsPath),
+  ]);
+
+  const specVersion = extractVersion(
+    specContent,
+    /Agent Identity & Discovery \(AID\)\s+—\s+v(\d+\.\d+\.\d+)/,
+    'spec version from packages/docs/specification.md',
+  );
+  const constantsVersion = extractVersion(
+    constantsContent,
+    /schemaVersion:\s*['"]?(\d+\.\d+\.\d+)['"]?/,
+    'schemaVersion from protocol/constants.yml',
+  );
+
+  const aidPackage = await readJson(path.join(repoRoot, 'packages', 'aid', 'package.json'));
+  const doctorPackage = await readJson(path.join(repoRoot, 'packages', 'aid-doctor', 'package.json'));
+  const conformancePackage = await readJson(
+    path.join(repoRoot, 'packages', 'aid-conformance', 'package.json'),
+  );
+
+  if (constantsVersion !== specVersion) {
+    mismatches.push(
+      `Version mismatch: protocol/constants.yml schemaVersion=${constantsVersion} but specification.md=${specVersion}`,
+    );
+  }
+
+  if (aidPackage.version !== specVersion) {
+    mismatches.push(
+      `Version mismatch: packages/aid/package.json version=${aidPackage.version} but specification.md=${specVersion}`,
+    );
+  }
+
+  if (doctorPackage.version !== aidPackage.version) {
+    mismatches.push(
+      `Version mismatch: packages/aid-doctor/package.json version=${doctorPackage.version} but packages/aid/package.json=${aidPackage.version}`,
+    );
+  }
+
+  if (conformancePackage.version !== aidPackage.version) {
+    mismatches.push(
+      `Version mismatch: packages/aid-conformance/package.json version=${conformancePackage.version} but packages/aid/package.json=${aidPackage.version}`,
+    );
+  }
+
+  const minor = minorOf(specVersion);
+  const expectedSpecTag = new RegExp(`^\\s*-\\s*v${minor.replace('.', '\\.')}\\s*$`, 'm');
+  if (!expectedSpecTag.test(specContent)) {
+    mismatches.push(
+      `Spec frontmatter mismatch: expected packages/docs/specification.md tags to include v${minor}`,
+    );
+  }
+
+  if (!rootReadme.includes(`### v${minor} Highlights`)) {
+    mismatches.push(`README.md mismatch: expected heading "### v${minor} Highlights"`);
+  }
+
+  if (!rootReadme.includes(`### v${minor} Release Status`)) {
+    mismatches.push(`README.md mismatch: expected heading "### v${minor} Release Status"`);
+  }
+
+  if (!aidReadme.includes(`## v${minor} Notes`)) {
+    mismatches.push(`packages/aid/README.md mismatch: expected heading "## v${minor} Notes"`);
+  }
+
+  if (!agentsContent.includes(`### v${minor} notes (Final)`)) {
+    mismatches.push(`AGENTS.md mismatch: expected heading "### v${minor} notes (Final)"`);
+  }
+
+  return mismatches;
 };
 
 const extractDocLinks = (content) => {
@@ -96,10 +195,18 @@ const verifyRequiredDocs = async (repoRoot) => {
   const docsRoot = path.join(repoRoot, 'packages', 'docs');
   const missing = [];
 
-  for (const relativeFile of REQUIRED_DOCS) {
-    const absoluteFile = path.join(docsRoot, relativeFile);
-    if (!(await fileExists(absoluteFile))) {
-      missing.push(relativeFile);
+  for (const alternatives of REQUIRED_DOCS) {
+    let found = false;
+    for (const relativeFile of alternatives) {
+      const absoluteFile = path.join(docsRoot, relativeFile);
+      if (await fileExists(absoluteFile)) {
+        found = true;
+        break;
+      }
+    }
+
+    if (!found) {
+      missing.push(alternatives.join(' or '));
     }
   }
 
@@ -110,11 +217,20 @@ const main = async () => {
   const repoRoot = process.cwd();
   const missingLinks = await findMissingLinks(repoRoot);
   const missingRequiredDocs = await verifyRequiredDocs(repoRoot);
+  const versionMismatches = await verifyVersionAlignment(repoRoot);
 
   if (missingRequiredDocs.length > 0) {
     console.error('Missing required canonical docs files:');
     for (const missing of missingRequiredDocs) {
       console.error(`- packages/docs/${missing}`);
+    }
+    process.exit(1);
+  }
+
+  if (versionMismatches.length > 0) {
+    console.error('Version alignment checks failed:');
+    for (const mismatch of versionMismatches) {
+      console.error(`- ${mismatch}`);
     }
     process.exit(1);
   }

@@ -4,7 +4,7 @@ description: 'The DNS-based discovery protocol for the agentic web.'
 icon: material/dns
 ---
 
-[View raw markdown](https://github.com/agentcommunity/agent-identity-discovery/raw/main/packages/docs/specification.md)
+[View raw markdown](https://github.com/agentcommunity/agent-identity-discovery/raw/main/packages/docs/index.md)
 
 # Agent Identity & Discovery (AID)
 
@@ -18,7 +18,10 @@ It's a simple, open standard that uses the internet's own directory—DNS—to a
 
 No more hunting through API docs. No more manual configuration. It's the zero-friction layer for a world of interconnected agents.
 
-[🚀 Try it Now — Live Resolver & Generator\*\*](https://aid.agentcommunity.org/workbench){ .md-button .md-button--secondary target="\_blank" }
+!!! tip "New to AID?"
+Start with [Core Concepts](Understand/concepts.md) for a quick overview, then follow the [Quick Start](quickstart/index.md) to publish your first agent.
+
+[Try it Now — Live Resolver & Generator](https://aid.agentcommunity.org/workbench)
 
 ---
 
@@ -62,11 +65,11 @@ flowchart LR
 ### Want the deep dive?
 
 - [**Specification**](specification.md) – _The exact format, algorithms, and security rules._
+- [**Core Concepts**](Understand/concepts.md) – _How DNS discovery, protocols, and identity fit together._
 - [**Identity & PKA**](Reference/identity_pka.md) – _How AID provides cryptographic proof of an agent's identity._
-- [**Rationale**](rationale.md) – _The design philosophy behind AID._
-- [**Security Best Practices**](security.md) – _DNSSEC, redirect handling, local execution, IDN safety, TTL & caching._
+- [**Rationale**](Understand/rationale.md) – _The design philosophy behind AID._
+- [**Security Best Practices**](Reference/security.md) – _DNSSEC, redirect handling, local execution, IDN safety, TTL & caching._
 - [**aid-doctor CLI**](Tooling/aid_doctor.md) – _Validate, secure, and generate AID records._
-- [**What’s New**](Reference/whats_new.md) – _Recent documentation updates._
 
 ---
 
@@ -85,10 +88,6 @@ AID has official libraries and tools across multiple languages, with additional 
 - Web Workbench: Interactive generator/resolver
 
 See the full package overview in the [Quick Start](quickstart/index.md#package-overview) and the cross-language [Discovery API](Reference/discovery_api.md).
-
-!!! tip "Implementation Files"
-All SDKs share constants generated from a single source: [`protocol/constants.yml`](../protocol/constants.yml).
-View generated files: [TypeScript](../packages/aid/src/constants.ts), [Python](../packages/aid-py/aid_py/constants.py), [Go](../packages/aid-go/constants_gen.go), [Rust](../packages/aid-rs/src/constants_gen.rs), [.NET](../packages/aid-dotnet/src/Constants.g.cs), [Java](../packages/aid-java/src/main/java/org/agentcommunity/aid/Constants.java)
 
 ---
 

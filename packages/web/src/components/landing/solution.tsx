@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Globe, Zap, Layers, ShieldCheck } from 'lucide-react';
 import { Reveal, RevealStagger } from './reveal';
@@ -23,8 +24,8 @@ const solutions: Array<{
     iconColor: 'text-blue-600',
     iconBg: 'bg-blue-50 dark:bg-blue-950/30',
     links: [
-      { label: 'Quick Start', href: 'https://docs.agentcommunity.org/aid/quickstart/index' },
-      { label: 'Specification', href: 'https://docs.agentcommunity.org/aid/specification' },
+      { label: 'Quick Start', href: '/docs/quickstart' },
+      { label: 'Specification', href: '/docs/specification' },
     ],
   },
   {
@@ -38,11 +39,11 @@ const solutions: Array<{
     links: [
       {
         label: 'Discovery API',
-        href: 'https://docs.agentcommunity.org/aid/Reference/discovery_api',
+        href: '/docs/Reference/discovery_api',
       },
       {
         label: 'Troubleshooting',
-        href: 'https://docs.agentcommunity.org/aid/Reference/troubleshooting',
+        href: '/docs/Reference/troubleshooting',
       },
     ],
   },
@@ -55,13 +56,13 @@ const solutions: Array<{
     iconColor: 'text-purple-600',
     iconBg: 'bg-purple-50 dark:bg-purple-950/30',
     links: [
-      { label: 'MCP Guide', href: 'https://docs.agentcommunity.org/aid/quickstart/quickstart_mcp' },
-      { label: 'A2A Guide', href: 'https://docs.agentcommunity.org/aid/quickstart/quickstart_a2a' },
+      { label: 'MCP Guide', href: '/docs/quickstart/quickstart_mcp' },
+      { label: 'A2A Guide', href: '/docs/quickstart/quickstart_a2a' },
       {
         label: 'OpenAPI Guide',
-        href: 'https://docs.agentcommunity.org/aid/quickstart/quickstart_openapi',
+        href: '/docs/quickstart/quickstart_openapi',
       },
-      { label: 'Protocols', href: 'https://docs.agentcommunity.org/aid/Reference/protocols' },
+      { label: 'Protocols', href: '/docs/Reference/protocols' },
     ],
   },
   {
@@ -75,9 +76,9 @@ const solutions: Array<{
     links: [
       {
         label: 'Identity & PKA',
-        href: 'https://docs.agentcommunity.org/aid/Reference/identity_pka',
+        href: '/docs/Reference/identity_pka',
       },
-      { label: 'Security', href: 'https://docs.agentcommunity.org/aid/security' },
+      { label: 'Security', href: '/docs/security' },
     ],
   },
 ];
@@ -138,15 +139,13 @@ export function Solution() {
                   {solution.links && (
                     <div className="mt-4 flex flex-wrap gap-2">
                       {solution.links.map((link, linkIndex) => (
-                        <a
+                        <Link
                           key={linkIndex}
                           href={link.href}
-                          target="_blank"
-                          rel="noopener noreferrer"
                           className="text-xs text-muted-foreground hover:text-primary transition-colors duration-200 underline decoration-1 underline-offset-2"
                         >
                           {link.label}
-                        </a>
+                        </Link>
                       ))}
                     </div>
                   )}

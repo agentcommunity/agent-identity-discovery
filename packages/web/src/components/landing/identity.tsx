@@ -8,7 +8,7 @@ import { ShieldCheck } from 'lucide-react';
 import { Reveal } from './reveal';
 
 const TXT_PKA_SNIPPET = `_agent.example.com. 300 IN TXT \
-  "v=aid1;\\\n  uri=https://api.example.com/mcp;\\\n  p=mcp;\\\n  k=z7rW8rTq8o4mM6vVf7w1k3m4uQn9p2YxCAbcDeFgHiJ;\\\n  i=g1"`;
+  "v=aid1;\\\n  u=https://api.example.com/mcp;\\\n  p=mcp;\\\n  k=z7rW8rTq8o4mM6vVf7w1k3m4uQn9p2YxCAbcDeFgHiJ;\\\n  i=g1"`;
 
 export function Identity() {
   return (
@@ -55,9 +55,7 @@ export function Identity() {
                     </ul>
                     <div>
                       <Button variant="outline" asChild>
-                        <Link href="https://docs.agentcommunity.org/aid/Reference/identity_pka">
-                          Learn more
-                        </Link>
+                        <Link href="/docs/Reference/identity_pka">Learn more</Link>
                       </Button>
                     </div>
                   </div>
