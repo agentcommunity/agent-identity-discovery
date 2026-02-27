@@ -16,6 +16,11 @@ type parityRecord struct {
 
 type parityRoot struct {
 	Records []parityRecord `json:"records"`
+	Invalid []struct {
+		Name      string `json:"name"`
+		Raw       string `json:"raw"`
+		ErrorCode string `json:"errorCode"`
+	} `json:"invalid"`
 }
 
 func TestParity(t *testing.T) {
@@ -66,6 +71,22 @@ func TestParity(t *testing.T) {
 			jg, _ := json.Marshal(got)
 			je, _ := json.Marshal(rec.Expected)
 			t.Errorf("%s: mismatch\n got %s\nwant %s", rec.Name, string(jg), string(je))
+		}
+	}
+
+	for _, rec := range fx.Invalid {
+		_, err := Parse(rec.Raw)
+		if err == nil {
+			t.Errorf("%s: expected parse error", rec.Name)
+			continue
+		}
+		aidErr, ok := err.(*AidError)
+		if !ok {
+			t.Errorf("%s: expected AidError, got %T", rec.Name, err)
+			continue
+		}
+		if rec.ErrorCode != "" && aidErr.Symbol != rec.ErrorCode {
+			t.Errorf("%s: got error %s, want %s", rec.Name, aidErr.Symbol, rec.ErrorCode)
 		}
 	}
 }

@@ -57,6 +57,21 @@
       "name": "pka-missing-kid",
       "raw": "v=aid1;uri=https://api.example.com/mcp;p=mcp;k=z111",
       "errorCode": "ERR_INVALID_TXT"
+    },
+    {
+      "name": "duplicate-proto-fields",
+      "raw": "v=aid1;uri=https://api.example.com/mcp;proto=mcp;p=mcp",
+      "errorCode": "ERR_INVALID_TXT"
+    },
+    {
+      "name": "unsupported-proto",
+      "raw": "v=aid1;uri=https://api.example.com/mcp;proto=unknown",
+      "errorCode": "ERR_UNSUPPORTED_PROTO"
+    },
+    {
+      "name": "remote-non-https",
+      "raw": "v=aid1;uri=http://api.example.com/mcp;proto=mcp",
+      "errorCode": "ERR_INVALID_TXT"
     }
   ]
 }

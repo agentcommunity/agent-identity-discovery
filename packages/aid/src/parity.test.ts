@@ -13,13 +13,26 @@ interface FixtureRecord {
 
 const __dirnameFix = path.dirname(fileURLToPath(import.meta.url));
 const fixturePath = path.resolve(__dirnameFix, '../../..', 'test-fixtures', 'golden.json');
-const fixture = JSON.parse(fs.readFileSync(fixturePath, 'utf8')) as { records: FixtureRecord[] };
+const fixture = JSON.parse(fs.readFileSync(fixturePath, 'utf8')) as {
+  records: FixtureRecord[];
+  invalid?: Array<{ name: string; raw: string; errorCode?: string }>;
+};
 
 describe('cross-language parity – TypeScript parser', () => {
   for (const rec of fixture.records) {
     it(`parses ${rec.name}`, () => {
       const parsed = parse(rec.raw);
       expect(parsed).toEqual(rec.expected);
+    });
+  }
+
+  for (const rec of fixture.invalid ?? []) {
+    it(`rejects invalid fixture ${rec.name}`, () => {
+      expect(() => parse(rec.raw)).toThrowError(
+        expect.objectContaining({
+          errorCode: rec.errorCode,
+        }),
+      );
     });
   }
 });

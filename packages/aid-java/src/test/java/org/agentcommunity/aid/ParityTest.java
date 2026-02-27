@@ -22,6 +22,12 @@ public class ParityTest {
     public Map<String, String> expected = new HashMap<>();
   }
 
+  static class InvalidRecord {
+    public String name;
+    public String raw;
+    public String errorCode;
+  }
+
   @Test
   public void parsesValidExamplesFromGolden() throws IOException {
     // Load golden.json
@@ -41,6 +47,11 @@ public class ParityTest {
       if (gr.expected.containsKey("desc")) {
         assertEquals(gr.expected.get("desc"), r.desc, gr.name);
       }
+    }
+
+    for (InvalidRecord ir : parseInvalid(json)) {
+      AidError err = assertThrows(AidError.class, () -> Parser.parse(ir.raw), ir.name);
+      assertEquals(ir.errorCode, err.errorCode, ir.name);
     }
   }
 
@@ -97,5 +108,22 @@ public class ParityTest {
 
   private static String unescape(String s) {
     return s.replace("\\\\", "\\").replace("\\\"", "\"");
+  }
+
+  private static List<InvalidRecord> parseInvalid(String json) {
+    List<InvalidRecord> list = new ArrayList<>();
+    Pattern invalidPattern =
+        Pattern.compile(
+            "\\{\\s*\\\"name\\\"\\s*:\\s*\\\"(.*?)\\\"\\s*,\\s*\\\"raw\\\"\\s*:\\s*\\\"(.*?)\\\"\\s*,\\s*\\\"errorCode\\\"\\s*:\\s*\\\"(.*?)\\\"\\s*\\}",
+            Pattern.DOTALL);
+    Matcher m = invalidPattern.matcher(json);
+    while (m.find()) {
+      InvalidRecord ir = new InvalidRecord();
+      ir.name = unescape(m.group(1));
+      ir.raw = unescape(m.group(2));
+      ir.errorCode = unescape(m.group(3));
+      list.add(ir);
+    }
+    return list;
   }
 }

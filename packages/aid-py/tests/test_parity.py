@@ -20,4 +20,12 @@ def test_parity():
     for rec in _fixture["records"]:
         parsed = parse(rec["raw"])
         # Convert TypedDict to plain dict for comparison
-        assert dict(parsed) == rec["expected"] 
+        assert dict(parsed) == rec["expected"]
+
+    for rec in _fixture.get("invalid", []):
+        try:
+            parse(rec["raw"])
+        except Exception as exc:  # noqa: BLE001
+            assert getattr(exc, "error_code", None) == rec.get("errorCode")
+        else:
+            raise AssertionError(f'{rec["name"]}: expected parse failure')
