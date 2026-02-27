@@ -57,9 +57,24 @@ console.log('Agent:', record.proto, record.uri);
 - `discover(domain: string, options?)` → `{ record, ttl, queryName }`
   - Node uses DNS; Browser uses DNS-over-HTTPS.
   - Canonical query is `_agent.<exact-host>`. Clients do not implicitly walk to parent hosts. When a specific protocol is requested, clients may query `_agent._<proto>.<exact-host>` as an optimization.
+  - Enterprise controls: `securityMode: 'balanced' | 'strict'` plus low-level policy knobs for DNSSEC, PKA, downgrade handling, and `.well-known`.
 - `parse(txt: string)` → validated AID record
 - `AidError` – error class exposing `code` (numeric) and `errorCode` (symbol)
 - Constants and types exported from `@agentcommunity/aid`
+
+### Example: enterprise policy preset
+
+```ts
+import { discover } from '@agentcommunity/aid';
+
+const result = await discover('example.com', {
+  securityMode: 'balanced',
+  previousSecurity: { pka: 'zOldKey', kid: 'g1' },
+});
+
+console.log(result.security.mode);
+console.log(result.security.warnings);
+```
 
 ## v1.2 Notes (PKA + .well-known)
 

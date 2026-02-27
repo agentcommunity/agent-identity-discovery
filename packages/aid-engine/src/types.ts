@@ -1,4 +1,12 @@
-import type { AidRecord } from '@agentcommunity/aid';
+import type {
+  AidRecord,
+  DnssecPolicy,
+  DowngradePolicy,
+  PkaPolicy,
+  PreviousSecurityState,
+  SecurityMode,
+  WellKnownPolicy,
+} from '@agentcommunity/aid';
 
 export interface CacheEntry {
   lastSeen: string;
@@ -101,6 +109,12 @@ export interface CheckOptions {
   timeoutMs: number;
   allowFallback: boolean;
   wellKnownTimeoutMs: number;
+  securityMode?: SecurityMode;
+  dnssecPolicy?: DnssecPolicy;
+  pkaPolicy?: PkaPolicy;
+  downgradePolicy?: DowngradePolicy;
+  wellKnownPolicy?: WellKnownPolicy;
+  previousSecurity?: PreviousSecurityState;
   showDetails?: boolean;
   dumpWellKnownPath?: string | null;
   checkDowngrade?: boolean;

@@ -51,6 +51,9 @@ describe('AID Doctor CLI', () => {
       expect(cliContent).toContain('.description(');
       expect(cliContent).toContain('.version(');
       expect(cliContent).toContain('.command(');
+      expect(cliContent).toContain('--security-mode <mode>');
+      expect(cliContent).toContain('--dnssec <policy>');
+      expect(cliContent).toContain('--pka-policy <policy>');
     });
   });
 

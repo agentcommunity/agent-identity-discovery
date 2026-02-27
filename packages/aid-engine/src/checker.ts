@@ -62,6 +62,12 @@ export async function runCheck(domain: string, opts: CheckOptions): Promise<Doct
       timeoutMs: opts.timeoutMs,
       allowFallback: opts.allowFallback,
       wellKnownTimeoutMs: opts.wellKnownTimeoutMs,
+      ...(opts.securityMode ? { securityMode: opts.securityMode } : {}),
+      ...(opts.dnssecPolicy ? { dnssecPolicy: opts.dnssecPolicy } : {}),
+      ...(opts.pkaPolicy ? { pkaPolicy: opts.pkaPolicy } : {}),
+      ...(opts.downgradePolicy ? { downgradePolicy: opts.downgradePolicy } : {}),
+      ...(opts.wellKnownPolicy ? { wellKnownPolicy: opts.wellKnownPolicy } : {}),
+      ...(opts.previousSecurity ? { previousSecurity: opts.previousSecurity } : {}),
     });
     // This is the success path now
     if (!dnsRes.ok) {
@@ -98,6 +104,12 @@ export async function runCheck(domain: string, opts: CheckOptions): Promise<Doct
     const record = value.record;
     report.record.parsed = record;
     report.record.valid = true;
+    for (const warning of value.security.warnings) {
+      report.record.warnings.push({
+        code: warning.code,
+        message: warning.message,
+      });
+    }
     report.record.raw = (() => {
       // For DNS, we don't receive raw concatenated string from SDK; synthesize minimal
       // to enable byte warnings based on a canonicalized render.

@@ -42,6 +42,11 @@ aid-doctor json example.com
 - `--timeout <ms>`: DNS query timeout (default: 5000)
 - `--no-fallback`: disable `.well-known` fallback on DNS miss
 - `--fallback-timeout <ms>`: HTTP timeout for `.well-known` (default: 2000)
+- `--security-mode <mode>`: enterprise preset (`balanced` or `strict`)
+- `--dnssec <policy>`: DNSSEC policy (`off`, `prefer`, `require`)
+- `--pka-policy <policy>`: PKA policy (`if-present`, `require`)
+- `--downgrade-policy <policy>`: downgrade policy (`off`, `warn`, `fail`)
+- `--well-known-policy <policy>`: `.well-known` policy (`auto`, `disable`)
 - `--show-details`: include fallback usage and PKA status in output
 - `--code` (check): exit with specific error code on failure
 
@@ -75,9 +80,13 @@ aid-doctor json example.com > result.json
 # Show PKA/fallback details (v1.1)
 aid-doctor check example.com --show-details
 
+# Enterprise preset with downgrade cache
+aid-doctor check example.com --security-mode strict --check-downgrade
+
 # Local testing with a mock HTTP server (insecure well-known)
 # (Use only for local dev)
 AID_ALLOW_INSECURE_WELL_KNOWN=1 aid-doctor check localhost:19081 --show-details --fallback-timeout 2000
+```
 
 ### PKA handshake expectations
 
@@ -90,7 +99,6 @@ AID_ALLOW_INSECURE_WELL_KNOWN=1 aid-doctor check localhost:19081 --show-details 
 ### Loopback HTTP (dev‑only)
 
 When `AID_ALLOW_INSECURE_WELL_KNOWN=1` is set and the domain is loopback (`localhost`/`127.0.0.1`/`::1`), the doctor permits `http://` in the `.well-known` path for local testing. All other validations, including PKA, still run. TXT discovery always enforces `https://` for remote agents.
-```
 
 ## License
 

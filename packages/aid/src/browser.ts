@@ -16,6 +16,21 @@
 import { type AidRecord, DNS_SUBDOMAIN } from './constants.js';
 import { AidError, parse, canonicalizeRaw, AidRecordValidator } from './parser.js';
 import { performPKAHandshake } from './pka.js';
+import {
+  type DiscoverySecurity,
+  type DnssecPolicy,
+  type DowngradePolicy,
+  type PkaPolicy,
+  type PreviousSecurityState,
+  type SecurityMode,
+  type WellKnownPolicy,
+  createDiscoverySecurity,
+  enforceDnssecPolicy,
+  enforceDowngradePolicy,
+  enforcePkaPolicy,
+  enforceWellKnownPolicy,
+  resolveSecurityPolicy,
+} from './discovery-security.js';
 
 /**
  * DNS-over-HTTPS query result from Cloudflare
@@ -51,6 +66,8 @@ export interface DiscoveryResult {
   queryName: string;
   /** TTL of the DNS record in seconds */
   ttl?: number;
+  /** Security policy evaluation for the chosen result. */
+  security: DiscoverySecurity;
 }
 
 /**
@@ -67,6 +84,18 @@ export interface DiscoveryOptions {
   wellKnownFallback?: boolean;
   /** Timeout for .well-known fetch in milliseconds (default: 2000) */
   wellKnownTimeoutMs?: number;
+  /** Enterprise security preset. */
+  securityMode?: SecurityMode;
+  /** DNSSEC policy for successful DNS answers. */
+  dnssecPolicy?: DnssecPolicy;
+  /** PKA presence policy for the final discovered record. */
+  pkaPolicy?: PkaPolicy;
+  /** Downgrade handling when previous security state is supplied. */
+  downgradePolicy?: DowngradePolicy;
+  /** `.well-known` fallback policy. */
+  wellKnownPolicy?: WellKnownPolicy;
+  /** Previously observed PKA/KID state for downgrade detection. */
+  previousSecurity?: PreviousSecurityState;
 }
 
 /**
@@ -112,14 +141,19 @@ function looksLikeAidRecord(raw: string): boolean {
 async function fetchWellKnown(
   domain: string,
   timeoutMs = 2000,
+  options: DiscoveryOptions = {},
 ): Promise<{
   record: AidRecord;
   raw: string;
   queryName: string;
+  security: DiscoverySecurity;
 }> {
+  const policy = resolveSecurityPolicy(options);
+  const security = createDiscoverySecurity(policy, true);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const url = `https://${domain}/.well-known/agent`;
+  enforceWellKnownPolicy(security, url);
   try {
     const res = await fetch(url, {
       signal: controller.signal,
@@ -175,7 +209,9 @@ async function fetchWellKnown(
         throw pkaError;
       }
     }
-    return { record, raw: text.trim(), queryName: url };
+    enforcePkaPolicy(record, url, security);
+    enforceDowngradePolicy(record, url, policy, security);
+    return { record, raw: text.trim(), queryName: url, security };
   } catch (e) {
     if (e instanceof AidError) {
       // Preserve ERR_SECURITY errors from PKA verification, don't convert to ERR_FALLBACK_FAILED
@@ -200,7 +236,7 @@ async function fetchWellKnown(
 async function queryTxtRecordsDoH(
   queryName: string,
   options: DiscoveryOptions = {},
-): Promise<Array<{ data: string; ttl: number }>> {
+): Promise<{ records: Array<{ data: string; ttl: number }>; ad: boolean }> {
   const { timeout = 5000, dohProvider = 'https://cloudflare-dns.com/dns-query' } = options;
 
   const url = new URL(dohProvider);
@@ -247,7 +283,7 @@ async function queryTxtRecordsDoH(
       throw new AidError('ERR_NO_RECORD', `No _agent TXT record found for ${queryName}`);
     }
 
-    return txtRecords;
+    return { records: txtRecords, ad: dnsResult.AD === true };
   } catch (error) {
     clearTimeout(timeoutId);
 
@@ -280,10 +316,11 @@ export async function discover(
   options: DiscoveryOptions = {},
 ): Promise<DiscoveryResult> {
   const { protocol, wellKnownFallback = true, wellKnownTimeoutMs = 2000 } = options;
+  const policy = resolveSecurityPolicy(options);
 
   const tryQuery = async (name: string): Promise<DiscoveryResult> => {
-    const txtRecords = await queryTxtRecordsDoH(name, options);
-    const validRecords: DiscoveryResult[] = [];
+    const { records: txtRecords, ad } = await queryTxtRecordsDoH(name, options);
+    const validRecords: Array<Omit<DiscoveryResult, 'security'>> = [];
     let lastAidError: AidError | null = null;
 
     for (const txtRecord of txtRecords) {
@@ -326,7 +363,13 @@ export async function discover(
       if (result.record.pka) {
         await performPKAHandshake(result.record.uri, result.record.pka, result.record.kid ?? '');
       }
-      return result;
+      const security = createDiscoverySecurity(policy, false);
+      enforcePkaPolicy(result.record, name, security);
+      enforceDowngradePolicy(result.record, name, policy, security);
+      if (policy.dnssecPolicy !== 'off') {
+        enforceDnssecPolicy(security, name, ad);
+      }
+      return { ...result, security };
     }
 
     if (validRecords.length > 1) {
@@ -363,13 +406,18 @@ export async function discover(
   } catch (error) {
     if (
       wellKnownFallback &&
+      policy.wellKnownPolicy !== 'disable' &&
       error instanceof AidError &&
       (error.errorCode === 'ERR_NO_RECORD' || error.errorCode === 'ERR_SECURITY') // ERR_SECURITY can be a timeout
     ) {
       try {
-        const { record, queryName } = await fetchWellKnown(domain, wellKnownTimeoutMs);
+        const { record, queryName, security } = await fetchWellKnown(
+          domain,
+          wellKnownTimeoutMs,
+          options,
+        );
         // well-known does not provide a TTL, so we use a sensible default.
-        return { record, domain, queryName, ttl: 300 };
+        return { record, domain, queryName, ttl: 300, security };
       } catch {
         // Throw original error if fallback fails to provide better context
         throw error;

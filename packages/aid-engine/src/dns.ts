@@ -1,4 +1,4 @@
-import { discover, AidError, SPEC_VERSION } from '@agentcommunity/aid';
+import { discover, AidError } from '@agentcommunity/aid';
 import type { ProbeAttempt } from './types';
 
 export interface DnsQueryResult<T> {
@@ -20,20 +20,33 @@ export async function runBaseDiscovery(
     timeoutMs: number;
     allowFallback: boolean;
     wellKnownTimeoutMs: number;
+    securityMode?: import('@agentcommunity/aid').SecurityMode;
+    dnssecPolicy?: import('@agentcommunity/aid').DnssecPolicy;
+    pkaPolicy?: import('@agentcommunity/aid').PkaPolicy;
+    downgradePolicy?: import('@agentcommunity/aid').DowngradePolicy;
+    wellKnownPolicy?: import('@agentcommunity/aid').WellKnownPolicy;
+    previousSecurity?: import('@agentcommunity/aid').PreviousSecurityState;
   },
 ): Promise<
   DnsQueryResult<{
     record: import('@agentcommunity/aid').AidRecord;
     queryName: string;
     ttl?: number;
+    security: import('@agentcommunity/aid').DiscoverySecurity;
   }>
 > {
   try {
     const res = await discover(domain, {
-      protocol: options.protocol,
+      ...(options.protocol ? { protocol: options.protocol } : {}),
       timeout: options.timeoutMs,
       wellKnownFallback: options.allowFallback,
       wellKnownTimeoutMs: options.wellKnownTimeoutMs,
+      ...(options.securityMode ? { securityMode: options.securityMode } : {}),
+      ...(options.dnssecPolicy ? { dnssecPolicy: options.dnssecPolicy } : {}),
+      ...(options.pkaPolicy ? { pkaPolicy: options.pkaPolicy } : {}),
+      ...(options.downgradePolicy ? { downgradePolicy: options.downgradePolicy } : {}),
+      ...(options.wellKnownPolicy ? { wellKnownPolicy: options.wellKnownPolicy } : {}),
+      ...(options.previousSecurity ? { previousSecurity: options.previousSecurity } : {}),
     });
     return { ok: true, value: res };
   } catch (e) {
@@ -50,13 +63,11 @@ export function attemptFromDnsResult(
   result: { ok: boolean; value?: { ttl?: number; record: { v: string } }; error?: AidError },
 ): ProbeAttempt {
   if (result.ok) {
-    const rawLen = result.value?.record?.v === SPEC_VERSION ? undefined : undefined;
     return {
       name,
       type: 'TXT',
       result: 'NOERROR',
       ttl: result.value?.ttl,
-      byteLength: rawLen,
     };
   }
   const err = result.error;
