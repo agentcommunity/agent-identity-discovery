@@ -11,12 +11,14 @@ Cross-language parity for AID `discover()` wrappers with consistent security and
 ## Common behaviors
 
 - IDNA: Normalize domains to A-label (Punycode) before DNS.
-- DNS-first: Query `_agent.<domain>`. When `protocol` is specified, try `_agent._<proto>.<domain>` then `_agent.<proto>.<domain>` before base.
+- Exact-host only: build DNS and `.well-known` lookups from the exact host the caller supplied after IDNA normalization. Do not implicitly walk to parent hosts.
+- DNS-first: Query `_agent.<domain>`. When `protocol` is specified, try protocol-specific names for that same exact host before base.
 - TXT parsing: Enforce v1.2 record rules (aliases, schemes, metadata constraints).
 - Multiple TXT answers: exactly one valid AID record at a queried DNS name succeeds; `2+` valid records fail as ambiguity instead of using resolver order.
 - PKA: When `pka`/`kid` present, perform Ed25519 HTTP Message Signatures handshake with exact covered fields set.
 - Well-known fallback: Only on `ERR_NO_RECORD` or `ERR_DNS_LOOKUP_FAILED`. HTTPS JSON, ≤64KB, ~2s timeout, no redirects. Successful fallback uses `TTL=300`.
 - Redirect policy: Do not auto-follow redirects for handshake or well-known.
+- Delegation: if operators want inheritance, they should delegate the exact `_agent.<child-host>` label in DNS, for example with `CNAME`.
 
 ## Options by language
 

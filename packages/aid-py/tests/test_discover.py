@@ -105,6 +105,26 @@ def test_discover_no_record(monkeypatch):
         discover("missing.com") 
 
 
+def test_discover_queries_only_exact_host(monkeypatch):
+    import dns.resolver
+
+    queries = []
+
+    def _fake_resolve(name, rdtype, lifetime=5.0):
+        queries.append(name)
+        if name == "_agent.app.team.example.com":
+            return _FakeAnswer(["v=aid1;u=https://app.team.example.com/mcp;p=mcp"], 300)
+        raise dns.resolver.NXDOMAIN()
+
+    monkeypatch.setattr(dns.resolver, "resolve", _fake_resolve)
+    record, ttl = discover("app.team.example.com")
+    assert record["uri"] == "https://app.team.example.com/mcp"
+    assert ttl == 300
+    assert queries == ["_agent.app.team.example.com"]
+    assert "_agent.team.example.com" not in queries
+    assert "_agent.example.com" not in queries
+
+
 def test_discover_succeeds_with_one_valid_and_one_malformed(monkeypatch):
     import dns.resolver
 

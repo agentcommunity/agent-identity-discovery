@@ -107,7 +107,7 @@ _agent.local.test. 300 IN TXT "v=aid1;p=zeroconf;u=zeroconf:_mcp._tcp;s=Local De
 An AID Client, when given a `<domain>`, **MUST** perform these steps:
 
 1.  Normalize domain. If the domain contains non-ASCII characters, convert it to its Punycode A-label representation ([RFC5890]).
-2.  DNS lookup. Query the `TXT` record for `_agent.<domain>`. If no record is found or the lookup fails, the client MAY attempt a `.well-known` fallback (Appendix E). If both fail, stop with an error.
+2.  DNS lookup. Query the `TXT` record for `_agent.<exact-host-user-entered>`. Clients **MUST NOT** implicitly retry parent hosts such as `_agent.<parent-domain>`. If no record is found or the lookup fails, the client MAY attempt a `.well-known` fallback on the same exact host (Appendix E). If both fail, stop with an error.
 3.  Parse and validate. Parse the returned `TXT` answers as semicolon-delimited `key=value` records. Key comparisons **MUST** be case-insensitive. Clients **MUST** recognize single-letter aliases for all keys. If exactly one valid AID record is present at the queried DNS name, use it. If more than one valid AID record is present at the same queried DNS name, clients **MUST** fail due to ambiguity rather than choosing by answer order. Malformed answers do not matter when there is exactly one valid AID record.
 4.  Optional metadata. If `docs` (`d`) is present, clients MAY display it. If `dep` (`e`) is in the future, clients SHOULD warn. If `dep` is in the past, clients SHOULD fail gracefully.
 5.  Endpoint proof. If `pka` (`k`) is present, clients **MUST** perform the handshake in Appendix D. Use HTTP Message Signatures (RFC 9421) with Ed25519. Clients SHOULD warn on downgrade if a previously present `pka` is removed.
@@ -126,7 +126,26 @@ Client implementations **SHOULD** use these codes to report specific failure mod
 | `1004` | `ERR_DNS_LOOKUP_FAILED` | The DNS query failed for a network-related reason.                                        |
 | `1005` | `ERR_FALLBACK_FAILED`   | The `.well-known` fallback failed or returned invalid data.                               |
 
-### **2.4. Exposing Multiple Protocols (Non-Normative Guidance)**
+### **2.4. Exact-Host Semantics and Explicit Delegation**
+
+Discovery is exact-host by default. If the application asks for `app.team.example.com`, the canonical base query is `_agent.app.team.example.com`.
+
+Clients **MUST NOT** walk up the DNS hierarchy looking for `_agent.team.example.com` or `_agent.example.com`.
+
+If an operator wants child hosts to inherit a shared record, that inheritance **MUST** be expressed in DNS for the exact queried name. A common pattern is a `CNAME` from the child host's `_agent` label to a shared `_agent` record.
+
+**Examples:**
+
+```dns
+_agent.app.team.example.com. 300 IN TXT "v=aid1;p=mcp;uri=https://app.team.example.com/mcp"
+
+_agent.app.team.example.com. 300 IN CNAME _agent.shared.team.example.com.
+_agent.shared.team.example.com. 300 IN TXT "v=aid1;p=mcp;uri=https://gateway.team.example.com/mcp"
+```
+
+Protocol-specific lookups follow the same exact-host rule. If a client explicitly requests `mcp` for `app.team.example.com`, it may query `_agent._mcp.app.team.example.com` before `_agent.app.team.example.com`, but it **MUST NOT** query parent hosts unless the operator has delegated the exact child name in DNS.
+
+### **2.5. Exposing Multiple Protocols (Non-Normative Guidance)**
 
 The canonical location for discovery is the base record: `_agent.<domain>`. Providers **MAY** additionally expose distinct agent services (e.g., one for MCP and one for A2A) on protocol-specific subdomains using the underscore form `_agent._<proto>.<domain>`.
 
@@ -139,8 +158,8 @@ _agent._a2a.example.com. 300 IN TXT "v=aid1;p=a2a;uri=..."
 
 **Client behavior:**
 
-- By default, clients query the base `_agent.<domain>`.
-- When a specific protocol is explicitly requested (by the application), clients **MAY** first query the protocol-specific subdomain `_agent._<proto>.<domain>` and, if not found, fall back to the base record.
+- By default, clients query the base `_agent.<exact-host>`.
+- When a specific protocol is explicitly requested (by the application), clients **MAY** first query the protocol-specific subdomain `_agent._<proto>.<exact-host>` and, if not found, fall back to the base record for that same exact host.
 - Providers that publish only the base record remain fully compliant.
 
 ---

@@ -56,7 +56,7 @@ console.log('Agent:', record.proto, record.uri);
 
 - `discover(domain: string, options?)` → `{ record, ttl, queryName }`
   - Node uses DNS; Browser uses DNS-over-HTTPS.
-  - Canonical query is `_agent.<domain>`. When a specific protocol is requested, clients may query `_agent._<proto>.<domain>` as an optimization.
+  - Canonical query is `_agent.<exact-host>`. Clients do not implicitly walk to parent hosts. When a specific protocol is requested, clients may query `_agent._<proto>.<exact-host>` as an optimization.
 - `parse(txt: string)` → validated AID record
 - `AidError` – error class exposing `code` (numeric) and `errorCode` (symbol)
 - Constants and types exported from `@agentcommunity/aid`

@@ -40,7 +40,7 @@ import org.agentcommunity.aid.Discovery;
 import org.agentcommunity.aid.Discovery.DiscoveryOptions;
 
 var opts = new DiscoveryOptions();
-opts.protocol = "mcp";               // Try _agent._mcp., then _agent.mcp., then base
+opts.protocol = "mcp";               // Try protocol-specific names for the same exact host, then the exact-host base
 opts.timeout = java.time.Duration.ofSeconds(5);
 opts.wellKnownFallback = true;        // Only on ERR_NO_RECORD / ERR_DNS_LOOKUP_FAILED
 opts.wellKnownTimeout = java.time.Duration.ofSeconds(2);
@@ -48,6 +48,8 @@ opts.wellKnownTimeout = java.time.Duration.ofSeconds(2);
 var result = Discovery.discover("example.com", opts);
 System.out.println(result.record.proto + " at " + result.record.uri + ", ttl=" + result.ttl + ", name=" + result.queryName);
 ```
+
+Discovery is exact-host only. Passing `app.team.example.com` does not cause implicit fallback to `_agent.team.example.com` or `_agent.example.com`. Use DNS delegation on `_agent.app.team.example.com` if you want inheritance.
 
 ## Usage
 

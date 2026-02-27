@@ -57,6 +57,39 @@ describe('Client protocol resolution', () => {
     expect(queryName).toBe('_agent.example.com');
   });
 
+  it('keeps protocol discovery on the exact host and never walks parent domains', async () => {
+    const calls: string[] = [];
+    const { query } = await import('dns-query');
+    (query as any).mockImplementation(async ({ question }: { question: { name: string } }) => {
+      calls.push(question.name);
+      if (question.name === '_agent._mcp.app.team.example.com') {
+        return { rcode: 'NXDOMAIN', answers: [] };
+      }
+      if (question.name === '_agent.app.team.example.com') {
+        return {
+          rcode: 'NOERROR',
+          answers: [
+            {
+              type: 'TXT',
+              name: '_agent.app.team.example.com',
+              data: 'v=aid1;u=https://app.team.example.com/mcp;p=mcp',
+            },
+          ],
+        };
+      }
+      return { rcode: 'NXDOMAIN', answers: [] };
+    });
+
+    const { record, queryName } = await discover('app.team.example.com', { protocol: 'mcp' });
+
+    expect(record.uri).toBe('https://app.team.example.com/mcp');
+    expect(queryName).toBe('_agent.app.team.example.com');
+    expect(calls).toEqual(['_agent._mcp.app.team.example.com', '_agent.app.team.example.com']);
+    expect(calls).not.toContain('_agent._mcp.team.example.com');
+    expect(calls).not.toContain('_agent.team.example.com');
+    expect(calls).not.toContain('_agent.example.com');
+  });
+
   it('fails on multiple valid TXT answers for the same queried name', async () => {
     const { query } = await import('dns-query');
     (query as any).mockResolvedValue({

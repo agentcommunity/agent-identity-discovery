@@ -38,7 +38,7 @@ using AidDiscovery;
 var result = await Discovery.DiscoverAsync(
   domain: "example.com",
   new DiscoveryOptions {
-    Protocol = "mcp",              // Try _agent._mcp., then _agent.mcp., then base
+    Protocol = "mcp",              // Try protocol-specific names for the same exact host, then the exact-host base
     Timeout = TimeSpan.FromSeconds(5),
     WellKnownFallback = true,       // Only on ERR_NO_RECORD / ERR_DNS_LOOKUP_FAILED
     WellKnownTimeout = TimeSpan.FromSeconds(2)
@@ -47,6 +47,8 @@ var result = await Discovery.DiscoverAsync(
 
 Console.WriteLine($"{result.Record.Proto} at {result.Record.Uri}, ttl={result.Ttl}, qname={result.QueryName}");
 ```
+
+Discovery is exact-host only. Passing `app.team.example.com` does not cause implicit fallback to `_agent.team.example.com` or `_agent.example.com`. Use DNS delegation on `_agent.app.team.example.com` if you want inheritance.
 
 ### Example: Handshake only
 

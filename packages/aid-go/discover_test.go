@@ -31,6 +31,45 @@ func TestDiscoverNoRecord(t *testing.T) {
 	}
 }
 
+func TestDiscoverWithProtocolStaysOnExactHost(t *testing.T) {
+	var queries []string
+	lookupTXT = func(_ context.Context, name string) ([]string, error) {
+		queries = append(queries, name)
+		switch name {
+		case "_agent._mcp.app.team.example.com":
+			return []string{}, nil
+		case "_agent.mcp.app.team.example.com":
+			return []string{}, nil
+		case "_agent.app.team.example.com":
+			return []string{"v=aid1;u=https://app.team.example.com/mcp;p=mcp"}, nil
+		default:
+			return []string{}, nil
+		}
+	}
+
+	rec, _, err := DiscoverWithOptions("app.team.example.com", 2*time.Second, DiscoveryOptions{
+		Protocol:          "mcp",
+		WellKnownFallback: false,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.URI != "https://app.team.example.com/mcp" {
+		t.Fatalf("expected exact-host record, got %s", rec.URI)
+	}
+	if len(queries) != 3 ||
+		queries[0] != "_agent._mcp.app.team.example.com" ||
+		queries[1] != "_agent.mcp.app.team.example.com" ||
+		queries[2] != "_agent.app.team.example.com" {
+		t.Fatalf("unexpected query order: %#v", queries)
+	}
+	for _, q := range queries {
+		if q == "_agent._mcp.team.example.com" || q == "_agent.team.example.com" || q == "_agent.example.com" {
+			t.Fatalf("unexpected parent fallback query: %s", q)
+		}
+	}
+}
+
 func TestDiscoverSucceedsWithOneValidAndOneMalformedTXT(t *testing.T) {
 	lookupTXT = func(_ context.Context, _ string) ([]string, error) {
 		return []string{
