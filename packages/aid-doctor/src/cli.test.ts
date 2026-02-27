@@ -174,5 +174,67 @@ describe('AID Doctor CLI', () => {
       expect(output).toContain('💡 Add endpoint proof');
       expect(output).toContain('💡 Renew TLS certificate');
     });
+
+    it('should suggest canonical short keys when long TXT keys are detected', () => {
+      const report: DoctorReport = {
+        domain: 'example.com',
+        queried: {
+          strategy: 'base-first',
+          hint: { source: 'cli', present: false },
+          attempts: [{ name: '_agent.example.com', type: 'TXT', result: 'NOERROR', ttl: 300 }],
+          wellKnown: {
+            attempted: false,
+            used: false,
+            url: null,
+            httpStatus: null,
+            contentType: null,
+            byteLength: null,
+            status: null,
+            snippet: null,
+          },
+        },
+        record: {
+          raw: 'version=aid1;uri=https://a.co;proto=mcp',
+          parsed: { v: 'aid1', uri: 'https://a.co', proto: 'mcp' },
+          valid: true,
+          warnings: [
+            {
+              code: 'LONG_KEY_COMPAT',
+              message: 'Long TXT keys are compatibility-only in v1.x.',
+            },
+          ],
+          errors: [],
+        },
+        dnssec: { present: true, method: 'RRSIG', proof: {} },
+        tls: {
+          checked: true,
+          valid: true,
+          host: 'a.co',
+          sni: 'a.co',
+          issuer: 'Test',
+          san: ['a.co'],
+          validFrom: '',
+          validTo: '',
+          daysRemaining: 90,
+          redirectBlocked: false,
+        },
+        pka: {
+          present: true,
+          attempted: true,
+          verified: true,
+          kid: 'g1',
+          alg: 'ed25519',
+          createdSkewSec: 1,
+          covered: [],
+        },
+        downgrade: { checked: true, previous: null, status: 'first_seen' },
+        exitCode: 0,
+        cacheEntry: null,
+      };
+
+      const output = formatCheckResult(report);
+      expect(output).toContain('Canonicalize TXT keys');
+      expect(output).toContain('Use single-letter aliases');
+    });
   });
 });

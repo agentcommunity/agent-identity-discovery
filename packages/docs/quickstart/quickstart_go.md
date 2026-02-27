@@ -56,7 +56,7 @@ Notes
 ## Parse Raw TXT
 
 ```go
-rec, err := aid.Parse("v=aid1;uri=https://api.example.com/mcp;proto=mcp;desc=Example")
+rec, err := aid.Parse("v=aid1;u=https://api.example.com/mcp;p=mcp;s=Example")
 if err != nil { /* handle */ }
 fmt.Println(rec.URI)
 ```

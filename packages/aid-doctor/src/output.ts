@@ -16,6 +16,12 @@ function generateActionableSuggestions(report: DoctorReport): string[] {
     }
   }
 
+  if (record.warnings.some((warning) => warning.code === 'LONG_KEY_COMPAT')) {
+    suggestions.push(
+      `${icon} ${chalk.bold('Canonicalize TXT keys:')} ${ERROR_MESSAGES.USE_ALIASES}`,
+    );
+  }
+
   if (!dnssec.present) {
     suggestions.push(`${icon} ${chalk.bold('Enable DNSSEC:')} ${ERROR_MESSAGES.ENABLE_DNSSEC}`);
   }

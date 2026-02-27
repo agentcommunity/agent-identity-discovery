@@ -20,7 +20,7 @@ If your OpenAPI specification is hosted at a public URL, you can make it discove
     - **Example:** `https://api.my-service.io/v3/openapi.json`
 
 2.  **Construct the AID TXT Record:** Use `openapi` for protocol; `uri` points to your spec file.
-    - **Value:** `v=aid1;uri=https://api.my-service.io/v3/openapi.json;proto=openapi;desc=My Public Service API`
+    - **Value:** `v=aid1;u=https://api.my-service.io/v3/openapi.json;p=openapi;s=My Public Service API`
 
 3.  **Publish to DNS:** Add a `TXT` record at the `_agent` subdomain for `my-service.io`.
     - **Type:** `TXT`

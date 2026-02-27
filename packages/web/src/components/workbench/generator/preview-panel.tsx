@@ -1,13 +1,12 @@
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Toggle } from '@/components/ui/toggle';
 import { Codeblock } from '@/components/ui/codeblock';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { CheckCircle2, XCircle, Globe, Lightbulb, ChevronDown, Key } from 'lucide-react';
 import { ValidationSummary } from './validation-summary';
-import type { ServerValidationResult, FormPatch } from '@/hooks/use-generator-form';
+import type { ServerValidationResult } from '@/hooks/use-generator-form';
 
 interface PreviewPanelProps {
   dnsHost: string;
@@ -18,8 +17,6 @@ interface PreviewPanelProps {
   specValidation: { isValid: boolean; errors: Array<{ code: string; message: string }> };
   serverResult: ServerValidationResult | null;
   wellKnownJson: Record<string, unknown>;
-  useAliases: boolean;
-  onChange: (patch: FormPatch) => void;
 }
 
 export function PreviewPanel({
@@ -31,8 +28,6 @@ export function PreviewPanel({
   specValidation,
   serverResult,
   wellKnownJson,
-  useAliases,
-  onChange,
 }: PreviewPanelProps) {
   return (
     <Card>
@@ -40,21 +35,7 @@ export function PreviewPanel({
         <div className="flex flex-row justify-between items-center">
           <CardTitle className="text-base">Preview</CardTitle>
           <div className="flex items-center gap-3">
-            <div className="text-xs text-muted-foreground flex items-center gap-2">
-              <span>Aliases</span>
-              <Toggle
-                pressed={useAliases}
-                onPressedChange={(v) => onChange({ useAliases: v })}
-                aria-label="Toggle alias keys"
-              >
-                {useAliases ? 'On' : 'Off'}
-              </Toggle>
-              {serverResult && (
-                <span className="text-xs">
-                  {serverResult.suggestAliases ? '(suggested)' : '(full preferred)'}
-                </span>
-              )}
-            </div>
+            <div className="text-xs text-muted-foreground">Canonical short-key format</div>
             {previewValid && (
               <div className="flex items-center gap-1 text-green-600">
                 <CheckCircle2 className="w-4 h-4" />
@@ -112,7 +93,10 @@ export function PreviewPanel({
           <Alert>
             <Lightbulb className="h-4 w-4" />
             <AlertTitle>Ready to publish!</AlertTitle>
-            <AlertDescription>Add the DNS record above to your DNS provider.</AlertDescription>
+            <AlertDescription>
+              Add the DNS record above to your DNS provider. AID v1.x publishes short keys as the
+              canonical wire format.
+            </AlertDescription>
           </Alert>
         )}
 

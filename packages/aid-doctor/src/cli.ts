@@ -459,12 +459,7 @@ program
 
     // We cast here because inquirer provides a partial object based on answers
     const formData = answers as AidGeneratorData;
-    const full = buildTxtRecordVariant(formData, false);
-    const alias = buildTxtRecordVariant(formData, true);
-    const fullLen = new TextEncoder().encode(full).length;
-    const aliasLen = new TextEncoder().encode(alias).length;
-    const suggest = aliasLen <= fullLen ? alias : full;
-    const txtRecord = suggest;
+    const txtRecord = buildTxtRecordVariant(formData, true);
     const validation = validateTxtRecord(txtRecord);
 
     console.log(chalk.green('\n--- Generation Complete ---\n'));

@@ -52,21 +52,18 @@ const result = await runCheck('example.com', {
 ```typescript
 import { buildTxtRecordVariant } from '@agentcommunity/aid-engine';
 
-const record = buildTxtRecordVariant(
-  {
-    domain: 'example.com',
-    uri: 'https://api.example.com/agent',
-    proto: 'mcp',
-    auth: 'pat',
-    desc: 'Example Agent',
-    pka: 'zBase58PublicKey',
-    kid: 'g1',
-  },
-  false,
-); // false = full keys, true = aliases
+const record = buildTxtRecordVariant({
+  domain: 'example.com',
+  uri: 'https://api.example.com/agent',
+  proto: 'mcp',
+  auth: 'pat',
+  desc: 'Example Agent',
+  pka: 'zBase58PublicKey',
+  kid: 'g1',
+}); // Canonical v1.x output uses short keys
 
 console.log(record);
-// "v=aid1;uri=https://api.example.com/agent;proto=mcp;auth=pat;desc=Example Agent;pka=zBase58PublicKey;kid=g1"
+// "v=aid1;u=https://api.example.com/agent;p=mcp;a=pat;s=Example Agent;k=zBase58PublicKey;i=g1"
 ```
 
 ### Validation
@@ -74,7 +71,7 @@ console.log(record);
 ```typescript
 import { validateTxtRecord } from '@agentcommunity/aid-engine';
 
-const validation = validateTxtRecord('v=aid1;uri=https://api.example.com/agent;proto=mcp');
+const validation = validateTxtRecord('v=aid1;u=https://api.example.com/agent;p=mcp');
 console.log(validation.isValid); // true
 console.log(validation.errors); // []
 ```

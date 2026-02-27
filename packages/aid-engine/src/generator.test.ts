@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildTxtRecordVariant, validateTxtRecord } from './generator';
+import { buildTxtRecordVariant, findLongKeyNames, validateTxtRecord } from './generator';
 import type { AidGeneratorData } from './generator';
 
 describe('AID Engine Generator', () => {
@@ -12,16 +12,16 @@ describe('AID Engine Generator', () => {
   };
 
   describe('buildTxtRecordVariant', () => {
-    it('should build record with full keys when useAliases=false', () => {
+    it('should emit canonical short keys even when legacy full-key mode is requested', () => {
       const record = buildTxtRecordVariant(sampleData, false);
       expect(record).toContain('v=aid1'); // Version always uses alias
-      expect(record).toContain('uri=https://api.example.com/agent');
-      expect(record).toContain('proto=mcp');
-      expect(record).toContain('auth=pat');
-      expect(record).toContain('desc=Example Agent');
+      expect(record).toContain('u=https://api.example.com/agent');
+      expect(record).toContain('p=mcp');
+      expect(record).toContain('a=pat');
+      expect(record).toContain('s=Example Agent');
     });
 
-    it('should build record with aliases when useAliases=true', () => {
+    it('should emit canonical short keys when alias mode is requested', () => {
       const record = buildTxtRecordVariant(sampleData, true);
       expect(record).toContain('v=aid1');
       expect(record).toContain('u=https://api.example.com/agent');
@@ -38,8 +38,8 @@ describe('AID Engine Generator', () => {
       };
       const record = buildTxtRecordVariant(minimalData, false);
       expect(record).toContain('v=aid1'); // Version always uses alias
-      expect(record).toContain('uri=https://test.com/api');
-      expect(record).toContain('proto=mcp');
+      expect(record).toContain('u=https://test.com/api');
+      expect(record).toContain('p=mcp');
       expect(record).not.toContain('auth=');
       expect(record).not.toContain('desc=');
     });
@@ -54,8 +54,8 @@ describe('AID Engine Generator', () => {
       };
       const record = buildTxtRecordVariant(dataWithEmptyOptionals, false);
       expect(record).toContain('v=aid1'); // Version always uses alias
-      expect(record).toContain('uri=https://test.com/api');
-      expect(record).toContain('proto=mcp');
+      expect(record).toContain('u=https://test.com/api');
+      expect(record).toContain('p=mcp');
       expect(record).not.toContain('auth=');
       expect(record).not.toContain('desc=');
     });
@@ -122,6 +122,20 @@ describe('AID Engine Generator', () => {
         expect(result.isValid).toBe(false);
         expect(result.error).toBeDefined();
       });
+    });
+  });
+
+  describe('findLongKeyNames', () => {
+    it('finds compatibility-only long keys in a TXT record', () => {
+      const longKeys = findLongKeyNames(
+        'version=aid1;uri=https://api.example.com/agent;proto=mcp;auth=pat;desc=Example Agent',
+      );
+
+      expect(longKeys).toEqual(['version', 'uri', 'proto', 'auth', 'desc']);
+    });
+
+    it('ignores canonical short-key records', () => {
+      expect(findLongKeyNames('v=aid1;u=https://api.example.com/agent;p=mcp')).toEqual([]);
     });
   });
 });

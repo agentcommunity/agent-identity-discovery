@@ -9,58 +9,58 @@
     },
     {
       "path": "quickstart/index.md",
-      "bytes": 10234,
-      "sha256": "c6f7bae7d3acb1d32364279f457b37f11d8c5f0881448a066d0e822376b6dc13"
+      "bytes": 10224,
+      "sha256": "f5aab7ecb9903c0c7fc276374fc6fe6ef49d1c84a3e6a0e6050762cf55a38cea"
     },
     {
       "path": "quickstart/quickstart_a2a.md",
-      "bytes": 3795,
-      "sha256": "f7a699204f8447b3bcd52971c109d86cda01011557b4c269e882bdddc1573c8d"
+      "bytes": 3786,
+      "sha256": "260ac1748806cd78514d94fc49361e16e96729cd98095b6eefc1846431f47fc4"
     },
     {
       "path": "quickstart/quickstart_browser.md",
-      "bytes": 1111,
-      "sha256": "93fa4a45bf630d8748f52cd63ea73a6180210ff8c3140ad362b5528f5a58ecd8"
+      "bytes": 1105,
+      "sha256": "35389c75632e75c0c02baa56eca69cd45c2c29e0163034c32830ed4308a06ecf"
     },
     {
       "path": "quickstart/quickstart_dotnet.md",
-      "bytes": 1505,
-      "sha256": "f4478fa824e9b35ac94989a7e58beb39dc4c1cf13b4cbf7f2a58ec629e74f9aa"
+      "bytes": 1496,
+      "sha256": "135ef83817202c014f96a86f2178c6c211bd26cdb0cbecf4f5d98fb971361b32"
     },
     {
       "path": "quickstart/quickstart_go.md",
-      "bytes": 1532,
-      "sha256": "294f685f8c3b4dfa0d4b00fddcb21ec04fcfc4326d7dc104c0d51b1f34229e18"
+      "bytes": 1523,
+      "sha256": "30746b57ebf955dd1598cd61f8d9e9564a674cfcd1850d6062a75db03188fb60"
     },
     {
       "path": "quickstart/quickstart_java.md",
-      "bytes": 1592,
-      "sha256": "ba2b2416302e6bd883f225b07a69342a8efadaf8f84bc591b1e69ffc129372a9"
+      "bytes": 1583,
+      "sha256": "fec659a1371a9475c228398d83baafd0fb19c54f07944c5d0d265ee4dea48498"
     },
     {
       "path": "quickstart/quickstart_mcp.md",
-      "bytes": 3605,
-      "sha256": "6abcc7a04db4a76f1ca8b0a6845f9dc3493a24a892f30857748f3ab19cebb7cf"
+      "bytes": 3596,
+      "sha256": "e5aa608f350153c2aadf2cacff85ec115a239718b882a1bc93ea60be71ffa921"
     },
     {
       "path": "quickstart/quickstart_openapi.md",
-      "bytes": 4095,
-      "sha256": "1b85f38960836e53c7e9f50b9730bea395ba04373d5c1e5fee84c962e45e0408"
+      "bytes": 4086,
+      "sha256": "4c7d1845ae688ed872e68a3b331bfd67a40ac3537cf56c29a5ebd574ad4462c2"
     },
     {
       "path": "quickstart/quickstart_python.md",
-      "bytes": 1336,
-      "sha256": "51369fc180be0c355330e7c3556b588989f352b117016ef80bffac5575a3f993"
+      "bytes": 1327,
+      "sha256": "983adc49e8dcb67071df64f7a3978826f4e64f522995024bed4a0fae98ae525d"
     },
     {
       "path": "quickstart/quickstart_rust.md",
-      "bytes": 1901,
-      "sha256": "6f8890c2dca37abc7ab105f6eb280486a48b1b11e6c4a99ddc468c2c765cb266"
+      "bytes": 1896,
+      "sha256": "a6968bed2ebc419b802715fc18d156453440d032aa57d4ad0f2b33b97b033bde"
     },
     {
       "path": "quickstart/quickstart_ts.md",
-      "bytes": 1983,
-      "sha256": "5bf51e2453d201f8f96760556b4f5b9d992bf556bff71f50bc60fc9753945d3f"
+      "bytes": 1974,
+      "sha256": "1f36521058e38836188380584af8a305e14d90bb0dbcc6c8b94ddc9ad8372c09"
     },
     {
       "path": "Reference/discovery_api.md",
@@ -79,8 +79,8 @@
     },
     {
       "path": "Reference/protocols.md",
-      "bytes": 6297,
-      "sha256": "23ac69397a42e4604bccfd5334d430364eaadbfc7f98ecf0dfb62cd442fc7a1f"
+      "bytes": 6296,
+      "sha256": "d7169c5a54054940a891239c4e6d46b8259f6c7f07d943c7f37048f9fc5aa9fa"
     },
     {
       "path": "Reference/security.md",
@@ -104,18 +104,18 @@
     },
     {
       "path": "specification.md",
-      "bytes": 20091,
-      "sha256": "a8b9d05da388a744952857a2ec2036996ea32e4e68cd9f389490d54fd91adb50"
+      "bytes": 20251,
+      "sha256": "1bb45803b02788342ddfd6b2c0dbb2691441c03c127a8a46f98bc6bef3ff4fe4"
     },
     {
       "path": "Tooling/aid_doctor.md",
-      "bytes": 6473,
-      "sha256": "29637f92d46d48c875b246f9d807fb0eddda3e3f5c99aaaa44cbb6302c82be4a"
+      "bytes": 6503,
+      "sha256": "36c862ebbb5692fcd60763329314ab8602a05bc3a4e9caf6922c1cc0aa1be2c0"
     },
     {
       "path": "Tooling/aid_engine.md",
-      "bytes": 5354,
-      "sha256": "66bb3dc4ffdb2995a14802993ce3cdac3849261cc4f5bb492a9a58067ebef161"
+      "bytes": 5327,
+      "sha256": "f2b1360525a48fda4c8b1b2d8a18107fd59d5686ba82d40432d44cccd045ab62"
     },
     {
       "path": "Tooling/conformance.md",
@@ -134,8 +134,8 @@
     },
     {
       "path": "Understand/faq.md",
-      "bytes": 5833,
-      "sha256": "64a804c876aa200344b2e95a4c81a1940c8473296bffa8030cac3677527c46a6"
+      "bytes": 5868,
+      "sha256": "970e5972cd7af1aef0659d4ea8cda5b11bf359058302fe7de51c9587ecf3dd50"
     },
     {
       "path": "Understand/rationale.md",
@@ -143,5 +143,5 @@
       "sha256": "985c0214d91997524c53b078da3a8b87599709ee71c1d39b0cfa96764bcbd117"
     }
   ],
-  "aggregateSha256": "5fbc1084a7f8b2417a0cf2faa08afb60f42c32cae93fcba9e3aa3de474c65471"
+  "aggregateSha256": "6c9ed7f54d0d9e8769643c9d9a0bccdbeb6a922a886a56c2e8e2abb25eeeca99"
 }

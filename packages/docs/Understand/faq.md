@@ -78,7 +78,7 @@ v1.1 is **fully backward-compatible** with v1.0. All v1.0 records are valid v1.1
 
 To take advantage of v1.1 features:
 
-1. **Key aliases:** Optionally switch to short aliases (`u`, `p`, `s`, etc.) for byte savings.
+1. **Canonical short keys:** Publish short keys (`u`, `p`, `s`, etc.) for v1.x. Parsers still accept long keys for compatibility.
 2. **New metadata:** Add `docs`/`d` for documentation and `dep`/`e` for deprecation.
 3. **PKA:** Add `pka`/`k` and `kid`/`i` for cryptographic identity.
 4. **New protocols:** Use `grpc`, `graphql`, `websocket`, `zeroconf`, or `ucp` tokens.

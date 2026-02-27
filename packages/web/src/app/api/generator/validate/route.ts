@@ -17,7 +17,7 @@ export async function POST(request: Request) {
         bytes: { txt: 0, desc: 0 },
         errors: [{ code: 'ERR_BODY', message: 'Invalid JSON body' }],
         warnings: [],
-        suggestAliases: false,
+        suggestAliases: true,
       },
       { status: 400 },
     );

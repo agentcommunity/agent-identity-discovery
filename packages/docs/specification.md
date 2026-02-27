@@ -64,6 +64,8 @@ The record **MUST** be a single string of semicolon-delimited `key=value` pairs.
 
 Clients **MUST** recognize single-letter lowercase aliases for all keys. A record **MUST NOT** include both a full key and its alias. Key comparisons are case-insensitive.
 
+Providers **SHOULD** emit the short-key form `v,u,p,a,s,d,e,k,i` for v1.x records. Long keys remain compatibility-only input for existing parsers and deployments.
+
 | Key       | Alias | Requirement  | Description                                                                                           | Example                            |
 | --------- | ----- | ------------ | ----------------------------------------------------------------------------------------------------- | ---------------------------------- |
 | `version` | `v`   | **Required** | The specification version. For v1 it **MUST** be `aid1`.                                              | `v=aid1`                           |
@@ -137,10 +139,10 @@ If an operator wants child hosts to inherit a shared record, that inheritance **
 **Examples:**
 
 ```dns
-_agent.app.team.example.com. 300 IN TXT "v=aid1;p=mcp;uri=https://app.team.example.com/mcp"
+_agent.app.team.example.com. 300 IN TXT "v=aid1;p=mcp;u=https://app.team.example.com/mcp"
 
 _agent.app.team.example.com. 300 IN CNAME _agent.shared.team.example.com.
-_agent.shared.team.example.com. 300 IN TXT "v=aid1;p=mcp;uri=https://gateway.team.example.com/mcp"
+_agent.shared.team.example.com. 300 IN TXT "v=aid1;p=mcp;u=https://gateway.team.example.com/mcp"
 ```
 
 Protocol-specific lookups follow the same exact-host rule. If a client explicitly requests `mcp` for `app.team.example.com`, it may query `_agent._mcp.app.team.example.com` before `_agent.app.team.example.com`, but it **MUST NOT** query parent hosts unless the operator has delegated the exact child name in DNS.

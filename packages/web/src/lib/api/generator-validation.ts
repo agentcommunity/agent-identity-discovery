@@ -67,7 +67,7 @@ export interface GeneratorValidationResponse {
   bytes: { txt: number; desc: number };
   errors: Issue[];
   warnings: Issue[];
-  suggestAliases: boolean;
+  suggestAliases: true;
 }
 
 const isGeneratorProtocol = (value: string): value is GeneratorProtocol =>
@@ -168,8 +168,6 @@ export const validateGeneratorPayload = (payload: unknown): GeneratorValidationR
 
   let txt = '';
   let txtBytes = 0;
-  let suggestAliases = false;
-
   if (data.uri && isGeneratorProtocol(data.proto)) {
     const engineData = {
       domain: data.domain,
@@ -182,11 +180,8 @@ export const validateGeneratorPayload = (payload: unknown): GeneratorValidationR
       pka: data.pka,
       kid: data.kid,
     };
-    const fullTxt = buildTxtRecordVariant(engineData, false);
-    const aliasTxt = buildTxtRecordVariant(engineData, true);
-    txt = data.useAliases ? aliasTxt : fullTxt;
+    txt = buildTxtRecordVariant(engineData, true);
     txtBytes = safeByteLength(txt);
-    suggestAliases = safeByteLength(aliasTxt) <= safeByteLength(fullTxt);
 
     if (txtBytes > 255) {
       warnings.push({ code: 'WARN_TXT_BYTES', message: 'TXT record exceeds 255 bytes' });
@@ -200,6 +195,6 @@ export const validateGeneratorPayload = (payload: unknown): GeneratorValidationR
     bytes: { txt: txtBytes, desc: descBytes },
     errors,
     warnings,
-    suggestAliases,
+    suggestAliases: true,
   };
 };

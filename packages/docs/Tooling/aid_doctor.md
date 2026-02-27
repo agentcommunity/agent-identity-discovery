@@ -92,7 +92,7 @@ aid-doctor generate [--save-draft <path>]
 ```
 
 - Interactive prompts for `uri`, `proto`, optional `auth`, `desc`, `docs`, `dep`, and PKA (`pka` + `kid`).
-- Outputs both full and alias variants; picks the shorter and copies it to clipboard.
+- Emits the canonical short-key TXT form (`v,u,p,a,s,d,e,k,i`) and copies it to the clipboard.
 - `--save-draft` flag saves the generated record to a file for later deployment.
 
 **Example with draft saving:**
@@ -174,7 +174,7 @@ aid-doctor pka verify --key <z...>
 
 ## Tips
 
-- Use aliases (`u,p,a,s,d,e,k,i`) to reduce TXT size.
+- Publish short keys (`u,p,a,s,d,e,k,i`) as the canonical v1.x TXT format.
 - Enable DNSSEC at your registrar; it improves integrity.
 - Add `pka`/`kid` for endpoint proof; rotate via `kid`.
 - For dev-only loopback `.well-known`, set `AID_ALLOW_INSECURE_WELL_KNOWN=1`.
