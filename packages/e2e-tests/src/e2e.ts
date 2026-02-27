@@ -5,14 +5,16 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
- * List of showcase domains to validate. These correspond to the
- * `locals.records` entries in `showcase/terraform/main.tf` (minus the _agent prefix).
+ * List of showcase domains to validate. Keep this list small and only include
+ * live showcase names that currently publish exactly one valid AID record and
+ * do not require additional PKA network dependencies.
+ *
+ * The suite intentionally avoids domains that publish multiple valid TXT answers
+ * for compatibility/demo purposes because Issue #95 makes that an ambiguity error.
  */
 const DOMAINS: readonly string[] = [
-  'simple.agentcommunity.org',
-  'local-docker.agentcommunity.org',
-  'messy.agentcommunity.org',
-  'multi-string.agentcommunity.org',
+  'ucp.agentcommunity.org',
+  'graphql.agentcommunity.org',
 ] as const;
 
 const TIMEOUT_MS = 15_000;
