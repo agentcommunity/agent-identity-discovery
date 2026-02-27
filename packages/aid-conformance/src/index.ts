@@ -14,6 +14,7 @@ export type AidRecord = {
 // Re-export the shared golden fixtures without duplicating the file.
 // Using a relative path to the repository-level fixture per instruction.
 import golden from '../../../test-fixtures/golden.json';
+import enterprise from '../../../test-fixtures/enterprise.json';
 
 export type GoldenRecordCase = {
   name: string;
@@ -27,3 +28,28 @@ export type GoldenFixture = {
 };
 
 export const fixtures: GoldenFixture = golden as unknown as GoldenFixture;
+
+export type EnterprisePolicyCase = {
+  name: string;
+  runtime: 'node' | 'browser';
+  queryName: string;
+  options: Record<string, unknown>;
+  dns: {
+    answers?: Array<{ name: string; data: string; ttl: number }>;
+    errorCode?: string;
+    ad?: boolean;
+  };
+  wellKnown?: {
+    body?: Record<string, unknown>;
+  };
+  expect: {
+    errorCode?: string;
+    warningCodes?: string[];
+  };
+};
+
+export type EnterpriseFixture = {
+  securityPolicies: EnterprisePolicyCase[];
+};
+
+export const enterpriseFixtures: EnterpriseFixture = enterprise as unknown as EnterpriseFixture;

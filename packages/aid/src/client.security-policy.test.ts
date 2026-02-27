@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { discover } from './index.js';
 import * as browser from './browser.js';
@@ -10,7 +13,32 @@ vi.mock('./pka.js', () => ({
   performPKAHandshake: vi.fn(async () => {}),
 }));
 
-describe('Discovery security policy', () => {
+type EnterprisePolicyCase = {
+  name: string;
+  runtime: 'node' | 'browser';
+  queryName: string;
+  options: Record<string, unknown>;
+  dns: {
+    answers?: Array<{ name: string; data: string; ttl: number }>;
+    errorCode?: string;
+    ad?: boolean;
+  };
+  wellKnown?: {
+    body?: Record<string, unknown>;
+  };
+  expect: {
+    errorCode?: string;
+    warningCodes?: string[];
+  };
+};
+
+const __dirnameFix = path.dirname(fileURLToPath(import.meta.url));
+const fixturePath = path.resolve(__dirnameFix, '../../..', 'test-fixtures', 'enterprise.json');
+const fixture = JSON.parse(fs.readFileSync(fixturePath, 'utf8')) as {
+  securityPolicies: EnterprisePolicyCase[];
+};
+
+describe('Discovery security policy vectors', () => {
   const g = globalThis as { fetch?: typeof fetch };
   let originalFetch: typeof fetch | undefined;
   let originalWarn: typeof console.warn;
@@ -27,164 +55,108 @@ describe('Discovery security policy', () => {
     vi.restoreAllMocks();
   });
 
-  it('node strict mode requires PKA', async () => {
-    const { query } = await import('dns-query');
-    (query as any).mockResolvedValue({
-      rcode: 'NOERROR',
-      answers: [
-        {
-          type: 'TXT',
-          name: '_agent.example.com',
-          data: 'v=aid1;u=https://api.example.com/mcp;p=mcp',
-          ttl: 300,
-        },
-      ],
-    });
+  for (const vector of fixture.securityPolicies) {
+    it(vector.name, async () => {
+      const domain = vector.queryName.replace(/^_agent\./, '');
 
-    await expect(discover('example.com', { securityMode: 'strict' })).rejects.toMatchObject({
-      errorCode: 'ERR_SECURITY',
-    });
-  });
+      if (vector.runtime === 'node') {
+        const { query } = await import('dns-query');
+        (query as any).mockImplementation(async () => {
+          if (vector.dns.errorCode === 'ERR_NO_RECORD') {
+            const error: any = new Error('ENOTFOUND');
+            error.code = 'ENOTFOUND';
+            throw error;
+          }
+          return {
+            rcode: 'NOERROR',
+            answers: (vector.dns.answers ?? []).map((answer) => ({
+              type: 'TXT',
+              name: answer.name,
+              data: answer.data,
+              ttl: answer.ttl,
+            })),
+          };
+        });
 
-  it('node strict mode requires DNSSEC validation', async () => {
-    const { query } = await import('dns-query');
-    (query as any).mockResolvedValue({
-      rcode: 'NOERROR',
-      answers: [
-        {
-          type: 'TXT',
-          name: '_agent.example.com',
-          data: 'v=aid1;u=https://api.example.com/mcp;p=mcp;k=zBase58EncodedKey;i=g1',
-          ttl: 300,
-        },
-      ],
-    });
-    g.fetch = vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      headers: { get: () => 'application/dns-json' },
-      text: async () => JSON.stringify({ Status: 0, AD: false }),
-    })) as typeof fetch;
-
-    await expect(discover('example.com', { securityMode: 'strict' })).rejects.toMatchObject({
-      errorCode: 'ERR_SECURITY',
-    });
-  });
-
-  it('node balanced mode warns when DNSSEC is preferred but unavailable', async () => {
-    const { query } = await import('dns-query');
-    (query as any).mockResolvedValue({
-      rcode: 'NOERROR',
-      answers: [
-        {
-          type: 'TXT',
-          name: '_agent.example.com',
-          data: 'v=aid1;u=https://api.example.com/mcp;p=mcp',
-          ttl: 300,
-        },
-      ],
-    });
-    g.fetch = vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      headers: { get: () => 'application/dns-json' },
-      text: async () => JSON.stringify({ Status: 0, AD: false }),
-    })) as typeof fetch;
-
-    const result = await discover('example.com', { securityMode: 'balanced' });
-    expect(result.security.warnings.map((warning) => warning.code)).toContain('DNSSEC_PREFERRED');
-  });
-
-  it('node can fail on downgrade when previous security state is supplied', async () => {
-    const { query } = await import('dns-query');
-    (query as any).mockResolvedValue({
-      rcode: 'NOERROR',
-      answers: [
-        {
-          type: 'TXT',
-          name: '_agent.example.com',
-          data: 'v=aid1;u=https://api.example.com/mcp;p=mcp',
-          ttl: 300,
-        },
-      ],
-    });
-
-    await expect(
-      discover('example.com', {
-        dnssecPolicy: 'off',
-        downgradePolicy: 'fail',
-        previousSecurity: { pka: 'zOldKey', kid: 'g1' },
-      }),
-    ).rejects.toMatchObject({
-      errorCode: 'ERR_SECURITY',
-    });
-  });
-
-  it('node strict mode disables well-known fallback', async () => {
-    const { query } = await import('dns-query');
-    (query as any).mockImplementation(async () => {
-      const error: any = new Error('ENOTFOUND');
-      error.code = 'ENOTFOUND';
-      throw error;
-    });
-    g.fetch = vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      headers: { get: () => 'application/json' },
-      text: async () => JSON.stringify({ v: 'aid1', u: 'https://api.example.com/mcp', p: 'mcp' }),
-    })) as typeof fetch;
-
-    await expect(discover('example.com', { securityMode: 'strict' })).rejects.toMatchObject({
-      errorCode: 'ERR_NO_RECORD',
-    });
-  });
-
-  it('browser strict mode requires DNSSEC validation', async () => {
-    g.fetch = vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        Status: 0,
-        AD: false,
-        Answer: [
-          {
-            name: '_agent.example.com',
-            type: 16,
-            TTL: 300,
-            data: '"v=aid1;u=https://api.example.com/mcp;p=mcp;k=zBase58EncodedKey;i=g1"',
+        g.fetch = vi.fn(async () => ({
+          ok: true,
+          status: 200,
+          headers: {
+            get: (name: string) =>
+              name.toLowerCase() === 'content-type' ? 'application/json' : 'application/dns-json',
           },
-        ],
-      }),
-    })) as typeof fetch;
+          text: async () =>
+            JSON.stringify(
+              vector.wellKnown?.body ?? {
+                Status: 0,
+                AD: vector.dns.ad ?? false,
+              },
+            ),
+        })) as typeof fetch;
 
-    await expect(browser.discover('example.com', { securityMode: 'strict' })).rejects.toMatchObject(
-      {
-        errorCode: 'ERR_SECURITY',
-      },
-    );
-  });
+        if (vector.expect.errorCode) {
+          await expect(discover(domain, vector.options as any)).rejects.toMatchObject({
+            errorCode: vector.expect.errorCode,
+          });
+          return;
+        }
 
-  it('browser strict mode disables well-known fallback', async () => {
-    g.fetch = vi.fn(async (url: string | URL) => {
-      if (url.toString().includes('cloudflare-dns.com')) {
+        const result = await discover(domain, vector.options as any);
+        expect(result.security.warnings.map((warning) => warning.code)).toEqual(
+          vector.expect.warningCodes ?? [],
+        );
+        return;
+      }
+
+      g.fetch = vi.fn(async (url: string | URL) => {
+        if (url.toString().includes('cloudflare-dns.com')) {
+          if (vector.dns.errorCode === 'ERR_NO_RECORD') {
+            return {
+              ok: true,
+              status: 200,
+              json: async () => ({ Status: 2 }),
+            } as Response;
+          }
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              Status: 0,
+              AD: vector.dns.ad ?? false,
+              Answer: (vector.dns.answers ?? []).map((answer) => ({
+                name: answer.name,
+                type: 16,
+                TTL: answer.ttl,
+                data: `"${answer.data}"`,
+              })),
+            }),
+          } as Response;
+        }
+
         return {
           ok: true,
           status: 200,
-          json: async () => ({ Status: 2 }),
+          headers: {
+            get: () => 'application/json',
+          },
+          text: async () =>
+            JSON.stringify(
+              vector.wellKnown?.body ?? { v: 'aid1', u: 'https://api.example.com/mcp', p: 'mcp' },
+            ),
         } as Response;
-      }
-      return {
-        ok: true,
-        status: 200,
-        headers: { get: () => 'application/json' },
-        text: async () => JSON.stringify({ v: 'aid1', u: 'https://api.example.com/mcp', p: 'mcp' }),
-      } as Response;
-    }) as typeof fetch;
+      }) as typeof fetch;
 
-    await expect(browser.discover('example.com', { securityMode: 'strict' })).rejects.toMatchObject(
-      {
-        errorCode: 'ERR_NO_RECORD',
-      },
-    );
-  });
+      if (vector.expect.errorCode) {
+        await expect(browser.discover(domain, vector.options as any)).rejects.toMatchObject({
+          errorCode: vector.expect.errorCode,
+        });
+        return;
+      }
+
+      const result = await browser.discover(domain, vector.options as any);
+      expect(result.security.warnings.map((warning) => warning.code)).toEqual(
+        vector.expect.warningCodes ?? [],
+      );
+    });
+  }
 });

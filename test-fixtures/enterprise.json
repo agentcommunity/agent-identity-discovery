@@ -1,0 +1,133 @@
+{
+  "securityPolicies": [
+    {
+      "name": "node-strict-requires-pka",
+      "runtime": "node",
+      "queryName": "_agent.example.com",
+      "options": {
+        "securityMode": "strict"
+      },
+      "dns": {
+        "answers": [
+          {
+            "name": "_agent.example.com",
+            "data": "v=aid1;u=https://api.example.com/mcp;p=mcp",
+            "ttl": 300
+          }
+        ]
+      },
+      "expect": {
+        "errorCode": "ERR_SECURITY"
+      }
+    },
+    {
+      "name": "node-balanced-warns-on-missing-dnssec",
+      "runtime": "node",
+      "queryName": "_agent.example.com",
+      "options": {
+        "securityMode": "balanced"
+      },
+      "dns": {
+        "answers": [
+          {
+            "name": "_agent.example.com",
+            "data": "v=aid1;u=https://api.example.com/mcp;p=mcp",
+            "ttl": 300
+          }
+        ],
+        "ad": false
+      },
+      "expect": {
+        "warningCodes": ["DNSSEC_PREFERRED"]
+      }
+    },
+    {
+      "name": "node-strict-disables-well-known",
+      "runtime": "node",
+      "queryName": "_agent.example.com",
+      "options": {
+        "securityMode": "strict"
+      },
+      "dns": {
+        "errorCode": "ERR_NO_RECORD"
+      },
+      "wellKnown": {
+        "body": {
+          "v": "aid1",
+          "u": "https://api.example.com/mcp",
+          "p": "mcp"
+        }
+      },
+      "expect": {
+        "errorCode": "ERR_NO_RECORD"
+      }
+    },
+    {
+      "name": "browser-strict-requires-dnssec",
+      "runtime": "browser",
+      "queryName": "_agent.example.com",
+      "options": {
+        "securityMode": "strict"
+      },
+      "dns": {
+        "answers": [
+          {
+            "name": "_agent.example.com",
+            "data": "v=aid1;u=https://api.example.com/mcp;p=mcp;k=zBase58EncodedKey;i=g1",
+            "ttl": 300
+          }
+        ],
+        "ad": false
+      },
+      "expect": {
+        "errorCode": "ERR_SECURITY"
+      }
+    },
+    {
+      "name": "node-downgrade-fail",
+      "runtime": "node",
+      "queryName": "_agent.example.com",
+      "options": {
+        "dnssecPolicy": "off",
+        "downgradePolicy": "fail",
+        "previousSecurity": {
+          "pka": "zOldKey",
+          "kid": "g1"
+        }
+      },
+      "dns": {
+        "answers": [
+          {
+            "name": "_agent.example.com",
+            "data": "v=aid1;u=https://api.example.com/mcp;p=mcp",
+            "ttl": 300
+          }
+        ]
+      },
+      "expect": {
+        "errorCode": "ERR_SECURITY"
+      }
+    },
+    {
+      "name": "browser-strict-disables-well-known",
+      "runtime": "browser",
+      "queryName": "_agent.example.com",
+      "options": {
+        "securityMode": "strict"
+      },
+      "dns": {
+        "errorCode": "ERR_NO_RECORD"
+      },
+      "wellKnown": {
+        "body": {
+          "v": "aid1",
+          "u": "https://api.example.com/mcp",
+          "p": "mcp"
+        }
+      },
+      "expect": {
+        "errorCode": "ERR_NO_RECORD"
+      }
+    }
+  ]
+}

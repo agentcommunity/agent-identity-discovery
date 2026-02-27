@@ -32,20 +32,14 @@ fn parity_from_golden() {
             assert_eq!(val, v.as_str().unwrap_or_default(), "key {} mismatch", k);
         }
     }
-}
-
-#[test]
-fn invalid_cases_error_codes() {
-    let err = parse("uri=https://x;p=mcp").unwrap_err();
-    assert_eq!(err.error_code, "ERR_INVALID_TXT");
-
-    let err = parse("v=aid1;uri=https://x;proto=mcp;p=mcp").unwrap_err();
-    assert_eq!(err.error_code, "ERR_INVALID_TXT");
-
-    let err = parse("v=aid1;uri=https://x;p=foo").unwrap_err();
-    assert_eq!(err.error_code, "ERR_UNSUPPORTED_PROTO");
-
-    let long_desc = "a".repeat(61);
-    let err = parse(&format!("v=aid1;uri=https://x;p=mcp;desc={}", long_desc)).unwrap_err();
-    assert_eq!(err.error_code, "ERR_INVALID_TXT");
+    let invalid = v.get("invalid").and_then(|r| r.as_array()).expect("invalid array");
+    for rec in invalid {
+        let raw = rec.get("raw").and_then(|s| s.as_str()).expect("raw string");
+        let expected = rec
+            .get("errorCode")
+            .and_then(|s| s.as_str())
+            .expect("errorCode string");
+        let err = parse(raw).expect_err("parse should fail");
+        assert_eq!(err.error_code, expected, "invalid case mismatch");
+    }
 }

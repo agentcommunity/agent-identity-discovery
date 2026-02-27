@@ -16,7 +16,12 @@ Built by the team at [agentcommunity.org](https://agentcommunity.org).
 - **Docs**: [docs.agentcommunity.org/aid](https://docs.agentcommunity.org/aid)
 - **GitHub**: [github.com/agent-community/agent-identity-discovery](https://github.com/agent-community/agent-identity-discovery)
 
-Exposes the shared `test-fixtures/golden.json` via a typed export (includes v1.1 fields like `docs`/`dep` and `pka`/`kid`) and provides a simple Node runner to execute the fixtures against a parser.
+Exposes the shared fixture packs via typed exports:
+
+- `golden.json` for parser parity across languages
+- `enterprise.json` for enterprise discovery and security vectors used by the reference implementation
+
+It also provides a simple Node runner to execute the parser fixtures against a parser.
 
 ## Install
 
@@ -29,18 +34,22 @@ npm i -D @agentcommunity/aid-conformance
 ## Usage (Node / TypeScript)
 
 ```ts
-import { fixtures, type GoldenFixture } from '@agentcommunity/aid-conformance';
+import { fixtures, enterpriseFixtures, type GoldenFixture } from '@agentcommunity/aid-conformance';
 import { parse } from '@agentcommunity/aid';
 
 for (const c of fixtures.records) {
   const record = parse(c.raw);
   // assert deep equality with c.expected
 }
+
+for (const c of enterpriseFixtures.securityPolicies) {
+  console.log(c.name, c.runtime);
+}
 ```
 
 To use from other language repos, consume the published package tarball as a dev artifact or copy the JSON path after installation:
 
-- The JSON is reused from the repo at `test-fixtures/golden.json` and is included in the published bundle (no duplication in source).
+- The JSON is reused from the repo at `test-fixtures/golden.json` and `test-fixtures/enterprise.json` and is included in the published bundle (no duplication in source).
 
 ## CLI
 

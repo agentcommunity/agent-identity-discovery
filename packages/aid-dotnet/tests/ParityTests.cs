@@ -5,7 +5,8 @@ namespace AidDiscovery.Tests;
 public class ParityTests
 {
     private record FixtureRecord(string name, string raw, Dictionary<string, string> expected);
-    private record FixtureRoot(List<FixtureRecord> records);
+    private record InvalidFixtureRecord(string name, string raw, string errorCode);
+    private record FixtureRoot(List<FixtureRecord> records, List<InvalidFixtureRecord>? invalid);
 
     [Fact]
     public void GoldenParity()
@@ -32,6 +33,12 @@ public class ParityTests
             if (parsed.Kid is not null) got["kid"] = parsed.Kid;
 
             Assert.Equivalent(rec.expected, got);
+        }
+
+        foreach (var rec in fx.invalid ?? [])
+        {
+            var err = Assert.Throws<AidError>(() => Aid.Parse(rec.raw));
+            Assert.Equal(rec.errorCode, err.ErrorCode);
         }
     }
 
