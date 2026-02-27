@@ -63,22 +63,35 @@ public static class Discovery
         throw new AidError(nameof(Constants.ERR_NO_RECORD), $"No TXT answers for {fqdn}");
     }
 
-    private static AidRecord ParseFirstValid(IEnumerable<string> txts, TimeSpan timeout)
+    private static AidRecord ParseSingleValid(IEnumerable<string> txts, TimeSpan timeout, string queryName)
     {
         AidError? last = null;
+        AidRecord? valid = null;
+        var validCount = 0;
         foreach (var txt in txts)
         {
             try
             {
                 var rec = Aid.Parse(txt);
-                if (!string.IsNullOrEmpty(rec.Pka))
-                {
-                    // Run PKA handshake when present
-                    Pka.PerformHandshakeAsync(rec.Uri, rec.Pka!, rec.Kid ?? string.Empty, timeout).GetAwaiter().GetResult();
-                }
-                return rec;
+                valid = rec;
+                validCount++;
             }
             catch (AidError e) { last = e; }
+        }
+        if (validCount == 1 && valid is not null)
+        {
+            if (!string.IsNullOrEmpty(valid.Pka))
+            {
+                Pka.PerformHandshakeAsync(valid.Uri, valid.Pka!, valid.Kid ?? string.Empty, timeout).GetAwaiter().GetResult();
+            }
+            return valid;
+        }
+        if (validCount > 1)
+        {
+            throw new AidError(
+                nameof(Constants.ERR_INVALID_TXT),
+                $"Multiple valid AID records found for {queryName}; publish exactly one valid record per queried DNS name"
+            );
         }
         throw last ?? new AidError(nameof(Constants.ERR_NO_RECORD), "No valid AID record in TXT answers");
     }
@@ -102,7 +115,7 @@ public static class Discovery
             try
             {
                 var (txts, ttl) = await QueryTxtDoHAsync(name, options.Timeout).ConfigureAwait(false);
-                var rec = ParseFirstValid(txts, options.Timeout);
+                var rec = ParseSingleValid(txts, options.Timeout, name);
                 return new DiscoveryResult { Record = rec, Ttl = ttl, QueryName = name };
             }
             catch (AidError e)
@@ -121,4 +134,3 @@ public static class Discovery
         throw last ?? new AidError(nameof(Constants.ERR_DNS_LOOKUP_FAILED), "DNS query failed");
     }
 }
-

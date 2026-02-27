@@ -64,8 +64,8 @@
     },
     {
       "path": "Reference/discovery_api.md",
-      "bytes": 2916,
-      "sha256": "27f160712a2d8b0ef761f556b48c7c37ad7a2799048a5271679561afe9629bc4"
+      "bytes": 3071,
+      "sha256": "4dbea16d709894bc7a1f83d1595e84579659854f016999cea82f7399a53adc4f"
     },
     {
       "path": "Reference/identity_pka.md",
@@ -99,8 +99,8 @@
     },
     {
       "path": "specification.md",
-      "bytes": 16916,
-      "sha256": "345a0287c567a2006f6f3253af2bd1d177af652bfceec4a2b68456e0c73a84cd"
+      "bytes": 17160,
+      "sha256": "15c8cc982b39341cfdbe3fa7e7c99aeb565e9272754ca0c878ba16d5ab6509db"
     },
     {
       "path": "Tooling/aid_doctor.md",
@@ -138,5 +138,5 @@
       "sha256": "985c0214d91997524c53b078da3a8b87599709ee71c1d39b0cfa96764bcbd117"
     }
   ],
-  "aggregateSha256": "bf816e45d25cf63f1acf3635dc57ed665e016976484be4d3426e632bd3b9c4e3"
+  "aggregateSha256": "6be9d26b6a0f6c22d8f21dd17dc0bea76048d9cb8be328c034f0d2d6368fad74"
 }

@@ -104,6 +104,7 @@ def discover(
         txt_records, ttl = _query_txt_record(query_name, timeout)
 
         last_error: AidError | None = None
+        valid_records: list[dict] = []
         for txt in txt_records:
             try:
                 record = parse(txt)
@@ -111,11 +112,19 @@ def discover(
                 if filter_by_protocol and protocol and record.get("proto") != protocol:
                     last_error = AidError("ERR_UNSUPPORTED_PROTO", f"Record found, but protocol does not match requested '{protocol}'")
                     continue
-                return record, ttl
+                valid_records.append(record)
             except AidError as exc:
                 # Save and try the next TXT string (if multiple records exist)
                 last_error = exc
                 continue
+
+        if len(valid_records) == 1:
+            return valid_records[0], ttl
+        if len(valid_records) > 1:
+            raise AidError(
+                "ERR_INVALID_TXT",
+                f"Multiple valid AID records found for {query_name}; publish exactly one valid record per queried DNS name",
+            )
 
         # If we got here, either no records or all invalid
         if last_error is not None:

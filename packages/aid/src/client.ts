@@ -34,6 +34,14 @@ function constructQueryName(domain: string, protocol?: string, useUnderscore = f
   return `${DNS_SUBDOMAIN}.${normalized}`;
 }
 
+function looksLikeAidRecord(raw: string): boolean {
+  const pattern = new RegExp(
+    String.raw`(?:^|;)\s*(?:v|version)\s*=\s*${SPEC_VERSION}(?:\s*(?:;|$))`,
+    'i',
+  );
+  return pattern.test(raw);
+}
+
 /**
  * Build a canonical RawAidRecord from JSON that may include alias keys
  */
@@ -256,6 +264,9 @@ export async function discover(
         throw new AidError('ERR_NO_RECORD', `No TXT record found for ${queryName}`);
       }
 
+      const validRecords: DiscoveryResult[] = [];
+      let lastAidError: AidError | null = null;
+
       for (const answer of response.answers) {
         // Ensure we are looking at a TXT record
         if (answer.type !== 'TXT' || !answer.data) continue;
@@ -265,44 +276,57 @@ export async function discover(
         const raw = parts.map((p) => p.toString()).join('');
         const rawTrimmed = raw.trim();
 
-        // Check if it looks like an AID record before trying to parse (ignore leading whitespace)
-        if (rawTrimmed.toLowerCase().startsWith(`v=${SPEC_VERSION}`)) {
-          try {
-            const record = parse(rawTrimmed);
-            if (record.dep) {
-              const depDate = new Date(record.dep);
-              if (!Number.isNaN(depDate.getTime())) {
-                if (depDate.getTime() < Date.now()) {
-                  throw new AidError(
-                    'ERR_INVALID_TXT',
-                    `Record for ${queryName} was deprecated on ${record.dep}`,
-                  );
-                }
+        if (!looksLikeAidRecord(rawTrimmed)) continue;
 
-                console.warn(
-                  `[AID] WARNING: Record for ${queryName} is scheduled for deprecation on ${record.dep}`,
+        try {
+          const record = parse(rawTrimmed);
+          if (record.dep) {
+            const depDate = new Date(record.dep);
+            if (!Number.isNaN(depDate.getTime())) {
+              if (depDate.getTime() < Date.now()) {
+                throw new AidError(
+                  'ERR_INVALID_TXT',
+                  `Record for ${queryName} was deprecated on ${record.dep}`,
                 );
               }
+
+              console.warn(
+                `[AID] WARNING: Record for ${queryName} is scheduled for deprecation on ${record.dep}`,
+              );
             }
-            if (record.pka) {
-              await performPKAHandshake(record.uri, record.pka, record.kid ?? '');
-            }
-            // Success! Return the parsed record, raw string, and TTL.
-            return {
-              record,
-              raw: rawTrimmed,
-              ttl: answer.ttl ?? DNS_TTL_MIN,
-              queryName,
-            };
-          } catch (parseError) {
-            // This record looked like an AID record but failed validation.
-            if (parseError instanceof AidError) throw parseError;
-            throw new AidError('ERR_INVALID_TXT', (parseError as Error).message);
           }
+          validRecords.push({
+            record,
+            raw: rawTrimmed,
+            ttl: answer.ttl ?? DNS_TTL_MIN,
+            queryName,
+          });
+        } catch (parseError) {
+          if (parseError instanceof AidError) {
+            lastAidError = parseError;
+            continue;
+          }
+          throw new AidError('ERR_INVALID_TXT', (parseError as Error).message);
         }
       }
 
-      // If the loop completes without finding a valid AID record
+      if (validRecords.length === 1) {
+        const result = validRecords[0];
+        if (result.record.pka) {
+          await performPKAHandshake(result.record.uri, result.record.pka, result.record.kid ?? '');
+        }
+        return result;
+      }
+
+      if (validRecords.length > 1) {
+        throw new AidError(
+          'ERR_INVALID_TXT',
+          `Multiple valid AID records found for ${queryName}; publish exactly one valid record per queried DNS name`,
+        );
+      }
+
+      if (lastAidError) throw lastAidError;
+
       throw new AidError('ERR_NO_RECORD', `No valid AID record found for ${queryName}`);
     } catch (error: unknown) {
       if (error instanceof AidError) {

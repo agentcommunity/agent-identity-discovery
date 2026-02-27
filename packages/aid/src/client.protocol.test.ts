@@ -56,4 +56,49 @@ describe('Client protocol resolution', () => {
     expect(record.uri).toBe('https://fallback.example.com');
     expect(queryName).toBe('_agent.example.com');
   });
+
+  it('fails on multiple valid TXT answers for the same queried name', async () => {
+    const { query } = await import('dns-query');
+    (query as any).mockResolvedValue({
+      rcode: 'NOERROR',
+      answers: [
+        {
+          type: 'TXT',
+          name: '_agent.example.com',
+          data: 'v=aid1;u=https://one.example.com;p=mcp',
+        },
+        {
+          type: 'TXT',
+          name: '_agent.example.com',
+          data: 'v=aid1;u=https://two.example.com;p=mcp',
+        },
+      ],
+    });
+
+    await expect(discover('example.com')).rejects.toMatchObject({
+      errorCode: 'ERR_INVALID_TXT',
+    });
+  });
+
+  it('accepts one valid TXT answer when another is malformed', async () => {
+    const { query } = await import('dns-query');
+    (query as any).mockResolvedValue({
+      rcode: 'NOERROR',
+      answers: [
+        {
+          type: 'TXT',
+          name: '_agent.example.com',
+          data: 'v=aid1;u=http://bad.example.com;p=mcp',
+        },
+        {
+          type: 'TXT',
+          name: '_agent.example.com',
+          data: 'v=aid1;u=https://good.example.com;p=mcp',
+        },
+      ],
+    });
+
+    const { record } = await discover('example.com');
+    expect(record.uri).toBe('https://good.example.com');
+  });
 });
