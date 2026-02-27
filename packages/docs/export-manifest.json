@@ -9,8 +9,8 @@
     },
     {
       "path": "quickstart/index.md",
-      "bytes": 10224,
-      "sha256": "f5aab7ecb9903c0c7fc276374fc6fe6ef49d1c84a3e6a0e6050762cf55a38cea"
+      "bytes": 10770,
+      "sha256": "ac53eaa506c203b07a07341901160a67cfcd1e99ac3dd0490fd0e5f70c44e701"
     },
     {
       "path": "quickstart/quickstart_a2a.md",
@@ -143,5 +143,5 @@
       "sha256": "985c0214d91997524c53b078da3a8b87599709ee71c1d39b0cfa96764bcbd117"
     }
   ],
-  "aggregateSha256": "55ee477c891099ce92efdaf2ab2b3af8fa4260722dbc65b3548edd755b228a84"
+  "aggregateSha256": "c01f9fc1d25a38d859f55c600d0fd4c0887afc32e09486167863a45d9a89b991"
 }
