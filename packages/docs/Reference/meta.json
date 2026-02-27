@@ -6,6 +6,7 @@
     "identity_pka",
     "well_known_json",
     "security",
+    "enterprise_rollout",
     "versioning",
     "troubleshooting"
   ]

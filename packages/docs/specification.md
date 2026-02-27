@@ -215,6 +215,8 @@ Policy semantics:
 
 If discovery succeeds only through `.well-known`, that result cannot satisfy `dnssec=require`.
 
+Operational rollout guidance for these modes lives in the [Enterprise Rollout Playbook](Reference/enterprise_rollout.md).
+
 ---
 
 ## **4. DNS and Caching**

@@ -180,3 +180,5 @@ aid-doctor pka verify --key <z...>
 - For dev-only loopback `.well-known`, set `AID_ALLOW_INSECURE_WELL_KNOWN=1`.
 - Use `--save-draft` with `generate` to save records for later deployment.
 - Error messages are standardized for consistent troubleshooting experience.
+
+For change windows, ownership split, and staged `balanced` to `strict` adoption, see the [Enterprise Rollout Playbook](../Reference/enterprise_rollout.md).

@@ -69,6 +69,7 @@ flowchart LR
 - [**Identity & PKA**](Reference/identity_pka.md) – _How AID provides cryptographic proof of an agent's identity._
 - [**Rationale**](Understand/rationale.md) – _The design philosophy behind AID._
 - [**Security Best Practices**](Reference/security.md) – _DNSSEC, redirect handling, local execution, IDN safety, TTL & caching._
+- [**Enterprise Rollout**](Reference/enterprise_rollout.md) – _Change windows, delegation patterns, and DNS team vs app team ownership._
 - [**aid-doctor CLI**](Tooling/aid_doctor.md) – _Validate, secure, and generate AID records._
 
 ---
