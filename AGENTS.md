@@ -53,6 +53,7 @@ pnpm build
 pnpm test
 pnpm e2e
 pnpm test:parity       # TS + Go + Python parity suite
+pnpm docs:verify       # required when docs or docs-exported content changes
 ```
 
 Per SDK
@@ -137,6 +138,7 @@ For complete CLI documentation, see the [aid-doctor CLI Reference](packages/docs
 * From any package root: `pnpm test`
 * Focus a test: `pnpm vitest run -t "<name>"`
 * Lint one package: `pnpm lint --filter <pkg>`
+* If you change `packages/docs/**`, `README.md`, `AGENTS.md`, or docs tooling/scripts, run `pnpm docs:verify` and commit the updated `packages/docs/export-manifest.json` and `packages/docs/export-manifest.sha256` if they change.
 
 ## Security
 
@@ -151,6 +153,7 @@ For complete CLI documentation, see the [aid-doctor CLI Reference](packages/docs
 * Conventional commits. Example: `feat(aid): add DoH client`
 * Add a Changeset for user visible changes
 * PRs must pass `turbo run build test lint`, include tests, and update docs
+* PRs that change docs or docs-exported content must also pass `pnpm docs:verify`
 * Update `tracking/PHASE_X.md` if applicable
 
 ## Extending the Spec
