@@ -67,6 +67,8 @@ async fn main() -> Result<(), aid_rs::AidError> {
 }
 ```
 
+Discovery stays on the exact host you pass in. If you call `discover_with_options("app.team.example.com", ...)`, the client does not implicitly retry `_agent.team.example.com` or `_agent.example.com`.
+
 ### Parse TXT records
 
 ```rust

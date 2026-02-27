@@ -44,7 +44,7 @@ func main() {
 
 ### `func Discover(domain string, timeout time.Duration) (AidRecord, uint32, error)`
 
-Discovers an agent by looking up the `_agent` TXT record for the given domain.
+Discovers an agent by looking up the `_agent` TXT record for the exact host you pass in. The resolver does not implicitly retry parent hosts.
 
 **Parameters:**
 
@@ -59,14 +59,14 @@ Discovers an agent by looking up the `_agent` TXT record for the given domain.
 
 ### `func DiscoverWithOptions(domain string, timeout time.Duration, opts DiscoveryOptions) (AidRecord, uint32, error)`
 
-Enhanced discovery with protocol-specific DNS lookup and `.well-known` controls.
+Enhanced discovery with protocol-specific DNS lookup and `.well-known` controls, still scoped to the exact host you passed in.
 
 ```go
 rec, ttl, err := aid.DiscoverWithOptions(
     "example.com",
     5*time.Second,
     aid.DiscoveryOptions{
-        Protocol:          "mcp",      // queries _agent._mcp.example.com then _agent.mcp.example.com, then base
+        Protocol:          "mcp",      // queries exact-host protocol names first, then exact-host base
         WellKnownFallback: true,        // only on ERR_NO_RECORD / ERR_DNS_LOOKUP_FAILED
         WellKnownTimeout:  2*time.Second,
     },

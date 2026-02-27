@@ -112,6 +112,59 @@ describe('Browser client', () => {
       expect(queryName).toBe('_agent.example.com');
     });
 
+    it('keeps protocol discovery on the exact host and never walks parent domains', async () => {
+      const calls: string[] = [];
+      const dohResponses: Record<string, unknown> = {
+        'https://cloudflare-dns.com/dns-query?name=_agent._mcp.app.team.example.com&type=TXT': {
+          Status: 2,
+        },
+        'https://cloudflare-dns.com/dns-query?name=_agent.app.team.example.com&type=TXT': {
+          Status: 0,
+          Answer: [
+            {
+              name: '_agent.app.team.example.com',
+              type: 16,
+              TTL: 300,
+              data: '"v=aid1;u=https://app.team.example.com/mcp;p=mcp"',
+            },
+          ],
+        },
+      };
+
+      g.fetch = vi.fn(async (url: string) => {
+        calls.push(url.toString());
+        const response = dohResponses[url.toString()];
+        if (response) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => response,
+          };
+        }
+        return { ok: false, status: 404, json: async () => ({}) };
+      });
+
+      const { record, queryName } = await browser.discover('app.team.example.com', {
+        protocol: 'mcp',
+      });
+
+      expect(record.uri).toBe('https://app.team.example.com/mcp');
+      expect(queryName).toBe('_agent.app.team.example.com');
+      expect(calls).toEqual([
+        'https://cloudflare-dns.com/dns-query?name=_agent._mcp.app.team.example.com&type=TXT',
+        'https://cloudflare-dns.com/dns-query?name=_agent.app.team.example.com&type=TXT',
+      ]);
+      expect(calls).not.toContain(
+        'https://cloudflare-dns.com/dns-query?name=_agent._mcp.team.example.com&type=TXT',
+      );
+      expect(calls).not.toContain(
+        'https://cloudflare-dns.com/dns-query?name=_agent.team.example.com&type=TXT',
+      );
+      expect(calls).not.toContain(
+        'https://cloudflare-dns.com/dns-query?name=_agent.example.com&type=TXT',
+      );
+    });
+
     it('fails on multiple valid TXT answers for the same queried name', async () => {
       g.fetch = vi.fn(async (url: string) => {
         if (

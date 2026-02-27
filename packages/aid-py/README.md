@@ -35,12 +35,12 @@ except AidError as e:
 
 ### `discover(domain: str, *, protocol: str | None = None, timeout: float = 5.0, well_known_fallback: bool = True, well_known_timeout: float = 2.0) -> (dict, int)`
 
-Discovers an agent by looking up the `_agent` TXT record for the given domain.
+Discovers an agent by looking up the `_agent` TXT record for the exact host you pass in. The resolver does not implicitly retry parent hosts.
 
 **Parameters:**
 
 - `domain` (str): The domain name to discover
-- `protocol` (str, optional): Try protocol-specific subdomain first (e.g., `mcp`)
+- `protocol` (str, optional): Try protocol-specific subdomain names for the same exact host first (e.g., `mcp`)
 - `timeout` (float): DNS timeout in seconds (default 5.0)
 - `well_known_fallback` (bool): If true, falls back to `https://<domain>/.well-known/agent` on `ERR_NO_RECORD` or `ERR_DNS_LOOKUP_FAILED` (default True)
 - `well_known_timeout` (float): Timeout for the `.well-known` HTTP fetch (default 2.0)
