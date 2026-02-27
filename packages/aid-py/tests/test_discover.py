@@ -103,3 +103,42 @@ def test_discover_no_record(monkeypatch):
     monkeypatch.setattr(dns.resolver, "resolve", _no_record)
     with pytest.raises(AidError):
         discover("missing.com") 
+
+
+def test_discover_succeeds_with_one_valid_and_one_malformed(monkeypatch):
+    import dns.resolver
+
+    def _fake_resolve(name, rdtype, lifetime=5.0):
+        if name == "_agent.example.com":
+            return _FakeAnswer(
+                [
+                    "v=aid1;uri=http://bad.example.com;proto=mcp",
+                    "v=aid1;u=https://good.example.com;p=mcp",
+                ],
+                300,
+            )
+        raise dns.resolver.NXDOMAIN()
+
+    monkeypatch.setattr(dns.resolver, "resolve", _fake_resolve)
+    record, ttl = discover("example.com")
+    assert record["uri"] == "https://good.example.com"
+    assert ttl == 300
+
+
+def test_discover_fails_on_multiple_valid_answers(monkeypatch):
+    import dns.resolver
+
+    def _fake_resolve(name, rdtype, lifetime=5.0):
+        if name == "_agent.example.com":
+            return _FakeAnswer(
+                [
+                    "v=aid1;uri=https://one.example.com;proto=mcp",
+                    "v=aid1;u=https://two.example.com;p=mcp",
+                ],
+                300,
+            )
+        raise dns.resolver.NXDOMAIN()
+
+    monkeypatch.setattr(dns.resolver, "resolve", _fake_resolve)
+    with pytest.raises(AidError, match="Multiple valid AID records found"):
+        discover("example.com")

@@ -111,5 +111,74 @@ describe('Browser client', () => {
       expect(record.uri).toBe('https://fallback.example.com');
       expect(queryName).toBe('_agent.example.com');
     });
+
+    it('fails on multiple valid TXT answers for the same queried name', async () => {
+      g.fetch = vi.fn(async (url: string) => {
+        if (
+          url.toString() === 'https://cloudflare-dns.com/dns-query?name=_agent.example.com&type=TXT'
+        ) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              Status: 0,
+              Answer: [
+                {
+                  name: '_agent.example.com',
+                  type: 16,
+                  TTL: 300,
+                  data: '"v=aid1;u=https://one.example.com;p=mcp"',
+                },
+                {
+                  name: '_agent.example.com',
+                  type: 16,
+                  TTL: 300,
+                  data: '"v=aid1;u=https://two.example.com;p=mcp"',
+                },
+              ],
+            }),
+          };
+        }
+        return { ok: false, status: 404, json: async () => ({}) };
+      });
+
+      await expect(browser.discover('example.com')).rejects.toMatchObject({
+        errorCode: 'ERR_INVALID_TXT',
+      });
+    });
+
+    it('accepts one valid TXT answer when another is malformed', async () => {
+      g.fetch = vi.fn(async (url: string) => {
+        if (
+          url.toString() === 'https://cloudflare-dns.com/dns-query?name=_agent.example.com&type=TXT'
+        ) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              Status: 0,
+              Answer: [
+                {
+                  name: '_agent.example.com',
+                  type: 16,
+                  TTL: 300,
+                  data: '"v=aid1;u=http://bad.example.com;p=mcp"',
+                },
+                {
+                  name: '_agent.example.com',
+                  type: 16,
+                  TTL: 300,
+                  data: '"v=aid1;u=https://good.example.com;p=mcp"',
+                },
+              ],
+            }),
+          };
+        }
+        return { ok: false, status: 404, json: async () => ({}) };
+      });
+
+      const { record } = await browser.discover('example.com');
+      expect(record.uri).toBe('https://good.example.com');
+    });
   });
 });

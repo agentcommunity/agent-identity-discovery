@@ -105,6 +105,10 @@ function constructQueryName(domain: string, protocol?: string, useUnderscore = f
   return `${DNS_SUBDOMAIN}.${normalizedDomain}`;
 }
 
+function looksLikeAidRecord(raw: string): boolean {
+  return /(?:^|;)\s*(?:v|version)\s*=\s*aid1(?:\s*(?:;|$))/i.test(raw);
+}
+
 async function fetchWellKnown(
   domain: string,
   timeoutMs = 2000,
@@ -279,42 +283,61 @@ export async function discover(
 
   const tryQuery = async (name: string): Promise<DiscoveryResult> => {
     const txtRecords = await queryTxtRecordsDoH(name, options);
+    const validRecords: DiscoveryResult[] = [];
+    let lastAidError: AidError | null = null;
+
     for (const txtRecord of txtRecords) {
-      const recordString = txtRecord.data;
-      if (recordString.includes('v=aid1') || recordString.includes('v=AID1')) {
-        try {
-          const record = parse(recordString);
-          if (record.dep) {
-            const depDate = new Date(record.dep);
-            if (!Number.isNaN(depDate.getTime())) {
-              if (depDate.getTime() < Date.now()) {
-                throw new AidError(
-                  'ERR_INVALID_TXT',
-                  `Record for ${name} was deprecated on ${record.dep}`,
-                );
-              }
-              console.warn(
-                `[AID] WARNING: Record for ${name} is scheduled for deprecation on ${record.dep}`,
+      const recordString = txtRecord.data.trim();
+      if (!looksLikeAidRecord(recordString)) continue;
+
+      try {
+        const record = parse(recordString);
+        if (record.dep) {
+          const depDate = new Date(record.dep);
+          if (!Number.isNaN(depDate.getTime())) {
+            if (depDate.getTime() < Date.now()) {
+              throw new AidError(
+                'ERR_INVALID_TXT',
+                `Record for ${name} was deprecated on ${record.dep}`,
               );
             }
-          }
-          if (record.pka) {
-            await performPKAHandshake(record.uri, record.pka, record.kid ?? '');
-          }
-          return {
-            record,
-            domain,
-            queryName: name,
-            ttl: txtRecord.ttl,
-          };
-        } catch (err) {
-          // If parsing fails but it's not a deprecation error, just continue to the next TXT record
-          if (err instanceof AidError && err.message.includes('deprecated')) {
-            throw err;
+            console.warn(
+              `[AID] WARNING: Record for ${name} is scheduled for deprecation on ${record.dep}`,
+            );
           }
         }
+        validRecords.push({
+          record,
+          domain,
+          queryName: name,
+          ttl: txtRecord.ttl,
+        });
+      } catch (err) {
+        if (err instanceof AidError) {
+          lastAidError = err;
+          continue;
+        }
+        throw err;
       }
     }
+
+    if (validRecords.length === 1) {
+      const result = validRecords[0];
+      if (result.record.pka) {
+        await performPKAHandshake(result.record.uri, result.record.pka, result.record.kid ?? '');
+      }
+      return result;
+    }
+
+    if (validRecords.length > 1) {
+      throw new AidError(
+        'ERR_INVALID_TXT',
+        `Multiple valid AID records found for ${name}; publish exactly one valid record per queried DNS name`,
+      );
+    }
+
+    if (lastAidError) throw lastAidError;
+
     throw new AidError('ERR_NO_RECORD', `No valid AID record found for ${name}`);
   };
 

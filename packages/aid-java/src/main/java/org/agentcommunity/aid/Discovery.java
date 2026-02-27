@@ -85,14 +85,25 @@ public final class Discovery {
     catch (Exception e) { throw new AidError("ERR_DNS_LOOKUP_FAILED", e.getMessage()); }
   }
 
-  private static ParsedRecordWithTtl parseFirstValid(List<DoHAnswer> answers, Duration timeout) {
+  private static ParsedRecordWithTtl parseSingleValid(List<DoHAnswer> answers, Duration timeout, String queryName) {
     AidError last = null;
+    ParsedRecordWithTtl valid = null;
+    int validCount = 0;
     for (DoHAnswer answer : answers) {
       try {
         AidRecord rec = Parser.parse(answer.data);
-        if (rec.pka != null) Handshake.performHandshake(rec.uri, rec.pka, rec.kid == null ? "" : rec.kid, timeout);
-        return new ParsedRecordWithTtl(rec, answer.ttl);
+        valid = new ParsedRecordWithTtl(rec, answer.ttl);
+        validCount += 1;
       } catch (AidError e) { last = e; }
+    }
+    if (validCount == 1 && valid != null) {
+      if (valid.record.pka != null) Handshake.performHandshake(valid.record.uri, valid.record.pka, valid.record.kid == null ? "" : valid.record.kid, timeout);
+      return valid;
+    }
+    if (validCount > 1) {
+      throw new AidError(
+          "ERR_INVALID_TXT",
+          "Multiple valid AID records found for " + queryName + "; publish exactly one valid record per queried DNS name");
     }
     throw last != null ? last : new AidError("ERR_NO_RECORD", "No valid AID record in TXT answers");
   }
@@ -114,7 +125,7 @@ public final class Discovery {
         if (options.requireDnssec && !res.ad) {
           throw new AidError("ERR_SECURITY", "DNSSEC validation failed or was not available for " + name);
         }
-        ParsedRecordWithTtl p = parseFirstValid(res.answer, options.timeout);
+        ParsedRecordWithTtl p = parseSingleValid(res.answer, options.timeout, name);
         return new DiscoveryResult(p.record, p.ttl, name);
       } catch (AidError e) {
         last = e;
@@ -129,4 +140,3 @@ public final class Discovery {
     throw last != null ? last : new AidError("ERR_DNS_LOOKUP_FAILED", "DNS query failed");
   }
 }
-
