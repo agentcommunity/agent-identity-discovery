@@ -36,7 +36,7 @@ function runGhJson(ghArgs) {
 
 function parseIssueSections(markdown) {
   const sections = [];
-  const headerRegex = /^## ISSUE (\d+)(?:\s+\(([^)]+)\))?/gm;
+  const headerRegex = /^### ISSUE (\d+)(?:\s+\(([^)]+)\))?/gm;
   const matches = [...markdown.matchAll(headerRegex)];
 
   for (const [index, match] of matches.entries()) {
@@ -47,9 +47,10 @@ function parseIssueSections(markdown) {
     const tracker = (match[2] || '').toLowerCase().includes('tracker');
 
     const titleMatch = sectionText.match(/Title:\s*\n`([^`]+)`/);
+    const githubIssueMatch = sectionText.match(/GitHub issue:\s*\n`#(\d+)`/);
     const bodyMatch = sectionText.match(/Body:\s*\n```md\n([\s\S]*?)\n```/);
     const labelsSectionMatch = sectionText.match(
-      /Suggested labels:\s*\n([\s\S]*?)(?:\n\n(?:Controversy level:|---|## ISSUE|$))/,
+      /Labels:\s*\n([\s\S]*?)(?:\n\n(?:GitHub issue:|Controversy level:|Body:|---|## ISSUE|$))/,
     );
     const labelMatches = labelsSectionMatch
       ? [...labelsSectionMatch[1].matchAll(/^\s*-\s*`([^`]+)`\s*$/gm)]
@@ -63,6 +64,7 @@ function parseIssueSections(markdown) {
       number,
       tracker,
       title: titleMatch[1].trim(),
+      githubIssueNumber: githubIssueMatch ? Number.parseInt(githubIssueMatch[1], 10) : null,
       body: bodyMatch[1].trim(),
       labels: labelMatches.map((labelMatch) => labelMatch[1].trim()),
     });
@@ -148,6 +150,45 @@ function createIssue(spec, availableLabels, bodyOverride) {
   };
 }
 
+function editIssue(spec, availableLabels, issueNumber, bodyOverride) {
+  const body = bodyOverride ?? spec.body;
+  if (!apply) {
+    return {
+      title: spec.title,
+      number: issueNumber,
+      url: `(dry-run existing #${issueNumber})`,
+      created: false,
+      updated: true,
+      simulated: true,
+    };
+  }
+
+  const cmd = [
+    'issue',
+    'edit',
+    String(issueNumber),
+    '--repo',
+    repo,
+    '--title',
+    spec.title,
+    '--body-file',
+    '-',
+  ];
+  for (const label of spec.labels.filter((value) => availableLabels.has(value))) {
+    cmd.push('--add-label', label);
+  }
+
+  runGh(cmd, body);
+  return {
+    title: spec.title,
+    number: issueNumber,
+    url: `https://github.com/${repo}/issues/${issueNumber}`,
+    created: false,
+    updated: true,
+    simulated: false,
+  };
+}
+
 function main() {
   const planPath = path.resolve(process.cwd(), PLAN_FILE);
   const markdown = fs.readFileSync(planPath, 'utf8');
@@ -173,9 +214,28 @@ function main() {
     'number,title,url',
   ]);
   const existingByTitle = new Map(existingIssues.map((issue) => [issue.title, issue]));
+  const existingByNumber = new Map(existingIssues.map((issue) => [issue.number, issue]));
 
   const childResults = [];
   for (const child of children) {
+    if (child.githubIssueNumber) {
+      const existing = existingByNumber.get(child.githubIssueNumber);
+      if (!existing) {
+        throw new Error(
+          `Mapped GitHub issue #${child.githubIssueNumber} for "${child.title}" was not found in ${repo}.`,
+        );
+      }
+
+      const edited = editIssue(child, availableLabels, child.githubIssueNumber);
+      childResults.push(edited);
+      existingByTitle.set(child.title, {
+        number: child.githubIssueNumber,
+        title: child.title,
+        url: `https://github.com/${repo}/issues/${child.githubIssueNumber}`,
+      });
+      continue;
+    }
+
     const existing = existingByTitle.get(child.title);
     if (existing) {
       childResults.push({
@@ -183,6 +243,7 @@ function main() {
         number: existing.number,
         url: existing.url,
         created: false,
+        updated: false,
         simulated: false,
       });
       continue;
@@ -204,16 +265,28 @@ function main() {
     return `#${child.number}`;
   });
 
-  const existingTracker = existingByTitle.get(tracker.title);
-  const trackerResult = existingTracker
-    ? {
-        title: tracker.title,
-        number: existingTracker.number,
-        url: existingTracker.url,
-        created: false,
-        simulated: false,
-      }
-    : createIssue(tracker, availableLabels, trackerBody);
+  let trackerResult;
+  if (tracker.githubIssueNumber) {
+    const existing = existingByNumber.get(tracker.githubIssueNumber);
+    if (!existing) {
+      throw new Error(
+        `Mapped GitHub issue #${tracker.githubIssueNumber} for tracker "${tracker.title}" was not found in ${repo}.`,
+      );
+    }
+    trackerResult = editIssue(tracker, availableLabels, tracker.githubIssueNumber, trackerBody);
+  } else {
+    const existingTracker = existingByTitle.get(tracker.title);
+    trackerResult = existingTracker
+      ? {
+          title: tracker.title,
+          number: existingTracker.number,
+          url: existingTracker.url,
+          created: false,
+          updated: false,
+          simulated: false,
+        }
+      : createIssue(tracker, availableLabels, trackerBody);
+  }
 
   console.log(`Repo: ${repo}`);
   console.log(`Plan: ${PLAN_FILE}`);
@@ -221,13 +294,25 @@ function main() {
   console.log('');
   console.log('Child issues:');
   for (const issue of childResults) {
-    const status = issue.created ? 'created' : issue.simulated ? 'would create' : 'existing';
+    const status = issue.created
+      ? 'created'
+      : issue.updated
+        ? issue.simulated
+          ? 'would update'
+          : 'updated'
+        : issue.simulated
+          ? 'would create'
+          : 'existing';
     console.log(`- [${status}] ${issue.title} -> ${issue.url}`);
   }
   console.log('');
   {
     const status = trackerResult.created
       ? 'created'
+      : trackerResult.updated
+        ? trackerResult.simulated
+          ? 'would update'
+          : 'updated'
       : trackerResult.simulated
         ? 'would create'
         : 'existing';
