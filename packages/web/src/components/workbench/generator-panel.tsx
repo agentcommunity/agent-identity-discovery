@@ -53,8 +53,6 @@ export function GeneratorPanel() {
             specValidation={form.specValidation}
             serverResult={form.serverResult}
             wellKnownJson={form.wellKnownJson}
-            useAliases={form.formData.useAliases}
-            onChange={(patch: FormPatch) => form.updateForm(patch)}
           />
 
           <div className="space-y-2">

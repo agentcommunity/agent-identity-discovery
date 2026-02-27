@@ -151,7 +151,7 @@ v=aid1;u=https://api.example.com/mcp;p=mcp;a=pat;s=Example MCP
 
 ## Notes
 
-- Prefer full key names (`proto`, `auth`); single-letter aliases (`p`, `a`) exist for byte efficiency in DNS TXT records.
+- Publish short keys (`p`, `a`) as the canonical v1.x TXT format. Parsers still accept the full names for compatibility.
 - `desc`/`s` is optional, max 60 UTF-8 bytes.
 - Remote protocols MUST use `https://` (or `wss://` for `websocket`).
 - `local` uses approved schemes only: `docker:`, `npx:`, `pip:`.

@@ -5,6 +5,7 @@ import { inspectTls } from './tls_inspect';
 import { probeDnssecRrsigTxt } from './dnssec';
 import { runProtocolProbe } from './protoProbe';
 import { ERROR_MESSAGES } from './error_messages';
+import { findLongKeyNames } from './generator';
 
 function initReport(domain: string, protocol?: string): DoctorReport {
   return {
@@ -110,38 +111,35 @@ export async function runCheck(domain: string, opts: CheckOptions): Promise<Doct
         message: warning.message,
       });
     }
-    report.record.raw = (() => {
-      // For DNS, we don't receive raw concatenated string from SDK; synthesize minimal
-      // to enable byte warnings based on a canonicalized render.
-      const parts: string[] = ['v=aid1'];
-      if (record.uri) parts.push(`u=${record.uri}`);
-      if (record.proto) parts.push(`p=${record.proto}`);
-      if (record.auth) parts.push(`a=${record.auth}`);
-      if (record.desc) parts.push(`s=${record.desc}`);
-      if (record.docs) parts.push(`d=${record.docs}`);
-      if (record.dep) {
-        const depDate = new Date(record.dep);
-        if (depDate.getTime() < Date.now()) {
-          report.record.errors.push({
-            code: 'DEPRECATED',
-            message: ERROR_MESSAGES.DEPRECATED_RECORD,
-          });
-          report.record.valid = false;
-          report.exitCode = 1001; // ERR_INVALID_TXT
-        } else {
-          report.record.warnings.push({
-            code: 'DEPRECATION_SCHEDULED',
-            message: `Record is scheduled for deprecation on ${record.dep}`,
-          });
-        }
+    report.record.raw = value.raw;
+    if (!value.queryName.startsWith('https')) {
+      const longKeys = findLongKeyNames(value.raw);
+      if (longKeys.length > 0) {
+        report.record.warnings.push({
+          code: 'LONG_KEY_COMPAT',
+          message: `${ERROR_MESSAGES.LONG_KEY_COMPAT} Found: ${longKeys.join(', ')}.`,
+        });
       }
-      if (record.pka) parts.push(`k=${record.pka}`);
-      if (record.kid) parts.push(`i=${record.kid}`);
-      return parts.join(';');
-    })();
+    }
+    if (record.dep) {
+      const depDate = new Date(record.dep);
+      if (depDate.getTime() < Date.now()) {
+        report.record.errors.push({
+          code: 'DEPRECATED',
+          message: ERROR_MESSAGES.DEPRECATED_RECORD,
+        });
+        report.record.valid = false;
+        report.exitCode = 1001; // ERR_INVALID_TXT
+      } else {
+        report.record.warnings.push({
+          code: 'DEPRECATION_SCHEDULED',
+          message: `Record is scheduled for deprecation on ${record.dep}`,
+        });
+      }
+    }
 
     // Byte length warning
-    const byteLen = new TextEncoder().encode(report.record.raw).length;
+    const byteLen = new TextEncoder().encode(report.record.raw ?? '').length;
     if (byteLen > 255) {
       report.record.warnings.push({
         code: 'BYTE_LIMIT',

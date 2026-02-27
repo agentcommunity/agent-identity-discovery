@@ -37,7 +37,7 @@ import org.agentcommunity.aid.AidRecord;
 
 public class Main {
   public static void main(String[] args) throws Exception {
-    AidRecord rec = Parser.parse("v=aid1;uri=https://api.example.com/mcp;proto=mcp;desc=Example");
+    AidRecord rec = Parser.parse("v=aid1;u=https://api.example.com/mcp;p=mcp;s=Example");
     System.out.println(rec.uri);
   }
 }

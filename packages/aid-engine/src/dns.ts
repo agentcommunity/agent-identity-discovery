@@ -30,6 +30,7 @@ export async function runBaseDiscovery(
 ): Promise<
   DnsQueryResult<{
     record: import('@agentcommunity/aid').AidRecord;
+    raw: string;
     queryName: string;
     ttl?: number;
     security: import('@agentcommunity/aid').DiscoverySecurity;

@@ -39,6 +39,8 @@ export const ERROR_MESSAGES = {
   TLS_EXPIRING_SOON: 'TLS certificate expires soon. Renew to avoid interruptions.',
   DNSSEC_NOT_DETECTED: 'DNSSEC not detected. Enable for better integrity.',
   PKA_NOT_PRESENT: 'Endpoint proof (PKA) not present. Consider adding for security.',
+  LONG_KEY_COMPAT:
+    'Long TXT keys are compatibility-only in v1.x. Publish short keys (v,u,p,a,s,d,e,k,i) as the canonical wire format.',
   DOWNGRADE_DETECTED:
     'Security downgrade detected: a previously present PKA or KID has been removed.',
 

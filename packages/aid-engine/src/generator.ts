@@ -20,28 +20,62 @@ export type AidGeneratorData = {
   kid?: string; // 1-6 chars [a-z0-9]
 };
 
-// The core logic function
-export function buildTxtRecordVariant(formData: AidGeneratorData, useAliases: boolean): string {
+const CANONICAL_TXT_KEYS = {
+  version: 'v',
+  uri: 'u',
+  proto: 'p',
+  auth: 'a',
+  desc: 's',
+  docs: 'd',
+  dep: 'e',
+  pka: 'k',
+  kid: 'i',
+} as const;
+
+const LONG_KEY_NAMES = new Set([
+  'version',
+  'uri',
+  'proto',
+  'auth',
+  'desc',
+  'docs',
+  'dep',
+  'pka',
+  'kid',
+]);
+
+// Canonical v1.x output always uses short keys. The legacy parameter is kept for call-site compatibility.
+export function buildTxtRecordVariant(formData: AidGeneratorData, _useAliases?: boolean): string {
+  void _useAliases;
   const parts: string[] = ['v=aid1'];
-  const k = (full: string, alias: string) => (useAliases ? alias : full);
-  if (formData.uri) parts.push(`${k('uri', 'u')}=${formData.uri}`);
-  if (formData.proto) parts.push(`${k('proto', 'p')}=${formData.proto}`);
-  if (formData.auth) parts.push(`${k('auth', 'a')}=${formData.auth}`);
-  if (formData.desc) parts.push(`${k('desc', 's')}=${formData.desc}`);
-  if (formData.docs) parts.push(`${k('docs', 'd')}=${formData.docs}`);
-  if (formData.dep) parts.push(`${k('dep', 'e')}=${formData.dep}`);
-  if (formData.pka) parts.push(`${k('pka', 'k')}=${formData.pka}`);
-  if (formData.kid) parts.push(`${k('kid', 'i')}=${formData.kid}`);
+  if (formData.uri) parts.push(`${CANONICAL_TXT_KEYS.uri}=${formData.uri}`);
+  if (formData.proto) parts.push(`${CANONICAL_TXT_KEYS.proto}=${formData.proto}`);
+  if (formData.auth) parts.push(`${CANONICAL_TXT_KEYS.auth}=${formData.auth}`);
+  if (formData.desc) parts.push(`${CANONICAL_TXT_KEYS.desc}=${formData.desc}`);
+  if (formData.docs) parts.push(`${CANONICAL_TXT_KEYS.docs}=${formData.docs}`);
+  if (formData.dep) parts.push(`${CANONICAL_TXT_KEYS.dep}=${formData.dep}`);
+  if (formData.pka) parts.push(`${CANONICAL_TXT_KEYS.pka}=${formData.pka}`);
+  if (formData.kid) parts.push(`${CANONICAL_TXT_KEYS.kid}=${formData.kid}`);
   return parts.join(';');
 }
 
 export function buildTxtRecord(formData: AidGeneratorData): string {
-  const full = buildTxtRecordVariant(formData, false);
-  const alias = buildTxtRecordVariant(formData, true);
-  // Prefer alias if it reduces size otherwise use full
-  return new TextEncoder().encode(alias).length <= new TextEncoder().encode(full).length
-    ? alias
-    : full;
+  return buildTxtRecordVariant(formData, true);
+}
+
+export function findLongKeyNames(record: string): string[] {
+  const found = new Set<string>();
+  for (const part of record.split(';')) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    const index = trimmed.indexOf('=');
+    if (index <= 0) continue;
+    const key = trimmed.slice(0, index).trim().toLowerCase();
+    if (LONG_KEY_NAMES.has(key)) {
+      found.add(key);
+    }
+  }
+  return [...found];
 }
 
 // The validation logic

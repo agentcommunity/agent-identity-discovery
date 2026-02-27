@@ -16,7 +16,7 @@ If your MCP server is live and accepting JSON-RPC messages at a specific URL, yo
     - **Example:** `https://api.my-mcp-service.com/v1/mcp`
 
 2.  **Construct the AID TXT Record:** Use `mcp` for protocol; `uri` is your JSON-RPC endpoint.
-    - **Value:** `v=aid1;uri=https://api.my-mcp-service.com/v1/mcp;proto=mcp;desc=My Awesome MCP Assistant`
+    - **Value:** `v=aid1;u=https://api.my-mcp-service.com/v1/mcp;p=mcp;s=My Awesome MCP Assistant`
 
 3.  **Publish to DNS:** Go to your DNS provider and add a `TXT` record for your service's domain (`my-mcp-service.com`).
     - **Type:** `TXT`

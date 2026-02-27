@@ -64,7 +64,7 @@ async fn main() -> Result<(), aid_rs::AidError> {
 use aid_rs::parse;
 
 fn main() -> Result<(), aid_rs::AidError> {
-    let rec = parse("v=aid1;uri=https://api.example.com/mcp;p=mcp;desc=Example")?;
+    let rec = parse("v=aid1;u=https://api.example.com/mcp;p=mcp;s=Example")?;
     println!("{}", rec.uri);
     Ok(())
 }

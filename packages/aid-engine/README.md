@@ -66,16 +66,13 @@ try {
   const validation = validateTxtRecord('v=aid1;u=https://api.example.com/agent;p=mcp');
   console.log('Valid:', validation.isValid);
 
-  // Build a record with aliases for smaller size
-  const record = buildTxtRecordVariant(
-    {
-      domain: 'example.com',
-      uri: 'https://api.example.com/agent',
-      proto: 'mcp',
-      auth: 'pat',
-    },
-    true,
-  ); // true = use aliases
+  // Build the canonical short-key TXT form
+  const record = buildTxtRecordVariant({
+    domain: 'example.com',
+    uri: 'https://api.example.com/agent',
+    proto: 'mcp',
+    auth: 'pat',
+  }); // Canonical v1.x output uses short keys
 
   console.log('TXT record:', record);
 
@@ -121,11 +118,8 @@ const data: AidGeneratorData = {
   kid: 'g1',
 };
 
-// Full keys: v=aid1;uri=...;proto=...
-const fullRecord = buildTxtRecordVariant(data, false);
-
-// Aliases (smaller): v=aid1;u=...;p=...
-const aliasRecord = buildTxtRecordVariant(data, true);
+// Canonical short-key output: v=aid1;u=...;p=...
+const record = buildTxtRecordVariant(data);
 ```
 
 ### Validation
