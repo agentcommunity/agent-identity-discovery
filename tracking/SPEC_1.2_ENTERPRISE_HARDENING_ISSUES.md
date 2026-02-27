@@ -1,9 +1,9 @@
 # SPEC v1.2 Enterprise Hardening Plan
 
-Status: In progress
+Status: Complete
 Owner: Agent Community
-Updated: 2026-02-26
-Branch context: `codex/spec12-enterprise-phased-plan`
+Updated: 2026-02-27
+Branch context: `codex/spec12-enterprise-cleanup`
 Baseline PR: #90 (spec/docs/sdk alignment)
 
 ## Purpose
@@ -15,10 +15,8 @@ This file is the planning source of truth for:
 - which GitHub issues exist already
 - which GitHub issues still need to be opened or updated
 
-This is not a claim that enterprise hardening is complete.
-
 ## Current Assessment
-Enterprise hardening is not complete yet.
+Enterprise hardening is complete for the v1.2.x scope defined in this plan.
 
 What is already true:
 - Spec/docs/code alignment for v1.2 naming and references is largely landed.
@@ -26,14 +24,12 @@ What is already true:
 - Cross-SDK protocol lookup order was aligned to `_agent._<proto>` -> `_agent.<proto>` -> `_agent.<domain>`.
 - Browser fallback trigger was aligned to `ERR_NO_RECORD` and `ERR_DNS_LOOKUP_FAILED`.
 - Drift checks in `scripts/docs-check.mjs` were strengthened.
-
-What is still missing:
-- Deterministic multi-TXT policy is not fully closed normatively and in parity vectors.
-- Exact-host and explicit delegation policy is not fully closed normatively.
-- Enterprise security modes are not defined end-to-end.
-- Conformance and CI gates are not expanded to the enterprise edge cases.
-- Enterprise rollout and ownership docs are not written.
-- The live GitHub issue set is behind this plan and needs reconciliation.
+- Deterministic multi-TXT behavior is implemented and tested (`#104`).
+- Exact-host lookup and explicit delegation semantics are implemented and documented (`#105`).
+- Enterprise security presets and policy controls are implemented in the reference stack (`#106`).
+- Conformance vectors and CI gates cover the enterprise edge cases in scope (`#107`).
+- Enterprise rollout guidance is published and linked from spec/security/tooling docs (`#108`).
+- Canonical short-key emission is enforced by default writers, with compatibility warnings for long-key publication (`#109`).
 
 ## Non-Goals
 - No `aid2` wire migration.
@@ -62,7 +58,7 @@ Completion evidence:
 - baseline alignment work landed before this plan
 
 ### Phase 1. Determinism And Discovery Boundaries
-Status: Not done
+Status: Done
 
 Goal:
 - remove discovery ambiguity before adding stricter enterprise policy
@@ -77,12 +73,16 @@ Exit criteria:
 - SDKs follow the same behavior
 - conformance vectors cover the edge cases
 
+Completion evidence:
+- `#104` deterministic multi-TXT behavior
+- `#105` exact-host lookup and delegation semantics
+
 Issue mapping:
 - Issue 1
 - Issue 2
 
 ### Phase 2. Enterprise Security Profile
-Status: Not done
+Status: Done
 
 Goal:
 - define enterprise policy controls without rewriting the base protocol
@@ -98,11 +98,14 @@ Exit criteria:
 - SDK and CLI options map to the policy
 - policy failures have defined error semantics
 
+Completion evidence:
+- `#106` enterprise security profile
+
 Issue mapping:
 - Issue 3
 
 ### Phase 3. Canonical Format And Tooling
-Status: Partial
+Status: Done
 
 Goal:
 - standardize canonical wire emission without breaking input compatibility
@@ -113,20 +116,19 @@ Includes:
 - generator and tooling behavior
 - warning strategy for long-key emission
 
-Known state:
-- some short-key emission work has landed
-- policy, linting, and full tooling alignment are still incomplete
-
 Exit criteria:
 - spec examples use short-key canonical form
 - generators and default writers emit short keys
 - tooling warns on long-key output where intended
 
+Completion evidence:
+- `#109` canonical short-key emission and tooling warnings
+
 Issue mapping:
 - Issue 4
 
 ### Phase 4. Conformance And CI Gates
-Status: Not done
+Status: Done
 
 Goal:
 - prevent reintroduction of cross-SDK drift
@@ -141,11 +143,14 @@ Exit criteria:
 - CI fails on divergence
 - diagnostics exist for the same edge cases
 
+Completion evidence:
+- `#107` conformance vectors and CI gates
+
 Issue mapping:
 - Issue 5
 
 ### Phase 5. Enterprise Rollout Docs
-Status: Not done
+Status: Done
 
 Goal:
 - make enterprise adoption operationally clear
@@ -162,6 +167,9 @@ Exit criteria:
 - linked from spec/security/tooling docs
 - includes apex and subdomain examples
 
+Completion evidence:
+- `#108` enterprise rollout playbook
+
 Issue mapping:
 - Issue 6
 
@@ -174,26 +182,24 @@ Issue mapping:
 - `#96` `spec(format): canonical short-key wire format and long-key compatibility path`
 - `#97` `spec(v1.2.x): enterprise hardening tracker (no protocol rewrite)`
 
-### Gaps Against This Plan
-- Missing updated tracker issue text for the current phased plan.
-- Missing issue for parity vectors + CI gates.
-- Missing issue for enterprise rollout playbook.
-- Existing tracker `#97` reflects the older pre-phase issue pack.
-- Existing security/format issue titles are close, but their wording predates the current plan.
-
-### Recommended Reconciliation Order
-1. Update the tracker to match this phased plan.
-2. Open the missing parity/CI issue.
-3. Open the missing rollout playbook issue.
-4. Decide whether to update issue titles/bodies for `#93` and `#96` or leave them as close-enough continuations.
+### Final Live Issue Set
+- `#92` closed by `#105`
+- `#93` closed by `#106`
+- `#95` closed by `#104`
+- `#96` closed by `#109`
+- `#97` close when this tracker cleanup lands
+- `#101` closed by `#107`
+- `#102` closed by `#108`
+- `#94` close as superseded by `#105` and `#107`
 
 ## Execution Order
-1. Issue 1: deterministic multi-TXT behavior
-2. Issue 2: exact-host discovery and delegation
-3. Issue 3: enterprise security profile
-4. Issue 4: canonical short-key emission policy
-5. Issue 5: conformance and CI gates
-6. Issue 6: rollout playbook
+Completed:
+1. Issue 1: deterministic multi-TXT behavior (`#104`)
+2. Issue 2: exact-host discovery and delegation (`#105`)
+3. Issue 3: enterprise security profile (`#106`)
+4. Issue 4: canonical short-key emission policy (`#109`)
+5. Issue 5: conformance and CI gates (`#107`)
+6. Issue 6: rollout playbook (`#108`)
 
 ## Issue Definitions
 
@@ -224,12 +230,12 @@ Track v1.2.x enterprise hardening work after baseline spec/SDK alignment, while 
 - Rollout guidance for enterprise teams.
 
 ## Child Issues
-- [ ] #TBD spec(parser): deterministic handling of multiple TXT answers
-- [ ] #TBD spec(discovery): exact-host lookup only + explicit delegation model
-- [ ] #TBD spec(security): enterprise profile for PKA + DNSSEC + well-known policy
-- [ ] #TBD spec(format): canonical short-key emission policy for v1.x
-- [ ] #TBD conformance: parity vectors and CI gates for discovery/security edge cases
-- [ ] #TBD docs(enterprise): rollout and ownership model (DNS team vs app team)
+- [x] #95 spec(parser): deterministic handling of multiple TXT answers
+- [x] #92 spec(discovery): exact-host lookup only + explicit delegation model
+- [x] #93 spec(security): enterprise profile for PKA + DNSSEC + well-known policy
+- [x] #96 spec(format): canonical short-key emission policy for v1.x
+- [x] #101 conformance: parity vectors and CI gates for discovery/security edge cases
+- [x] #102 docs(enterprise): rollout and ownership model (DNS team vs app team)
 
 ## Non-Goals
 - No `aid2` wire migration.
