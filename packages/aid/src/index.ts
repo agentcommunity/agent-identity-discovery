@@ -34,6 +34,17 @@ export {
 // Security helpers
 export { enforceRedirectPolicy } from './security.js';
 export { performPKAHandshake } from './pka.js';
+export type {
+  SecurityMode,
+  DnssecPolicy,
+  PkaPolicy,
+  DowngradePolicy,
+  WellKnownPolicy,
+  PreviousSecurityState,
+  DiscoverySecurity,
+  DiscoverySecurityWarning,
+  SecurityPolicyOptions,
+} from './discovery-security.js';
 
 // Re-export client functions and types
 export { type DiscoveryResult, type DiscoveryOptions, discover } from './client.js';

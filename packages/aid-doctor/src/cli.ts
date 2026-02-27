@@ -92,6 +92,11 @@ program
   .option('-t, --timeout <ms>', 'DNS query timeout in milliseconds', '5000')
   .option('--no-fallback', 'Disable .well-known fallback on DNS miss', false)
   .option('--fallback-timeout <ms>', 'Timeout for .well-known fetch (ms)', '2000')
+  .option('--security-mode <mode>', 'Security preset: balanced | strict')
+  .option('--dnssec <policy>', 'DNSSEC policy: off | prefer | require')
+  .option('--pka-policy <policy>', 'PKA policy: if-present | require')
+  .option('--downgrade-policy <policy>', 'Downgrade policy: off | warn | fail')
+  .option('--well-known-policy <policy>', 'Well-known policy: auto | disable')
   .option('--show-details', 'Show TLS/DNSSEC/PKA short details', false)
   .option('--dump-well-known [path]', 'On fallback failure, print or save body snippet', false)
   .option('--check-downgrade', 'Consult cache and warn when pka has been removed or changed', false)
@@ -107,6 +112,11 @@ program
         timeout: string;
         noFallback?: boolean;
         fallbackTimeout?: string;
+        securityMode?: 'balanced' | 'strict';
+        dnssec?: 'off' | 'prefer' | 'require';
+        pkaPolicy?: 'if-present' | 'require';
+        downgradePolicy?: 'off' | 'warn' | 'fail';
+        wellKnownPolicy?: 'auto' | 'disable';
         showDetails?: boolean;
         dumpWellKnown?: string | boolean;
         checkDowngrade?: boolean;
@@ -131,6 +141,14 @@ program
           timeoutMs: Number.parseInt(options.timeout),
           allowFallback: !options.noFallback,
           wellKnownTimeoutMs: Number.parseInt(options.fallbackTimeout || '2000'),
+          securityMode: options.securityMode,
+          dnssecPolicy: options.dnssec,
+          pkaPolicy: options.pkaPolicy,
+          downgradePolicy: options.downgradePolicy,
+          wellKnownPolicy: options.wellKnownPolicy,
+          previousSecurity: previousCacheEntry
+            ? { pka: previousCacheEntry.pka, kid: previousCacheEntry.kid }
+            : undefined,
           showDetails: options.showDetails,
           probeProtoSubdomain: options.probeProtoSubdomain,
           probeProtoEvenIfBase: options.probeProtoEvenIfBase,
@@ -172,6 +190,11 @@ program
   .option('-t, --timeout <ms>', 'DNS query timeout in milliseconds', '5000')
   .option('--no-fallback', 'Disable .well-known fallback on DNS miss', false)
   .option('--fallback-timeout <ms>', 'Timeout for .well-known fetch (ms)', '2000')
+  .option('--security-mode <mode>', 'Security preset: balanced | strict')
+  .option('--dnssec <policy>', 'DNSSEC policy: off | prefer | require')
+  .option('--pka-policy <policy>', 'PKA policy: if-present | require')
+  .option('--downgrade-policy <policy>', 'Downgrade policy: off | warn | fail')
+  .option('--well-known-policy <policy>', 'Well-known policy: auto | disable')
   .option('--show-details', 'Show TLS/DNSSEC/PKA short details', false)
   .option('--dump-well-known [path]', 'On fallback failure, print or save body snippet', false)
   .option('--check-downgrade', 'Consult cache and warn when pka has been removed or changed', false)
@@ -185,6 +208,11 @@ program
         timeout: string;
         noFallback?: boolean;
         fallbackTimeout?: string;
+        securityMode?: 'balanced' | 'strict';
+        dnssec?: 'off' | 'prefer' | 'require';
+        pkaPolicy?: 'if-present' | 'require';
+        downgradePolicy?: 'off' | 'warn' | 'fail';
+        wellKnownPolicy?: 'auto' | 'disable';
         showDetails?: boolean;
         dumpWellKnown?: string | boolean;
         checkDowngrade?: boolean;
@@ -201,6 +229,14 @@ program
           timeoutMs: Number.parseInt(options.timeout),
           allowFallback: !options.noFallback,
           wellKnownTimeoutMs: Number.parseInt(options.fallbackTimeout || '2000'),
+          securityMode: options.securityMode,
+          dnssecPolicy: options.dnssec,
+          pkaPolicy: options.pkaPolicy,
+          downgradePolicy: options.downgradePolicy,
+          wellKnownPolicy: options.wellKnownPolicy,
+          previousSecurity: previousCacheEntry
+            ? { pka: previousCacheEntry.pka, kid: previousCacheEntry.kid }
+            : undefined,
           showDetails: options.showDetails || false,
           probeProtoSubdomain: false, // JSON command doesn't support proto probing for now
           probeProtoEvenIfBase: false,

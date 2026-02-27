@@ -1,6 +1,21 @@
 import { type AidRecord, DNS_TTL_MIN, SPEC_VERSION, DNS_SUBDOMAIN } from './constants';
 import { AidError, parse, AidRecordValidator, canonicalizeRaw } from './parser';
 import { performPKAHandshake } from './pka.js';
+import {
+  type DiscoverySecurity,
+  type DnssecPolicy,
+  type DowngradePolicy,
+  type PkaPolicy,
+  type PreviousSecurityState,
+  type SecurityMode,
+  type WellKnownPolicy,
+  createDiscoverySecurity,
+  enforceDnssecPolicy,
+  enforceDowngradePolicy,
+  enforcePkaPolicy,
+  enforceWellKnownPolicy,
+  resolveSecurityPolicy,
+} from './discovery-security.js';
 import { query } from 'dns-query';
 
 /**
@@ -15,6 +30,18 @@ export interface DiscoveryOptions {
   wellKnownFallback?: boolean;
   /** Timeout for .well-known fetch in milliseconds (default: 2000) */
   wellKnownTimeoutMs?: number;
+  /** Enterprise security preset. */
+  securityMode?: SecurityMode;
+  /** DNSSEC policy for successful DNS answers. */
+  dnssecPolicy?: DnssecPolicy;
+  /** PKA presence policy for the final discovered record. */
+  pkaPolicy?: PkaPolicy;
+  /** Downgrade handling when previous security state is supplied. */
+  downgradePolicy?: DowngradePolicy;
+  /** `.well-known` fallback policy. */
+  wellKnownPolicy?: WellKnownPolicy;
+  /** Previously observed PKA/KID state for downgrade detection. */
+  previousSecurity?: PreviousSecurityState;
 }
 
 function normalizeDomain(domain: string): string {
@@ -78,15 +105,51 @@ type HeadersLike = { get(name: string): string | null };
 type ResponseLike = { ok: boolean; status: number; headers: HeadersLike; text(): Promise<string> };
 type FetchInit = { signal?: unknown; redirect?: 'error' | 'follow' | 'manual' };
 type FetchLike = (input: string, init?: FetchInit) => Promise<ResponseLike>;
+type DnssecResponse = { Status: number; AD?: boolean };
+
+async function queryDnssecStatus(queryName: string, timeoutMs: number): Promise<boolean | null> {
+  const fetchImpl = (globalThis as unknown as { fetch?: FetchLike }).fetch;
+  if (typeof fetchImpl !== 'function') {
+    return null;
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const url = new URL('https://cloudflare-dns.com/dns-query');
+    url.searchParams.set('name', queryName);
+    url.searchParams.set('type', 'TXT');
+    const res = (await fetchImpl(url.toString(), {
+      signal: controller.signal as unknown,
+      redirect: 'error',
+    })) as ResponseLike;
+    if (!res.ok) {
+      return null;
+    }
+    const parsed = JSON.parse(await res.text()) as DnssecResponse;
+    if (parsed.Status !== 0) {
+      return false;
+    }
+    return parsed.AD === true;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 async function fetchWellKnown(
   domain: string,
   timeoutMs = 2000,
+  options: DiscoveryOptions = {},
 ): Promise<{
   record: AidRecord;
   raw: string;
   queryName: string;
+  security: DiscoverySecurity;
 }> {
+  const policy = resolveSecurityPolicy(options);
+  const security = createDiscoverySecurity(policy, true);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   // Preserve port (and IPv6 brackets) when building the well-known URL
@@ -105,6 +168,7 @@ async function fetchWellKnown(
         : '127.0.0.1'
       : host;
   const url = `${scheme}://${correctedHost}/.well-known/agent`;
+  enforceWellKnownPolicy(security, url);
   try {
     const fetchImpl = (globalThis as unknown as { fetch?: FetchLike }).fetch;
     if (typeof fetchImpl !== 'function') {
@@ -205,7 +269,9 @@ async function fetchWellKnown(
         throw pkaError;
       }
     }
-    return { record, raw: text.trim(), queryName: url };
+    enforcePkaPolicy(record, url, security);
+    enforceDowngradePolicy(record, url, policy, security);
+    return { record, raw: text.trim(), queryName: url, security };
   } catch (e) {
     if (e instanceof AidError) {
       // Preserve ERR_SECURITY errors from PKA verification, don't convert to ERR_FALLBACK_FAILED
@@ -236,6 +302,8 @@ export interface DiscoveryResult {
   ttl: number;
   /** The DNS name that was queried */
   queryName: string;
+  /** Security policy evaluation for the chosen result. */
+  security: DiscoverySecurity;
 }
 
 /**
@@ -246,6 +314,7 @@ export async function discover(
   options: DiscoveryOptions = {},
 ): Promise<DiscoveryResult> {
   const { protocol, timeout = 5000, wellKnownFallback = true, wellKnownTimeoutMs = 2000 } = options;
+  const policy = resolveSecurityPolicy(options);
 
   // helper to perform single DNS query for a given name
   const queryOnce = async (queryName: string): Promise<DiscoveryResult> => {
@@ -264,7 +333,7 @@ export async function discover(
         throw new AidError('ERR_NO_RECORD', `No TXT record found for ${queryName}`);
       }
 
-      const validRecords: DiscoveryResult[] = [];
+      const validRecords: Array<Omit<DiscoveryResult, 'security'>> = [];
       let lastAidError: AidError | null = null;
 
       for (const answer of response.answers) {
@@ -315,7 +384,14 @@ export async function discover(
         if (result.record.pka) {
           await performPKAHandshake(result.record.uri, result.record.pka, result.record.kid ?? '');
         }
-        return result;
+        const security = createDiscoverySecurity(policy, false);
+        enforcePkaPolicy(result.record, queryName, security);
+        enforceDowngradePolicy(result.record, queryName, policy, security);
+        if (policy.dnssecPolicy !== 'off') {
+          const validated = await queryDnssecStatus(queryName, timeout);
+          enforceDnssecPolicy(security, queryName, validated);
+        }
+        return { ...result, security };
       }
 
       if (validRecords.length > 1) {
@@ -415,12 +491,17 @@ export async function discover(
   } catch (error) {
     if (
       wellKnownFallback &&
+      policy.wellKnownPolicy !== 'disable' &&
       error instanceof AidError &&
       (error.errorCode === 'ERR_NO_RECORD' || error.errorCode === 'ERR_DNS_LOOKUP_FAILED')
     ) {
       try {
-        const { record, raw, queryName } = await fetchWellKnown(domain, wellKnownTimeoutMs);
-        return { record, raw, ttl: DNS_TTL_MIN, queryName };
+        const { record, raw, queryName, security } = await fetchWellKnown(
+          domain,
+          wellKnownTimeoutMs,
+          options,
+        );
+        return { record, raw, ttl: DNS_TTL_MIN, queryName, security };
       } catch (fallbackError) {
         if (fallbackError instanceof AidError) {
           // Propagate rich details from the fallback

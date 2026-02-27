@@ -180,6 +180,41 @@ _agent._a2a.example.com. 300 IN TXT "v=aid1;p=a2a;uri=..."
   a. terminate with `ERR_SECURITY`, or  
   b. require explicit user confirmation before proceeding.
 
+### **3.1 Enterprise Policy Modes**
+
+Clients that expose enterprise controls **SHOULD** provide a preset mode surface and **MAY** also expose the underlying policy knobs directly.
+
+The normative preset names for v1.2.x are:
+
+- `balanced`
+  - `pka`: `if-present`
+  - `dnssec`: `prefer`
+  - `well-known`: `auto`
+  - `downgrade`: `warn`
+- `strict`
+  - `pka`: `require`
+  - `dnssec`: `require`
+  - `well-known`: `disable`
+  - `downgrade`: `fail`
+
+The underlying policy knobs are:
+
+- **PKA policy:** `if-present | require`
+- **DNSSEC policy:** `off | prefer | require`
+- **Well-known policy:** `auto | disable`
+- **Downgrade policy:** `off | warn | fail`
+
+Policy semantics:
+
+- **PKA `require`:** discovery **MUST** fail with `ERR_SECURITY` if the selected record does not publish `pka` and `kid`.
+- **DNSSEC `prefer`:** clients **SHOULD** continue when DNSSEC cannot be validated, but **SHOULD** surface a warning.
+- **DNSSEC `require`:** clients **MUST** fail with `ERR_SECURITY` when DNSSEC validation is unavailable or unsuccessful for the selected DNS answer.
+- **Well-known `disable`:** clients **MUST NOT** use `/.well-known/agent` fallback.
+- **Downgrade `warn`:** if a previously seen `pka` disappears or `pka`/`kid` changes, clients **SHOULD** surface a warning.
+- **Downgrade `fail`:** if a previously seen `pka` disappears or `pka`/`kid` changes, clients **MUST** fail with `ERR_SECURITY`.
+
+If discovery succeeds only through `.well-known`, that result cannot satisfy `dnssec=require`.
+
 ---
 
 ## **4. DNS and Caching**
