@@ -184,8 +184,11 @@ Use this checklist when deploying or auditing an AID record.
 
 Use the [aid-doctor CLI](../Tooling/aid_doctor.md) to automate validation and security checks.
 
+For production adoption across separate DNS and application owners, follow the [Enterprise Rollout Playbook](enterprise_rollout.md).
+
 ## See Also
 
 - [Identity & PKA](identity_pka.md) — Full PKA handshake details
+- [Enterprise Rollout](enterprise_rollout.md) — DNS team and application team rollout checklist
 - [Specification](../specification.md) — Normative security requirements
 - [Troubleshooting](troubleshooting.md) — Common security-related errors

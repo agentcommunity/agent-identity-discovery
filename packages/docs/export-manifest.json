@@ -4,8 +4,8 @@
   "files": [
     {
       "path": "index.md",
-      "bytes": 4651,
-      "sha256": "0f2f9823422b1342689d2d305467d45e5e7cc8e2ec7242f3b81428e038d0cd2c"
+      "bytes": 4790,
+      "sha256": "9d45d832a0efec55a8661535579095fddf2834e1e3facbd739babc38c77ab535"
     },
     {
       "path": "quickstart/index.md",
@@ -68,6 +68,11 @@
       "sha256": "1a16d952228e4e8a0b989e267be6e5a7a3cff4605abb86d1d1e638943f2d2821"
     },
     {
+      "path": "Reference/enterprise_rollout.md",
+      "bytes": 7150,
+      "sha256": "b82753726b18849922eca142dd325df9981dc66cd32a7bdf3d161c3ee4840f21"
+    },
+    {
       "path": "Reference/identity_pka.md",
       "bytes": 6055,
       "sha256": "723a263961982965c1f46248cadb9ce335e5a2ff70962bd8eede009ba7503fe1"
@@ -79,8 +84,8 @@
     },
     {
       "path": "Reference/security.md",
-      "bytes": 8976,
-      "sha256": "a403b3bff934511db84dd9013ad4947f05e5674d9f657b5a851e27a97ab8a392"
+      "bytes": 9208,
+      "sha256": "584dcb24ce0f113cae49c2b6d4079444dd31b14f9ed81b546d392923e2196d31"
     },
     {
       "path": "Reference/troubleshooting.md",
@@ -99,13 +104,13 @@
     },
     {
       "path": "specification.md",
-      "bytes": 19968,
-      "sha256": "c1d154b2498a1b173124539fd39fe31e056c90a97ed2037a2b36793b1d527763"
+      "bytes": 20091,
+      "sha256": "a8b9d05da388a744952857a2ec2036996ea32e4e68cd9f389490d54fd91adb50"
     },
     {
       "path": "Tooling/aid_doctor.md",
-      "bytes": 6316,
-      "sha256": "53168ac068e4e3622a0e0e432c9c035403572b385193b1e15c2c2e055fcf342b"
+      "bytes": 6473,
+      "sha256": "29637f92d46d48c875b246f9d807fb0eddda3e3f5c99aaaa44cbb6302c82be4a"
     },
     {
       "path": "Tooling/aid_engine.md",
@@ -138,5 +143,5 @@
       "sha256": "985c0214d91997524c53b078da3a8b87599709ee71c1d39b0cfa96764bcbd117"
     }
   ],
-  "aggregateSha256": "bb6b04ec8c3de678f88dd17bfab9f025c7a2dc48d54fe7a2825289f9831a6289"
+  "aggregateSha256": "5fbc1084a7f8b2417a0cf2faa08afb60f42c32cae93fcba9e3aa3de474c65471"
 }
