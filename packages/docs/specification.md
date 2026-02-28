@@ -17,7 +17,7 @@ tags:
 _Minimal, DNS-first agent bootstrap standard_
 
 **Date:** 6 February 2026
-**Editor:** Agent Community
+**Editor:** [Agent Community](https://agentcommunity.org)
 **Status:** Final
 
 ---

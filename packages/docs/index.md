@@ -18,6 +18,8 @@ It's a simple, open standard that uses the internet's own directory—DNS—to a
 
 No more hunting through API docs. No more manual configuration. It's the zero-friction layer for a world of interconnected agents.
 
+AID is an open standard maintained by [Agent Community](https://agentcommunity.org).
+
 !!! tip "New to AID?"
 Start with [Core Concepts](Understand/concepts.md) for a quick overview, then follow the [Quick Start](quickstart/index.md) to publish your first agent.
 

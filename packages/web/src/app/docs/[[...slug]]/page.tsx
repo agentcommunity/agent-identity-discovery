@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeSlug from 'rehype-slug';
 import rehypeAutolinkHeadings from 'rehype-autolink-headings';
 import { getDocBySlug, getAllDocSlugs } from '@/lib/docs';
+import { getSiteUrl } from '@/lib/seo';
 import { mdxComponents } from '@/components/docs/mdx-components';
 import { AiToolbar } from '@/components/docs/ai-toolbar';
 import { Toc } from '@/components/docs/toc';
@@ -50,6 +51,57 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
+function buildJsonLd(slug: string, title: string, description: string) {
+  const siteUrl = getSiteUrl();
+  const pageUrl = `${siteUrl}/docs${slug === 'index' ? '' : `/${slug}`}`;
+
+  const base: Record<string, unknown> = {
+    '@context': 'https://schema.org',
+    '@type': 'TechArticle',
+    headline: title,
+    name: title,
+    description,
+    url: pageUrl,
+    inLanguage: 'en-US',
+    author: { '@type': 'Organization', name: 'Agent Community', url: 'https://agentcommunity.org' },
+    publisher: {
+      '@type': 'Organization',
+      name: 'Agent Community',
+      url: 'https://agentcommunity.org',
+      logo: { '@type': 'ImageObject', url: `${siteUrl}/logo/agent.png` },
+    },
+    isPartOf: { '@type': 'WebSite', name: 'Agent Identity & Discovery', url: siteUrl },
+    mainEntityOfPage: { '@type': 'WebPage', '@id': pageUrl },
+  };
+
+  if (slug === 'specification') {
+    Object.assign(base, {
+      proficiencyLevel: 'Expert',
+      datePublished: '2026-02-06',
+      dateModified: '2026-02-06',
+      version: '1.2.0',
+      keywords: [
+        'AID protocol',
+        'agent discovery',
+        'DNS TXT record',
+        'MCP',
+        'A2A',
+        'agent identity',
+        'PKA',
+        'Ed25519',
+      ],
+      about: {
+        '@type': 'Thing',
+        name: 'Agent Identity & Discovery Protocol',
+        description:
+          'DNS-first agent bootstrap standard for discovering AI agent services via TXT records.',
+      },
+    });
+  }
+
+  return base;
+}
+
 export default async function DocPage({ params }: PageProps) {
   const { slug: slugParts } = await params;
   const slug = slugParts?.join('/') ?? 'index';
@@ -57,8 +109,15 @@ export default async function DocPage({ params }: PageProps) {
 
   if (!doc) notFound();
 
+  const jsonLd = buildJsonLd(slug, doc.title, doc.description);
+
   return (
     <div className="flex">
+      <script
+        type="application/ld+json"
+        suppressHydrationWarning
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* Article */}
       <article
         className="flex-1 min-w-0 max-w-5xl mx-auto px-6 py-8 lg:px-8"

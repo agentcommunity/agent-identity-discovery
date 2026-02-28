@@ -11,6 +11,16 @@ export function Footer() {
             <p className="text-sm text-muted-foreground">
               Universal standard for AI agent discovery via DNS
             </p>
+            <p className="text-sm">
+              <Link
+                href="https://agentcommunity.org"
+                className="text-muted-foreground hover:text-foreground inline-flex items-center transition-all duration-200 group"
+                target="_blank"
+              >
+                agentcommunity.org
+                <ExternalLink className="ml-1 h-3 w-3 transition-transform duration-200 group-hover:translate-x-0.5" />
+              </Link>
+            </p>
           </div>
 
           <div className="space-y-3">
@@ -204,7 +214,7 @@ export function Footer() {
         </div>
 
         <div className="mt-8 border-t border-border/50 pt-6 text-center text-sm text-muted-foreground">
-          <p>&copy; 2025 Agent Community. Open source under MIT license.</p>
+          <p>&copy; 2026 Agent Community. Open source under MIT license.</p>
         </div>
       </div>
     </footer>
