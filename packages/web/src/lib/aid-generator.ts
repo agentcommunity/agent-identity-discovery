@@ -18,12 +18,10 @@ export interface AidGeneratorData {
   dep?: string; // ISO timestamp
   pka?: string;
   kid?: string;
-  useAliases?: boolean;
 }
 
 // The core logic function
 export function buildTxtRecord(formData: AidGeneratorData): string {
-  void formData.useAliases;
   const parts: string[] = ['v=aid1'];
   if (formData.uri) parts.push(`u=${formData.uri}`);
   if (formData.proto) parts.push(`p=${formData.proto}`);

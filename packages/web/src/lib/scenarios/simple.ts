@@ -18,8 +18,7 @@ const discoveryOk: DiscoveryResult = {
       lookupTime: 89,
       recordType: 'TXT',
       source: 'DNS',
-      txtRecord:
-        'v=aid1;uri=ws://simple.agentcommunity.org:8080/mcp;protocol=mcp;desc=Simple demo agent',
+      txtRecord: 'v=aid1;u=ws://simple.agentcommunity.org:8080/mcp;p=mcp;s=Simple demo agent',
     },
   },
 };

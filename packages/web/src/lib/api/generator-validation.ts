@@ -40,7 +40,6 @@ interface GeneratorBody {
   dep?: string;
   pka?: string;
   kid?: string;
-  useAliases: boolean;
 }
 
 interface Issue {
@@ -67,7 +66,6 @@ export interface GeneratorValidationResponse {
   bytes: { txt: number; desc: number };
   errors: Issue[];
   warnings: Issue[];
-  suggestAliases: true;
 }
 
 const isGeneratorProtocol = (value: string): value is GeneratorProtocol =>
@@ -85,7 +83,6 @@ const normalize = (payload: unknown): GeneratorBody => {
     dep: typeof body.dep === 'string' && body.dep.trim() ? body.dep.trim() : undefined,
     pka: typeof body.pka === 'string' && body.pka.trim() ? body.pka.trim() : undefined,
     kid: typeof body.kid === 'string' && body.kid.trim() ? body.kid.trim() : undefined,
-    useAliases: Boolean(body.useAliases),
   };
 };
 
@@ -195,6 +192,5 @@ export const validateGeneratorPayload = (payload: unknown): GeneratorValidationR
     bytes: { txt: txtBytes, desc: descBytes },
     errors,
     warnings,
-    suggestAliases: true,
   };
 };

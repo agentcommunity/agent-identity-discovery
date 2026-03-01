@@ -5,7 +5,7 @@
  * Designed to be portable across Next.js projects.
  */
 
-export { getDocBySlug, getAllDocSlugs, getAllDocs } from './content';
+export { getDocBySlug, getAllDocSlugs, getAllDocRouteSlugs, getAllDocs } from './content';
 export type { DocPage, Heading } from './content';
 
 export { getNavigation } from './navigation';

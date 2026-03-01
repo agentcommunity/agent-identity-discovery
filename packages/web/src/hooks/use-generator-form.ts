@@ -5,13 +5,12 @@ import {
   buildTxtRecord as buildTxtV11,
   buildWellKnownJson,
   computeBytes,
-  suggestAliases,
   parseRecordString,
   validate as validateV11,
 } from '@/lib/generator/core';
 import type { AidGeneratorFormData } from '@/lib/generator/types';
 
-export type GeneratorFormData = AidGeneratorFormData & { useAliases: boolean };
+export type GeneratorFormData = AidGeneratorFormData;
 export type FormPatch = Partial<GeneratorFormData>;
 
 export type ServerValidationResult = {
@@ -21,7 +20,6 @@ export type ServerValidationResult = {
   errors: Array<{ code: string; message: string }>;
   warnings: Array<{ code: string; message: string }>;
   success: boolean;
-  suggestAliases?: boolean;
 };
 
 const defaultFormData: GeneratorFormData = {
@@ -34,7 +32,6 @@ const defaultFormData: GeneratorFormData = {
   dep: '',
   pka: '',
   kid: '',
-  useAliases: true,
 };
 
 export function useGeneratorForm() {
@@ -71,10 +68,7 @@ export function useGeneratorForm() {
     return () => globalThis.removeEventListener('hashchange', checkPrefill);
   }, []);
 
-  const txtRecordString = useMemo(
-    () => buildTxtV11(formData, { useAliases: formData.useAliases }),
-    [formData],
-  );
+  const txtRecordString = useMemo(() => buildTxtV11(formData), [formData]);
   const { txtBytes, descBytes } = useMemo(
     () => computeBytes(txtRecordString, formData.desc),
     [txtRecordString, formData.desc],
@@ -110,10 +104,7 @@ export function useGeneratorForm() {
   const updateForm = (patch: FormPatch) =>
     setFormData((p: GeneratorFormData) => ({ ...p, ...patch }));
 
-  const wellKnownJson = useMemo(
-    () => buildWellKnownJson(formData, { useAliases: formData.useAliases }),
-    [formData],
-  );
+  const wellKnownJson = useMemo(() => buildWellKnownJson(formData), [formData]);
 
   const previewValid = serverResult?.success ?? specValidation.isValid;
   let previewErrors: Array<{ code: string; message: string }> = [];
@@ -125,17 +116,6 @@ export function useGeneratorForm() {
 
   const loadExample = (ex: { domain: string; content: string }) => {
     const parsed = parseRecordString(ex.content);
-    const aliasesSuggested = suggestAliases({
-      domain: ex.domain,
-      uri: parsed.uri ?? '',
-      proto: parsed.proto ?? 'mcp',
-      auth: parsed.auth ?? '',
-      desc: parsed.desc ?? '',
-      docs: parsed.docs,
-      dep: parsed.dep,
-      pka: parsed.pka,
-      kid: parsed.kid,
-    });
 
     setFormData((previous: GeneratorFormData) => ({
       ...previous,
@@ -148,7 +128,6 @@ export function useGeneratorForm() {
       dep: parsed.dep ?? previous.dep,
       pka: parsed.pka ?? previous.pka,
       kid: parsed.kid ?? previous.kid,
-      useAliases: aliasesSuggested,
     }));
   };
 

@@ -1,9 +1,5 @@
 import type { AidGeneratorFormData, ValidationResult } from './types';
 
-export interface BuildOptions {
-  useAliases?: boolean;
-}
-
 export function computeBytes(txt: string, desc: string): { txtBytes: number; descBytes: number } {
   return {
     txtBytes: new TextEncoder().encode(txt).length,
@@ -11,12 +7,7 @@ export function computeBytes(txt: string, desc: string): { txtBytes: number; des
   };
 }
 
-export function suggestAliases(_data: AidGeneratorFormData): boolean {
-  return true;
-}
-
-export function buildTxtRecord(data: AidGeneratorFormData, opts: BuildOptions = {}): string {
-  void opts;
+export function buildTxtRecord(data: AidGeneratorFormData): string {
   const parts: string[] = ['v=aid1'];
   if (data.uri) parts.push(`u=${data.uri}`);
   if (data.proto) parts.push(`p=${data.proto}`);
@@ -29,11 +20,7 @@ export function buildTxtRecord(data: AidGeneratorFormData, opts: BuildOptions = 
   return parts.join(';');
 }
 
-export function buildWellKnownJson(
-  data: AidGeneratorFormData,
-  opts: BuildOptions = {},
-): Record<string, string> {
-  void opts;
+export function buildWellKnownJson(data: AidGeneratorFormData): Record<string, string> {
   const o: Record<string, string> = { v: 'aid1' };
   const put = (alias: string, val?: string) => {
     if (!val) return;
@@ -108,7 +95,7 @@ export function validate(data: AidGeneratorFormData): ValidationResult {
   }
 
   // Byte length for TXT
-  const txt = buildTxtRecord(data, { useAliases: true });
+  const txt = buildTxtRecord(data);
   const totalBytes = byteLen(txt);
   if (totalBytes > 255)
     warnings.push({ code: 'WARN_TXT_BYTES', message: 'TXT record exceeds 255 bytes' });

@@ -20,7 +20,7 @@ const discoveryOk: DiscoveryResult = {
       lookupTime: 8,
       recordType: 'TXT',
       source: 'DNS',
-      txtRecord: 'v=aid1;uri=docker:my-agent:latest;proto=local;desc=Local Docker Agent',
+      txtRecord: 'v=aid1;u=docker:my-agent:latest;p=local;s=Local Docker Agent',
     },
   },
 };

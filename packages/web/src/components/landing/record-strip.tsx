@@ -6,12 +6,12 @@ const EXAMPLES = [
   { domain: 'example.com', proto: 'mcp', uri: 'https://example.com/mcp' },
   { domain: 'acme.com', proto: 'a2a', uri: 'https://acme.com/a2a' },
   { domain: 'northwind.com', proto: 'openapi', uri: 'https://northwind.com/openapi.json' },
-  { domain: 'globex.com', proto: 'grpc', uri: 'grpc://globex.com:443' },
+  { domain: 'globex.com', proto: 'grpc', uri: 'https://globex.com/grpc' },
   { domain: 'contoso.com', proto: 'websocket', uri: 'wss://contoso.com/ws' },
 ];
 
 function formatRecord(ex: (typeof EXAMPLES)[number]) {
-  return `_agent.${ex.domain}. // TXT "v=aid1;u=${ex.uri};p=${ex.proto}"`;
+  return `_agent.${ex.domain}. 300 IN TXT "v=aid1;u=${ex.uri};p=${ex.proto}"`;
 }
 
 const INTERVAL_MS = 3500;
