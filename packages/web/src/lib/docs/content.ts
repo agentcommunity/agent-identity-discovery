@@ -30,6 +30,26 @@ export interface DocPage {
   headings: Heading[];
 }
 
+/** Convert a file slug to its canonical docs route slug. */
+function toRouteSlug(slug: string): string {
+  if (slug === 'index') return '';
+  if (slug.endsWith('/index')) return slug.slice(0, -'/index'.length);
+  return slug;
+}
+
+/** Resolve an incoming route slug to an existing markdown file slug. */
+function resolveFileSlug(slug: string): string | null {
+  const normalized = slug.replaceAll(/^\/+|\/+$/g, '');
+  const candidates = normalized ? [normalized, `${normalized}/index`] : ['index'];
+
+  for (const candidate of candidates) {
+    const filePath = path.join(DOCS_DIR, `${candidate}.md`);
+    if (fs.existsSync(filePath)) return candidate;
+  }
+
+  return null;
+}
+
 /** Slugify a heading string into a URL-safe anchor id. */
 function slugify(text: string): string {
   return text
@@ -90,22 +110,29 @@ export function getAllDocSlugs(): string[] {
   return walkDir(DOCS_DIR).map((f) => pathToSlug(f));
 }
 
+/** Get all canonical route slugs (without trailing `/index`). */
+export function getAllDocRouteSlugs(): string[] {
+  return [...new Set(getAllDocSlugs().map((slug) => toRouteSlug(slug)))];
+}
+
 /** Load and parse a single doc by its slug. Returns null if not found. */
 export function getDocBySlug(slug: string): DocPage | null {
-  const filePath = path.join(DOCS_DIR, `${slug}.md`);
-  if (!fs.existsSync(filePath)) return null;
+  const fileSlug = resolveFileSlug(slug);
+  if (!fileSlug) return null;
+  const routeSlug = toRouteSlug(fileSlug);
+  const filePath = path.join(DOCS_DIR, `${fileSlug}.md`);
 
   const raw = fs.readFileSync(filePath, 'utf8');
   const { data, content: rawBody } = matter(raw);
 
-  const title = (data.title as string) || slug.split('/').pop() || slug;
+  const title = (data.title as string) || routeSlug.split('/').pop() || routeSlug || 'index';
   const description = (data.description as string) || '';
 
-  const preprocessed = preprocessMarkdown(rawBody, slug);
+  const preprocessed = preprocessMarkdown(rawBody, fileSlug);
   const headings = extractHeadings(rawBody);
 
   return {
-    slug,
+    slug: routeSlug === '' ? 'index' : routeSlug,
     title,
     description,
     content: preprocessed,
@@ -116,7 +143,7 @@ export function getDocBySlug(slug: string): DocPage | null {
 
 /** Load all doc pages. Used for sitemap generation and llms.txt. */
 export function getAllDocs(): DocPage[] {
-  return getAllDocSlugs()
+  return getAllDocRouteSlugs()
     .map((s) => getDocBySlug(s))
     .filter((doc): doc is DocPage => doc !== null);
 }

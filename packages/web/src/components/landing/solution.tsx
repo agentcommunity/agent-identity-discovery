@@ -78,7 +78,7 @@ const solutions: Array<{
         label: 'Identity & PKA',
         href: '/docs/Reference/identity_pka',
       },
-      { label: 'Security', href: '/docs/security' },
+      { label: 'Security', href: '/docs/Reference/security' },
     ],
   },
 ];
@@ -93,7 +93,7 @@ export function Solution() {
               How <span className="text-gradient">Agent Discovery</span> Solves This
             </h2>
             <p className="text-xl md:text-2xl leading-relaxed text-muted-foreground">
-              Three simple principles that eliminate integration complexity
+              Four core principles that eliminate integration complexity
             </p>
           </Reveal>
 

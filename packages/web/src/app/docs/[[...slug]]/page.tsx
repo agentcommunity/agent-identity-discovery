@@ -4,7 +4,7 @@ import { MDXRemote } from 'next-mdx-remote/rsc';
 import remarkGfm from 'remark-gfm';
 import rehypeSlug from 'rehype-slug';
 import rehypeAutolinkHeadings from 'rehype-autolink-headings';
-import { getDocBySlug, getAllDocSlugs } from '@/lib/docs';
+import { getDocBySlug, getAllDocRouteSlugs } from '@/lib/docs';
 import { mdxComponents } from '@/components/docs/mdx-components';
 import { AiToolbar } from '@/components/docs/ai-toolbar';
 import { Toc } from '@/components/docs/toc';
@@ -16,26 +16,27 @@ interface PageProps {
 }
 
 export function generateStaticParams() {
-  const slugs = getAllDocSlugs();
+  const slugs = getAllDocRouteSlugs();
   return [
     { slug: undefined }, // /docs index
-    ...slugs.filter((s) => s !== 'index').map((s) => ({ slug: s.split('/') })),
+    ...slugs.filter((s) => s !== '').map((s) => ({ slug: s.split('/') })),
   ];
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug: slugParts } = await params;
-  const slug = slugParts?.join('/') ?? 'index';
-  const doc = getDocBySlug(slug);
+  const requestedSlug = slugParts?.join('/') ?? 'index';
+  const doc = getDocBySlug(requestedSlug);
   if (!doc) return {};
 
-  const ogSlug = slug === 'index' ? '' : slug;
+  const canonicalSlug = doc.slug;
+  const ogSlug = canonicalSlug === 'index' ? '' : canonicalSlug;
   const ogUrl = `/api/og/docs?title=${encodeURIComponent(doc.title)}&description=${encodeURIComponent(doc.description)}&slug=${encodeURIComponent(ogSlug)}`;
 
   return {
     title: doc.title,
     description: doc.description,
-    alternates: { canonical: `/docs${slug === 'index' ? '' : `/${slug}`}` },
+    alternates: { canonical: `/docs${canonicalSlug === 'index' ? '' : `/${canonicalSlug}`}` },
     openGraph: {
       title: doc.title,
       description: doc.description,
@@ -52,8 +53,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function DocPage({ params }: PageProps) {
   const { slug: slugParts } = await params;
-  const slug = slugParts?.join('/') ?? 'index';
-  const doc = getDocBySlug(slug);
+  const requestedSlug = slugParts?.join('/') ?? 'index';
+  const doc = getDocBySlug(requestedSlug);
 
   if (!doc) notFound();
 
@@ -71,7 +72,7 @@ export default async function DocPage({ params }: PageProps) {
         <h1 className="text-3xl font-bold tracking-tight text-foreground mb-2">{doc.title}</h1>
         {doc.description && <p className="text-lg text-muted-foreground mb-6">{doc.description}</p>}
 
-        <AiToolbar slug={slug} rawContent={doc.rawContent} />
+        <AiToolbar slug={doc.slug} rawContent={doc.rawContent} />
 
         <TocMobile headings={doc.headings} />
 

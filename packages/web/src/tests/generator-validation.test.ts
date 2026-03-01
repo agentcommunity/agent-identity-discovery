@@ -13,7 +13,6 @@ describe('generator validation', () => {
       dep: '2026-01-01T00:00:00Z',
       pka: 'z7rW8rTq8o4mM6vVf7w1k3m4uQn9p2YxCAbcDeFgHiJ',
       kid: 'g1',
-      useAliases: true,
     });
 
     expect(result.success).toBe(true);
@@ -24,19 +23,17 @@ describe('generator validation', () => {
     expect(result.bytes.desc).toBeLessThanOrEqual(60);
   });
 
-  it('always emits canonical short-key TXT output even when full-key mode is requested', () => {
+  it('always emits canonical short-key TXT output', () => {
     const result = validateGeneratorPayload({
       domain: 'example.com',
       uri: 'https://api.example.com/mcp',
       proto: 'mcp',
       auth: 'pat',
       desc: 'Primary endpoint',
-      useAliases: false,
     });
 
     expect(result.success).toBe(true);
     expect(result.txt).toBe('v=aid1;u=https://api.example.com/mcp;p=mcp;a=pat;s=Primary endpoint');
-    expect(result.suggestAliases).toBe(true);
   });
 
   it('rejects docs links that are not https', () => {

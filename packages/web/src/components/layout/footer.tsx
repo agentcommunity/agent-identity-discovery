@@ -39,7 +39,7 @@ export function Footer() {
                   </li>
                   <li>
                     <Link
-                      href="/docs/rationale"
+                      href="/docs/Understand/rationale"
                       className="text-muted-foreground hover:text-foreground transition-all duration-200 hover:translate-x-1"
                     >
                       Design Rationale
@@ -111,7 +111,7 @@ export function Footer() {
                   Protocols
                 </Link>
                 <Link
-                  href="/docs/security"
+                  href="/docs/Reference/security"
                   className="text-muted-foreground hover:text-foreground transition-all duration-200 hover:translate-x-1"
                 >
                   Security
@@ -123,7 +123,7 @@ export function Footer() {
                   Troubleshooting
                 </Link>
                 <Link
-                  href="/docs/versioning"
+                  href="/docs/Reference/versioning"
                   className="text-muted-foreground hover:text-foreground transition-all duration-200 hover:translate-x-1"
                 >
                   Versioning
