@@ -111,6 +111,7 @@ AID v1 is a deliberately focused and pragmatic standard. It provides a simple, r
 - [Quick Start Guide](../quickstart/index.md)
 - [Specification](../specification.md)
 - [Security Best Practices](../Reference/security.md)
+- [PKA as External Trust Anchor](https://blog.agentcommunity.org/external_identity_anchor) — how AID PKA addresses cross-boundary agent authentication, and open questions for the identity community
 
 ---
 

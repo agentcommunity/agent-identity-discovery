@@ -85,6 +85,20 @@ export function DocsSidebar({ navigation }: DocsSidebarProps) {
       {navigation.groups.map((group) => (
         <SidebarGroup key={group.slug} group={group} pathname={pathname} />
       ))}
+
+      {/* External links */}
+      <ul className="space-y-0.5 border-t pt-4">
+        <li>
+          <a
+            href="https://blog.agentcommunity.org"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
+          >
+            AID Blog ↗
+          </a>
+        </li>
+      </ul>
     </aside>
   );
 }
