@@ -60,6 +60,12 @@ flowchart LR
     E -->|No| G
 ```
 
+## Blog
+
+Read posts about AID design decisions, identity patterns, and protocol evolution on the [Agent Community blog](https://blog.agentcommunity.org/?tag=aid).
+
+---
+
 ## Learn more
 
 ### Want the deep dive?

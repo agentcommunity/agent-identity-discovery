@@ -4,7 +4,6 @@
     { "slug": "Understand", "title": "Understand" },
     { "slug": "quickstart", "title": "Quick Start" },
     { "slug": "Reference", "title": "Reference" },
-    { "slug": "Tooling", "title": "Tooling" },
-    { "slug": "blog", "title": "Blog" }
+    { "slug": "Tooling", "title": "Tooling" }
   ]
 }
