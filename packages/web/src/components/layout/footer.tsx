@@ -137,7 +137,7 @@ export function Footer() {
             <ul className="space-y-2 text-sm">
               <li>
                 <Link
-                  href="https://agentcommunity.org/auth/sign-in"
+                  href="https://agentcommunity.org/join"
                   className="text-muted-foreground hover:text-foreground inline-flex items-center transition-all duration-200 hover:translate-x-1 group"
                   target="_blank"
                 >
@@ -199,12 +199,35 @@ export function Footer() {
                   <ExternalLink className="ml-1 h-3 w-3 transition-transform duration-200 group-hover:translate-x-0.5" />
                 </Link>
               </li>
+              <li>
+                <Link
+                  href="https://docs.agentcommunity.org"
+                  className="text-muted-foreground hover:text-foreground inline-flex items-center transition-all duration-200 hover:translate-x-1 group"
+                  target="_blank"
+                >
+                  Docs
+                  <ExternalLink className="ml-1 h-3 w-3 transition-transform duration-200 group-hover:translate-x-0.5" />
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="https://blog.agentcommunity.org"
+                  className="text-muted-foreground hover:text-foreground inline-flex items-center transition-all duration-200 hover:translate-x-1 group"
+                  target="_blank"
+                >
+                  Blog
+                  <ExternalLink className="ml-1 h-3 w-3 transition-transform duration-200 group-hover:translate-x-0.5" />
+                </Link>
+              </li>
             </ul>
           </div>
         </div>
 
         <div className="mt-8 border-t border-border/50 pt-6 text-center text-sm text-muted-foreground">
-          <p>&copy; 2025 Agent Community. Open source under MIT license.</p>
+          <p>
+            &copy; {new Date().getFullYear()} Open Agent Registry, Inc. Open source under MIT
+            license.
+          </p>
         </div>
       </div>
     </footer>

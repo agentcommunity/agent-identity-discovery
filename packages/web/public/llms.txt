@@ -1,45 +1,50 @@
-# Agent Identity & Discovery (AID) Documentation
-# https://aid.agentcommunity.org/docs
+# Agent Identity & Discovery (AID)
 
-## Overview
-> AID is a DNS-based discovery protocol for the agentic web.
-> Given a domain, query _agent.<domain> TXT record to find its agent endpoint.
+> AID is a DNS-based discovery protocol for the agentic web, created by the .agent Community (Open Agent Registry, Inc.). Given a domain, query `_agent.<domain>` TXT record to find its agent endpoint. AID supports MCP, A2A, OpenAPI, and custom protocols. The community has over 3,000 members including 700+ companies and 2,300+ developers.
 
-## Documentation Pages
+## Links
 
-- [Agent Identity & Discovery](/docs): Overview and introduction
-- [Specification](/docs/specification): Full protocol specification (v1.1)
-- [Design Rationale](/docs/rationale): Why AID was designed this way
-- [Security](/docs/security): Security considerations
-- [Versioning](/docs/versioning): Protocol versioning strategy
+- [AID Homepage](https://aid.agentcommunity.org): Landing page, interactive workbench
+- [AID Specification](https://aid.agentcommunity.org/docs/specification): Full protocol specification (v1.1)
+- [Quick Start](https://aid.agentcommunity.org/docs/quickstart): Getting started with AID
+- [TypeScript SDK](https://aid.agentcommunity.org/docs/quickstart/quickstart_ts): Node.js / TypeScript integration
+- [Python SDK](https://aid.agentcommunity.org/docs/quickstart/quickstart_python): Python integration
+- [Go SDK](https://aid.agentcommunity.org/docs/quickstart/quickstart_go): Go integration
+- [Rust SDK](https://aid.agentcommunity.org/docs/quickstart/quickstart_rust): Rust integration
+- [Java SDK](https://aid.agentcommunity.org/docs/quickstart/quickstart_java): Java integration
+- [.NET SDK](https://aid.agentcommunity.org/docs/quickstart/quickstart_dotnet): .NET integration
+- [Browser SDK](https://aid.agentcommunity.org/docs/quickstart/quickstart_browser): Browser integration
+- [MCP Integration](https://aid.agentcommunity.org/docs/quickstart/quickstart_mcp): Model Context Protocol
+- [A2A Integration](https://aid.agentcommunity.org/docs/quickstart/quickstart_a2a): Agent-to-Agent Protocol
+- [OpenAPI Integration](https://aid.agentcommunity.org/docs/quickstart/quickstart_openapi): OpenAPI tools
+- [Design Rationale](https://aid.agentcommunity.org/docs/Understand/rationale): Why AID uses DNS
+- [Security](https://aid.agentcommunity.org/docs/Reference/security): Security considerations
+- [Discovery API](https://aid.agentcommunity.org/docs/Reference/discovery_api): API reference
+- [Protocols](https://aid.agentcommunity.org/docs/Reference/protocols): Supported protocols
+- [Identity & PKA](https://aid.agentcommunity.org/docs/Reference/identity_pka): Public key attestation
+- [Well-Known JSON](https://aid.agentcommunity.org/docs/Reference/well_known_json): .well-known fallback
+- [Troubleshooting](https://aid.agentcommunity.org/docs/Reference/troubleshooting): Common issues
+- [aid-doctor CLI](https://aid.agentcommunity.org/docs/Tooling/aid_doctor): CLI diagnostic tool
+- [Workbench](https://aid.agentcommunity.org/workbench): Interactive resolver and generator tool
+- [GitHub](https://github.com/agentcommunity/agent-identity-discovery): Source code and issues
 
-### Quick Start
-- [Quick Start Overview](/docs/quickstart): Getting started guide
-- [TypeScript / Node.js](/docs/quickstart/quickstart_ts): Node.js SDK
-- [Go](/docs/quickstart/quickstart_go): Go SDK
-- [Python](/docs/quickstart/quickstart_python): Python SDK
-- [Rust](/docs/quickstart/quickstart_rust): Rust SDK
-- [Java](/docs/quickstart/quickstart_java): Java SDK
-- [.NET](/docs/quickstart/quickstart_dotnet): .NET SDK
-- [Browser](/docs/quickstart/quickstart_browser): Browser SDK
-- [MCP Protocol](/docs/quickstart/quickstart_mcp): MCP integration
-- [A2A Protocol](/docs/quickstart/quickstart_a2a): A2A integration
-- [OpenAPI](/docs/quickstart/quickstart_openapi): OpenAPI integration
+## Related Sites
 
-### Reference
-- [Discovery API](/docs/Reference/discovery_api): API reference
-- [Protocols](/docs/Reference/protocols): Supported protocols
-- [Identity & PKA](/docs/Reference/identity_pka): Public key attestation
-- [Well-Known JSON](/docs/Reference/well_known_json): .well-known fallback
-- [Troubleshooting](/docs/Reference/troubleshooting): Common issues
-- [What's New](/docs/Reference/whats_new): Changelog
+- [.agent Community](https://agentcommunity.org): Main site, pre-register a .agent domain
+- [Community Docs](https://docs.agentcommunity.org): Governance, guides, and key concepts
+- [AgentBrief Blog](https://blog.agentcommunity.org): Daily news and updates
 
-### Tooling
-- [aid-doctor CLI](/docs/Tooling/aid_doctor): CLI diagnostic tool
-- [aid-engine](/docs/Tooling/aid_engine): Core business logic engine
-- [Conformance Suite](/docs/Tooling/conformance): Testing conformance
+## Key Concepts
+
+- **AID record**: A DNS TXT record at `_agent.<domain>` that advertises an agent's endpoint, supported protocols, and optional public key fingerprint.
+- **Agentic web**: The emerging internet layer where autonomous AI agents discover, authenticate, and interact with each other.
+- **.agent TLD**: A proposed top-level domain dedicated to AI agents, pending ICANN approval. The community application window opens late April 2026.
+- **MCP (Model Context Protocol)**: Protocol for connecting AI models to tools and data sources. AID can advertise MCP endpoints.
+- **A2A (Agent-to-Agent)**: Google's protocol for agent interoperability. AID can advertise A2A endpoints.
+- **PKA (Public Key Attestation)**: Optional cryptographic identity verification in AID records, enabling agent authentication without a central authority.
 
 ## Raw Markdown API
-Each page is available as raw markdown at /api/docs/{slug}
-Example: /api/docs/specification
-Add ?format=json for structured JSON with title, description, content, and headings.
+
+Each documentation page is available as raw markdown at `/api/docs/{slug}`.
+Example: `https://aid.agentcommunity.org/api/docs/specification`
+Add `?format=json` for structured JSON with title, description, content, and headings.

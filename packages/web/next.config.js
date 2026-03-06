@@ -2,6 +2,7 @@
 const nextConfig = {
   devIndicators: false,
   output: 'standalone',
+  poweredByHeader: false,
   images: {
     formats: ['image/avif', 'image/webp'],
   },
@@ -21,6 +22,10 @@ const nextConfig = {
           {
             key: 'Referrer-Policy',
             value: 'strict-origin-when-cross-origin',
+          },
+          {
+            key: 'Permissions-Policy',
+            value: 'interest-cohort=(), camera=(), microphone=(), geolocation=()',
           },
         ],
       },

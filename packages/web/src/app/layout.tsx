@@ -100,9 +100,10 @@ export const viewport: Viewport = {
 const organizationJsonLd = {
   '@context': 'https://schema.org',
   '@type': 'Organization',
-  name: SITE_NAME,
-  url: siteUrl,
+  name: 'Open Agent Registry, Inc.',
+  url: 'https://agentcommunity.org',
   logo: `${siteUrl}/logo/agent.png`,
+  sameAs: ['https://github.com/agentcommunity', 'https://x.com/agentcommunity_'],
 };
 
 const websiteJsonLd = {
