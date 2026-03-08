@@ -124,3 +124,13 @@ __pycache__/
 
 # Git worktrees
 .worktrees/
+
+# IANA strategy docs (internal, not for public repo)
+tracking/SPEC_IANA_GAP_ANALYSIS.md
+tracking/iana/SPEC_IANA_GAP_ANALYSIS.md
+tracking/iana/EMAILS_READY_TO_SEND.md
+tracking/iana/draft-aid-agent-discovery-00.xml
+tracking/iana/GITHUB_ISSUE_RESPONSE_DRAFT.md
+tracking/PRIORITY_EVIDENCE.md
+tracking/iana/IANA_AGENT_PLAN.md
+tracking/iana/IANA-ICANN-Research-Report.md
