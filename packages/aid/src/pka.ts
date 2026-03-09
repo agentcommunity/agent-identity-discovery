@@ -1,7 +1,33 @@
 import { AidError } from './parser.js';
-import { webcrypto as nodeWebcrypto } from 'node:crypto';
-import { Buffer } from 'node:buffer';
-import { timingSafeEqual as nodeTimingSafeEqual } from 'node:crypto';
+
+// Lazy Node.js imports – available in Node, absent in browsers.
+let nodeWebcrypto: unknown;
+let nodeTimingSafeEqual: ((a: Uint8Array, b: Uint8Array) => boolean) | undefined;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const nodeCrypto = require('node:crypto');
+  nodeWebcrypto = nodeCrypto.webcrypto;
+  nodeTimingSafeEqual = nodeCrypto.timingSafeEqual;
+} catch {
+  // Browser – node:crypto not available.
+}
+
+// ── Portable base64 helpers (no Buffer dependency) ──────────────────────
+
+function uint8ToBase64Url(bytes: Uint8Array): string {
+  // Use btoa which works in both Node 16+ and browsers
+  const binary = Array.from(bytes, (b) => String.fromCharCode(b)).join('');
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function base64ToUint8(b64: string): Uint8Array {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+// ── Timing-safe comparison ──────────────────────────────────────────────
 
 // Type-safe interface for global crypto with timingSafeEqual
 interface CryptoWithTimingSafeEqual {
@@ -9,26 +35,29 @@ interface CryptoWithTimingSafeEqual {
 }
 
 function timingSafeEqual(a: string | Uint8Array, b: string | Uint8Array): boolean {
+  const enc = new TextEncoder();
+  const aBytes = typeof a === 'string' ? enc.encode(a) : a;
+  const bBytes = typeof b === 'string' ? enc.encode(b) : b;
+
+  // Prefer native timingSafeEqual when available (Node.js crypto or Deno)
   const globalCrypto = (globalThis as unknown as { crypto?: CryptoWithTimingSafeEqual }).crypto;
   if (typeof globalCrypto?.timingSafeEqual === 'function') {
-    const enc = new TextEncoder();
-    const aEncoded = typeof a === 'string' ? enc.encode(a) : a;
-    const bEncoded = typeof b === 'string' ? enc.encode(b) : b;
-    return globalCrypto.timingSafeEqual(aEncoded, bEncoded);
+    if (aBytes.length !== bBytes.length) return false;
+    return globalCrypto.timingSafeEqual(aBytes, bBytes);
   }
-  // Fallback for environments without native support, including browsers.
-  const aBuf = Buffer.from(typeof a === 'string' ? a : new Uint8Array(a.buffer));
-  const bBuf = Buffer.from(typeof b === 'string' ? b : new Uint8Array(b.buffer));
+  if (typeof nodeTimingSafeEqual === 'function') {
+    if (aBytes.length !== bBytes.length) {
+      nodeTimingSafeEqual(bBytes, bBytes); // constant-time filler
+      return false;
+    }
+    return nodeTimingSafeEqual(aBytes, bBytes);
+  }
 
-  if (aBuf.length !== bBuf.length) {
-    // For string comparisons, we must ensure they are of equal length.
-    // In this PKA context, `keyid` and `alg` have predictable lengths,
-    // so length differences don't leak critical info. We still check
-    // b against itself to keep the timing consistent.
-    nodeTimingSafeEqual(bBuf, bBuf);
-    return false;
-  }
-  return nodeTimingSafeEqual(aBuf, bBuf);
+  // Browser fallback – constant-time XOR compare
+  if (aBytes.length !== bBytes.length) return false;
+  let diff = 0;
+  for (let i = 0; i < aBytes.length; i++) diff |= aBytes[i] ^ bBytes[i];
+  return diff === 0;
 }
 
 function asciiLowerCase(s: string): string {
@@ -183,7 +212,7 @@ function parseSignatureHeaders(headers: HeaderLike): {
   // Extract signature value from Signature header
   const sigMatch = /sig\s*=\s*:\s*([^:]+)\s*:/i.exec(sig);
   if (!sigMatch) throw new AidError('ERR_SECURITY', 'Invalid Signature header');
-  const signature = Uint8Array.from(Buffer.from(sigMatch[1], 'base64'));
+  const signature = base64ToUint8(sigMatch[1]);
   const responseDate = (headers.get('Date') || headers.get('date') || null) as string | null;
   return { covered, created, keyid, keyidRaw, alg, signature, responseDate };
 }
@@ -240,7 +269,7 @@ export async function performPKAHandshake(uri: string, pka: string, kid: string)
     (globalThis as unknown as { crypto?: CryptoLike }).crypto ??
     (nodeWebcrypto as unknown as CryptoLike);
   const nonce = cryptoImpl.getRandomValues(new Uint8Array(32));
-  const challenge = Buffer.from(nonce).toString('base64url');
+  const challenge = uint8ToBase64Url(nonce);
   const date = new Date().toUTCString();
   const fetchImpl = (globalThis as unknown as { fetch?: FetchLike }).fetch;
   if (typeof fetchImpl !== 'function') {
