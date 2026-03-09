@@ -62,6 +62,7 @@ pnpm -C packages/aid-doctor build && node packages/aid-doctor/dist/cli.js check 
 | `packages/docs` | Markdown documentation (rendered by web at `/docs`) |
 | `packages/web` | Next.js workbench UI + docs renderer |
 | `packages/e2e-tests` | E2E tests against live domains |
+| `packages/agent-id` | Unscoped npm alias — re-exports @agentcommunity/aid |
 
 ### Key Architecture Decisions
 
