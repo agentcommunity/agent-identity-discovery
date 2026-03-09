@@ -11,17 +11,17 @@
 locals {
   a2a_showcase = {
     name  = "_agent.a2a"
-    value = "v=aid1;u=https://a2a.agentcommunity.org/.well-known/agent.json;p=a2a;k=zQrStUvWxYz0123456789AbCdEfGhIjKlMnOpQrStUv;i=a1;d=https://google.github.io/A2A/;s=A2A Protocol Showcase"
+    value = "v=aid1;u=https://a2a.agentcommunity.org/.well-known/agent.json;p=a2a;d=https://google.github.io/A2A/;s=A2A Protocol Showcase"
   }
 
   auth0 = {
     name  = "_agent.auth0"
-    value = "v=aid1;u=https://ai.auth0.com/mcp;p=mcp;a=pat;k=zEfGhIjKlMnOpQrStUvWxYz0123456789AbCdEfGhI;i=a1;d=https://auth0.com/docs/get-started/auth0-mcp-server;s=Auth0 MCP (Mock Service)"
+    value = "v=aid1;u=https://ai.auth0.com/mcp;p=mcp;a=pat;d=https://auth0.com/docs/get-started/auth0-mcp-server;s=Auth0 MCP (Mock Service)"
   }
 
   complete_v1_1 = {
     name  = "_agent.complete"
-    value = "v=aid1;p=mcp;u=https://api.complete.agentcommunity.org/mcp;k=z7rW8rTq8o4mM6vVf7w1k3m4uQn9p2YxCAbcDeFgHiJ;i=g1;d=https://docs.agentcommunity.org/complete;e=2026-12-31T23:59:59Z;s=Complete v1.1 with all features"
+    value = "v=aid1;p=mcp;u=https://api.complete.agentcommunity.org/mcp;d=https://docs.agentcommunity.org/complete;e=2026-12-31T23:59:59Z;s=Complete v1.1 with all features"
   }
 
   deprecated = {
@@ -66,17 +66,17 @@ locals {
 
   pka_basic = {
     name  = "_agent.pka-basic"
-    value = "v=aid1;p=mcp;u=https://api.example.com/mcp;k=z7rW8rTq8o4mM6vVf7w1k3m4uQn9p2YxCAbcDeFgHiJ;i=p1;s=Basic PKA Example"
+    value = "v=aid1;p=mcp;u=https://aid.agentcommunity.org/api/pka-demo;k=z2Cwtdw9EZzy1Mhv8ZmGRoMJPkJcU3amQQhpUJx35pKUs;i=p1;s=Live PKA Demo"
   }
 
   playwright = {
     name  = "_agent.playwright"
-    value = "v=aid1;u=https://api.playwright.dev;p=openapi;k=zMnOpQrStUvWxYz0123456789AbCdEfGhIjKlMnOp;i=p1;d=https://github.com/microsoft/playwright-mcp;s=Playwright OpenAPI (Mock Service)"
+    value = "v=aid1;u=https://api.playwright.dev;p=openapi;d=https://github.com/microsoft/playwright-mcp;s=Playwright OpenAPI (Mock Service)"
   }
 
   secure = {
     name  = "_agent.secure"
-    value = "v=aid1;u=https://api.secure.agentcommunity.org/mcp;p=mcp;a=pat;k=z7rW8rTq8o4mM6vVf7w1k3m4uQn9p2YxCAbcDeFgHiJ;i=g1;d=https://docs.agentcommunity.org/secure;s=Secure MCP with PKA"
+    value = "v=aid1;u=https://api.secure.agentcommunity.org/mcp;p=mcp;a=pat;d=https://docs.agentcommunity.org/secure;s=Secure MCP with Auth"
   }
 
   simple = {
@@ -86,7 +86,7 @@ locals {
 
   supabase = {
     name  = "_agent.supabase"
-    value = "v=aid1;u=https://api.supabase.com/mcp;p=mcp;a=pat;k=zAbCdEfGhIjKlMnOpQrStUvWxYz0123456789AbCdEf;i=s1;d=https://supabase.com/docs/guides/getting-started/mcp;s=Supabase MCP (Mock Service)"
+    value = "v=aid1;u=https://api.supabase.com/mcp;p=mcp;a=pat;d=https://supabase.com/docs/guides/getting-started/mcp;s=Supabase MCP (Mock Service)"
   }
 
   ucp_showcase = {
