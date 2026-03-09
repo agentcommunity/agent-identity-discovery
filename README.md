@@ -100,6 +100,7 @@ Build AID-aware clients in your favorite language.
 
 ```bash
 pnpm add @agentcommunity/aid
+# or: pnpm add agent-id
 ```
 
 **Node.js (uses native DNS):**
