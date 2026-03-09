@@ -42,7 +42,8 @@ jobs:
       - name: Publish npm packages
         # Requires npm Trusted Publisher entries for each package:
         # @agentcommunity/aid, @agentcommunity/aid-conformance,
-        # @agentcommunity/aid-doctor, @agentcommunity/aid-engine
+        # @agentcommunity/aid-doctor, @agentcommunity/aid-engine,
+        # agent-id (unscoped alias for @agentcommunity/aid)
         run: pnpm changeset publish
         env:
           NPM_CONFIG_PROVENANCE: true
