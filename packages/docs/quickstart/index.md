@@ -17,6 +17,7 @@ AID provides libraries and tools for multiple languages and use cases:
 | Package                                                                                                           | Purpose                                          | Language   | Status                                                     |
 | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | ---------- | ---------------------------------------------------------- |
 | **[@agentcommunity/aid](https://www.npmjs.com/package/@agentcommunity/aid)**                                      | Core discovery library                           | TypeScript | ✅ Published                                               |
+| **[agent-id](https://www.npmjs.com/package/agent-id)** (alias)                                                    | Unscoped alias for @agentcommunity/aid           | TypeScript | Pending npm dispute                                        |
 | **[@agentcommunity/aid-engine](https://www.npmjs.com/package/@agentcommunity/aid-engine)**                        | Pure business logic (discovery, validation, PKA) | TypeScript | ✅ Published                                               |
 | **[@agentcommunity/aid-doctor](https://www.npmjs.com/package/@agentcommunity/aid-doctor)**                        | CLI validation & generation (wraps aid-engine)   | Node.js    | ✅ Published                                               |
 | **[aid-discovery (Python)](https://pypi.org/project/aid-discovery/)**                                             | Python discovery library                         | Python     | 🔜 Published (not yet community-owned; transfer planned)   |
@@ -142,6 +143,7 @@ Install the library:
 
 ```bash
 pnpm add @agentcommunity/aid
+# or: pnpm add agent-id
 ```
 
 Then use the `discover` function:

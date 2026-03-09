@@ -28,7 +28,7 @@ Agent Identity & Discovery (AID) answers one question: **"Given a domain, where 
 
 This protocol is an intentionally minimal discovery layer. After a client uses AID to find the correct endpoint or package, richer protocols such as the Model Context Protocol (MCP) or the Agent-to-Agent Protocol (A2A) take over for communication and capability negotiation.
 
-This document defines the record format, a simple client algorithm, and strict security rules. It does not include manifests, capability lists, or runtime orchestration.
+This document defines the record format, a simple client algorithm, and strict security rules. It does not include manifests, capability lists, or runtime orchestration. AID defines a DNS discovery entry point for a specific protocol. It does not attempt to define a universal discovery framework for all agent systems.
 
 ---
 
@@ -50,7 +50,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 - **Zero-Configuration:** A user types a domain, and the client automatically discovers how to connect.
 - **Decentralized and Deployable:** The standard uses DNS TXT records, which are universally supported and require no central registry.
 - **Protocol-Agnostic:** AID discovers agents speaking any protocol, including MCP, A2A, OpenAPI, or even local package-based protocols.
-- **Clear Upgrade Path:** A future AID v2 is planned to use DNS SRV records, leveraging the same `_agent` service label established in this specification.
+- **Clear Upgrade Path:** A future AID version may adopt a more structured DNS record type, such as SRV or SVCB, while preserving the same `_agent` discovery label established in this specification.
 
 ---
 
@@ -59,6 +59,8 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 A provider **MUST** advertise its agent service by publishing a single DNS TXT record at `_agent.<domain>`.
 
 ### **2.1. Format**
+
+For AID v1.x, agents **MUST** use DNS TXT records for discovery. TXT was chosen because it is universally supported by every DNS registrar and provider, enabling any developer to deploy AID discovery without requiring specialized DNS infrastructure. Alternative record types such as SVCB ([RFC9460]) and SRV ([RFC2782]) offer more structured semantics but are not yet uniformly available across registrar control panels, limiting real-world deployability. Future AID versions may adopt alternative record types as provider support matures; the `_agent` label is designed to remain stable across such transitions (see Section 5).
 
 The record **MUST** be a single string of semicolon-delimited `key=value` pairs. Clients **SHOULD** `trim()` leading and trailing whitespace from keys and values. Clients **MUST** ignore unknown keys. If a DNS server splits the record into multiple 255-octet strings, the client **MUST** concatenate them in order before parsing. Keep the total length under 255 bytes when possible.
 
@@ -154,8 +156,8 @@ The canonical location for discovery is the base record: `_agent.<domain>`. Prov
 **Examples:**
 
 ```dns
-_agent._mcp.example.com. 300 IN TXT "v=aid1;p=mcp;uri=..."
-_agent._a2a.example.com. 300 IN TXT "v=aid1;p=a2a;uri=..."
+_agent._mcp.example.com. 300 IN TXT "v=aid1;p=mcp;u=..."
+_agent._a2a.example.com. 300 IN TXT "v=aid1;p=a2a;u=..."
 ```
 
 **Client behavior:**
@@ -168,7 +170,7 @@ _agent._a2a.example.com. 300 IN TXT "v=aid1;p=a2a;uri=..."
 
 ## **3. Security Rules**
 
-- **DNSSEC:** Providers are **STRONGLY ENCOURAGED** to sign their DNS records with DNSSEC. Vercel-registered apex domains (including `agentcommunity.org`) are DNSSEC-signed by default. Clients **SHOULD** validate the `RRSIG` when the zone advertises it for the `_agent` record.
+- **DNSSEC:** Providers **SHOULD** sign their DNS records with DNSSEC. Clients **SHOULD** perform DNSSEC validation when DNSSEC-signed answers are available.
 - **HTTPS:** A `remote` agent's `uri` **MUST** use `https://`. Clients **MUST** perform standard TLS certificate and hostname validation.
 - **No Secrets:** The TXT record is public and **MUST NOT** contain any secrets.
 - **Endpoint Proof (PKA):** When the record includes `pka`/`k`, clients **MUST** verify server control of the private key using HTTP Message Signatures (RFC 9421) with Ed25519 (Appendix D). Providers **MUST** publish `kid`/`i` when `pka` is present. Clients **SHOULD** warn on downgrade if a domain removes `pka` after prior discovery.
@@ -182,7 +184,28 @@ _agent._a2a.example.com. 300 IN TXT "v=aid1;p=a2a;uri=..."
   a. terminate with `ERR_SECURITY`, or  
   b. require explicit user confirmation before proceeding.
 
-### **3.1 Enterprise Policy Modes**
+### **3.1 Threat Model**
+
+AID's security model addresses the following threat landscape:
+
+**Assumptions:**
+- DNS resolvers are trusted for transport. DNSSEC is recommended but not required, preserving deployability across all registrars.
+- HTTPS endpoints are verified via standard TLS certificate validation ([RFC6125]).
+- The TXT record is public data. No secrets are transmitted via DNS.
+
+**Mitigations provided:**
+- **DNS spoofing/cache poisoning:** DNSSEC validation (when available) provides cryptographic proof of record authenticity. Enterprise deployments can mandate DNSSEC via policy modes (Section 3.2).
+- **Endpoint impersonation:** PKA (Appendix D) provides endpoint proof using Ed25519 HTTP Message Signatures ([RFC9421]). AID's Ed25519 key material is also compatible with other external key-distribution systems, though AID v1.2 does not depend on or require them.
+- **Downgrade attacks:** Clients track previously seen PKA keys and detect removal or rotation (configurable via policy).
+- **Command injection (local agents):** Local execution safeguards (explicit consent, integrity checks, no shell interpretation) prevent exploitation of `proto=local` records.
+- **Cross-origin redirect:** Clients reject or flag cross-origin HTTP redirects from discovered endpoints.
+
+**Explicitly out of scope:**
+- Compromised authoritative DNS servers (DNSSEC is the mitigation; AID does not replace it)
+- Active network attackers between client and HTTPS endpoint (TLS provides this defense)
+- Revocation of compromised PKA keys beyond DNS record update (future work; see Section 5)
+
+### **3.2 Enterprise Policy Modes**
 
 Clients that expose enterprise controls **SHOULD** provide a preset mode surface and **MAY** also expose the underlying policy knobs directly.
 
@@ -230,8 +253,12 @@ Operational rollout guidance for these modes lives in the [Enterprise Rollout Pl
 
 ## **5. Future Path**
 
-- **SRV/HTTPS Record Upgrade:** AID v2 is planned to use `SRV` records ([RFC2782]) for a more structured discovery mechanism. The service name will be `_agent._tcp`. Until ratified, TXT lookup remains the canonical method for v1.
-- **IANA Registration:** A formal request for the `_agent` service name will be submitted to IANA as per [RFC6335].
+- **Record Type Evolution:** AID v2 may adopt a more structured DNS record type such as SRV ([RFC2782]) or SVCB ([RFC9460]) for discovery, depending on registrar support at the time of ratification. Until then, TXT lookup remains the canonical method for v1.x.
+- **IANA Registration:** Formal requests will be submitted for the `_agent` underscored DNS node name under [RFC8552] and the `agent` service name under [RFC6335].
+
+### **5.1 Label Stability**
+
+The `_agent` DNS label is the stable discovery identifier for AID across all protocol versions. If AID evolves from v1 (TXT) to v2 (SRV, SVCB, or another record type), the `_agent` label remains the stable identifier. Clients use the version field (`v=aid1`) to determine record format. This ensures that IANA registration of `_agent` provides long-term stability for operators regardless of future record type transitions.
 
 ---
 
@@ -244,6 +271,37 @@ To ensure interoperability, token registries and community resources are maintai
   Additions require a pull request and are governed by a "First Come, First Served" policy with expert review.
 - **Global Index:** An open DNS crawler and community dashboard showcasing AID adoption is maintained at:
   [https://github.com/agentcommunity/aid-registry](https://github.com/agentcommunity/aid-registry)
+
+---
+
+## **7. IANA Considerations**
+
+This specification requests registration in two IANA registries. The two registrations serve different purposes: the RFC 8552 registration covers AID v1.x TXT-based discovery at `_agent.<domain>`, while the RFC 6335 service name supports potential future SRV-based discovery at `_agent._tcp.<domain>`.
+
+### **7.1. Underscored and Globally Scoped DNS Node Names (RFC 8552)**
+
+| Field | Value |
+| ----- | ----- |
+| RR Type | TXT |
+| _NODE NAME | _agent |
+| Reference | This document |
+
+The `_agent` global underscored node name is used exclusively for Agent Identity & Discovery (AID) service discovery. A single TXT record published at `_agent.<domain>` contains semicolon-delimited key=value pairs specifying an agent service endpoint, protocol type, and optional metadata as defined in Section 2 of this specification.
+
+The `_agent` node name is specific to the AID protocol and does not reserve the broader concept of software agents or agent-related discovery generally.
+
+Protocol-specific labels of the form `_agent._<proto>.<domain>` (e.g., `_agent._mcp.<domain>`) are scoped beneath the globally registered `_agent` node and do not require separate global registration.
+
+### **7.2. Service Name and Transport Protocol Port Number Registry (RFC 6335)**
+
+| Field | Value |
+| ----- | ----- |
+| Service Name | agent |
+| Transport Protocol(s) | tcp |
+| Description | Agent Identity & Discovery (AID): DNS-based discovery of agent service endpoints |
+| Reference | This document |
+| Port Number | N/A |
+| Assignment Notes | No port number is requested. This is a service-name-only registration intended to establish `agent` for future DNS service discovery usage at `_agent._tcp.<domain>` if a later AID version adopts SRV-based discovery under the same `_agent` label. |
 
 ---
 
@@ -324,6 +382,8 @@ Providers MUST include `kid`/`i` with `pka`/`k`. Clients SHOULD warn on downgrad
 
 ## **Appendix E: .well-known Fallback (Non-Normative)**
 
+AID is a DNS-based discovery protocol. The `.well-known` fallback described here is a non-normative convenience for environments where DNS TXT record creation is restricted (e.g., certain managed hosting platforms). It does not affect the `_agent` DNS registration or its scope under RFC 8552.
+
 - Path: `GET https://<domain>/.well-known/agent`
 - Format: JSON that mirrors TXT keys, including aliases.
 - Security: Relies on TLS certificate validation. PKA still applies when present.
@@ -336,7 +396,11 @@ Providers MUST include `kid`/`i` with `pka`/`k`. Clients SHOULD warn on downgrad
 - [RFC2119] Key words for use in RFCs to Indicate Requirement Levels
 - [RFC2782] A DNS RR for specifying the location of services (DNS SRV)
 - [RFC5890] Internationalized Domain Names for Applications (IDNA)
+- [RFC6125] Representation and Verification of Domain-Based Application Service Identity (TLS)
+- [RFC6335] Service Name and Transport Protocol Port Number Registry
 - [RFC8174] Ambiguity of Uppercase vs Lowercase in RFC 2119 Key Words
+- [RFC8552] Scoped Interpretation of DNS Resource Records through "Underscored" Naming of Attribute Leaves
+- [RFC9421] HTTP Message Signatures
 - [RFC9460] Service Binding and Parameter Specification (SVCB/HTTPS)
 
 ---

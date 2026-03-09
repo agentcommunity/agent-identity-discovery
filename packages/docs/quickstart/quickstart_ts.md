@@ -12,6 +12,7 @@ icon: material/language-typescript
 pnpm add @agentcommunity/aid
 # or
 npm i @agentcommunity/aid
+# or: pnpm add agent-id
 ```
 
 ## Discover by Domain

@@ -1,0 +1,778 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Internet-Draft source for AID.
+  Aligned to the current RFCXML v3 template model and the core AID v1.2 specification.
+-->
+<?xml-model href="rfc7991bis.rnc"?>
+
+<!DOCTYPE rfc [
+  <!ENTITY nbsp "&#160;">
+  <!ENTITY zwsp "&#8203;">
+  <!ENTITY nbhy "&#8209;">
+  <!ENTITY wj "&#8288;">
+]>
+
+<rfc
+  xmlns:xi="http://www.w3.org/2001/XInclude"
+  category="info"
+  docName="draft-nemethi-aid-agent-identity-discovery-00"
+  ipr="trust200902"
+  submissionType="IETF"
+  sortRefs="true"
+  symRefs="true"
+  tocDepth="3"
+  tocInclude="true"
+  version="3"
+  xml:lang="en">
+  <front>
+    <title abbrev="AID">Agent Identity and Discovery (AID)</title>
+    <seriesInfo name="Internet-Draft" value="draft-nemethi-aid-agent-identity-discovery-00"/>
+
+    <author fullname="Balazs Nemethi" initials="B." surname="Nemethi" role="editor">
+      <organization>Open Agent Registry, Inc.</organization>
+      <address>
+        <email>balazs@agentcommunity.org</email>
+        <uri>https://agentcommunity.org</uri>
+      </address>
+    </author>
+
+    <date day="8" month="March" year="2026"/>
+    <area>General</area>
+    <workgroup>Internet Engineering Task Force</workgroup>
+    <keyword>AID</keyword>
+    <keyword>agent discovery</keyword>
+    <keyword>DNS</keyword>
+    <keyword>service discovery</keyword>
+
+    <abstract>
+      <t>
+        Agent Identity and Discovery (AID) is a minimal, DNS-first discovery protocol for locating
+        agent service endpoints. Given a domain name, an AID client queries a DNS TXT record at the
+        well-known subdomain _agent.&lt;domain&gt; and learns the service endpoint URI, protocol token,
+        authentication hint, and optional metadata for that agent.
+      </t>
+      <t>
+        This document defines the AID v1.2 record format, client discovery algorithm, exact-host
+        lookup rules, security requirements, and IANA registrations for the `_agent` DNS node name and
+        the `agent` service name. AID is intentionally small. After discovery, protocol-specific
+        mechanisms such as MCP or A2A handle communication and capability negotiation.
+      </t>
+    </abstract>
+  </front>
+
+  <middle>
+    <section anchor="introduction">
+      <name>Introduction</name>
+      <t>
+        Applications that need to locate and connect to an agent often rely on out-of-band
+        configuration, centralized directories, or protocol-specific discovery mechanisms. AID defines
+        a single DNS-based bootstrap point that answers one question: given a domain, where is the
+        agent and which protocol should a client speak?
+      </t>
+      <t>
+        AID uses a TXT record at the well-known DNS name _agent.&lt;domain&gt;. The record is small,
+        versioned, and protocol-agnostic. It tells a client where the agent is located, which
+        protocol token applies, what authentication hint to expect, and whether endpoint proof is
+        required.
+      </t>
+      <ul>
+        <li>Zero configuration: a user supplies a domain and the client performs discovery.</li>
+        <li>Decentralized deployment: the protocol uses standard DNS publication.</li>
+        <li>Protocol-agnostic bootstrap: AID identifies the next protocol, rather than replacing it.</li>
+        <li>Stable evolution path: the `_agent` label remains stable across protocol versions.</li>
+      </ul>
+      <t>
+        This document specifies the wire format and client behavior for AID v1.2 and requests two IANA
+        registrations. The RFC 8552 registration covers the deployed TXT-based discovery label
+        `_agent`, while the RFC 6335 service-name-only registration reserves `agent` for possible
+        future SRV-based discovery under the same naming family.
+      </t>
+    </section>
+
+    <section anchor="conventions">
+      <name>Conventions and Terminology</name>
+      <section anchor="requirements-language">
+        <name>Requirements Language</name>
+        <t>
+          The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD",
+          "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this
+          document are to be interpreted as described in BCP 14 <xref target="RFC2119"/>
+          <xref target="RFC8174"/> when, and only when, they appear in all capitals, as shown here.
+        </t>
+      </section>
+      <section anchor="terms">
+        <name>Terms</name>
+        <dl newline="true">
+          <dt>AID Client</dt>
+          <dd>Software that performs AID discovery for a domain.</dd>
+          <dt>Provider</dt>
+          <dd>The entity that controls a domain and publishes the AID TXT record.</dd>
+          <dt>_agent subdomain</dt>
+          <dd>The DNS name `_agent.&lt;domain&gt;` where the AID TXT record is published.</dd>
+          <dt>A-label</dt>
+          <dd>The Punycode representation of an Internationalized Domain Name as described in <xref target="RFC5890"/>.</dd>
+        </dl>
+      </section>
+    </section>
+
+    <section anchor="record-format">
+      <name>AID Record Format</name>
+      <t>
+        A provider advertises an agent service by publishing a single TXT record at `_agent.&lt;domain&gt;`.
+        For AID v1.x, TXT is the deployed discovery record type because it is widely available across
+        DNS providers and registrars. Future versions of AID may adopt a more structured record type,
+        but the `_agent` label remains stable; see <xref target="label-stability"/>.
+      </t>
+
+      <section anchor="syntax-and-parsing">
+        <name>Syntax and Parsing</name>
+        <t>
+          The record MUST be a semicolon-delimited sequence of `key=value` pairs. Clients SHOULD trim
+          leading and trailing whitespace from keys and values. Clients MUST ignore unknown keys.
+        </t>
+        <t>
+          If a DNS server splits the TXT record into multiple 255-octet strings, the client MUST
+          concatenate them in order before parsing. Providers SHOULD keep the full record under 255
+          octets when practical.
+        </t>
+        <t>
+          Key comparison is case-insensitive. Clients MUST recognize the single-letter lowercase alias
+          for every defined key. A record MUST NOT include both a long key and its alias. Providers
+          SHOULD emit the short-key form `v,u,p,a,s,d,e,k,i` for AID v1.x records.
+        </t>
+      </section>
+
+      <section anchor="defined-keys">
+        <name>Defined Keys</name>
+        <dl newline="true">
+          <dt>version (`v`) Required</dt>
+          <dd>Specification version. For AID v1.x this MUST be `aid1`. Example: `v=aid1`.</dd>
+          <dt>uri (`u`) Required</dt>
+          <dd>Absolute endpoint URL or local locator. Allowed schemes depend on the selected protocol token; see <xref target="proto-registry"/>. Example: `u=https://api.example.com/mcp`.</dd>
+          <dt>proto (`p`) Required</dt>
+          <dd>Protocol token from <xref target="proto-registry"/>. Example: `p=mcp`.</dd>
+          <dt>auth (`a`) Recommended</dt>
+          <dd>Authentication hint token from <xref target="auth-registry"/>. Example: `a=pat`.</dd>
+          <dt>desc (`s`) Optional</dt>
+          <dd>Short human-readable description, up to 60 UTF-8 bytes. Example: `s=Primary AI Gateway`.</dd>
+          <dt>docs (`d`) Optional</dt>
+          <dd>Absolute HTTPS URL for human-readable documentation. Example: `d=https://docs.example.com/agent`.</dd>
+          <dt>dep (`e`) Optional</dt>
+          <dd>ISO 8601 UTC timestamp indicating deprecation. Example: `e=2026-01-01T00:00:00Z`.</dd>
+          <dt>pka (`k`) Optional</dt>
+          <dd>Multibase-encoded Ed25519 public key for endpoint proof. Example: `k=z7rW8rTq8o4mM6vVf7w1k3m4uQn9p2YxCAbcDeFgHiJ`.</dd>
+          <dt>kid (`i`) Conditional</dt>
+          <dd>Rotation identifier, 1 to 6 lowercase alphanumeric characters. Required when `pka` is present. Example: `i=g1`.</dd>
+        </dl>
+      </section>
+
+      <section anchor="examples">
+        <name>Examples</name>
+
+        <figure anchor="example-remote-mcp">
+          <name>Remote MCP Agent</name>
+          <sourcecode type="dns"><![CDATA[
+_agent.example.com. 300 IN TXT (
+  "v=aid1;u=https://api.example.com/mcp;"
+  "p=mcp;a=pat;s=Example AI Tools"
+)
+          ]]></sourcecode>
+        </figure>
+
+        <figure anchor="example-local-agent">
+          <name>Local Agent via Docker</name>
+          <sourcecode type="dns"><![CDATA[
+_agent.grafana.com. 300 IN TXT (
+  "v=aid1;u=docker:grafana/mcp:latest;"
+  "p=local;a=pat;s=Run Grafana agent locally"
+)
+          ]]></sourcecode>
+        </figure>
+
+        <figure anchor="example-pka">
+          <name>Remote MCP with PKA and Metadata</name>
+          <sourcecode type="dns"><![CDATA[
+_agent.example.com. 300 IN TXT (
+  "v=aid1;p=mcp;u=https://api.example.com/mcp;"
+  "k=z7rW8rTq8o4mM6vVf7w1k3m4uQn9p2YxCAbcDeFgHiJ;i=g1;"
+  "d=https://docs.example.com/agent;"
+  "e=2026-01-01T00:00:00Z;s=Secure AI Gateway"
+)
+          ]]></sourcecode>
+        </figure>
+
+        <figure anchor="example-zeroconf">
+          <name>Local Zeroconf Example</name>
+          <sourcecode type="dns"><![CDATA[
+_agent.local.test. 300 IN TXT (
+  "v=aid1;p=zeroconf;"
+  "u=zeroconf:_mcp._tcp;s=Local Dev Agent"
+)
+          ]]></sourcecode>
+        </figure>
+      </section>
+    </section>
+
+    <section anchor="discovery-procedure">
+      <name>Client Discovery Procedure</name>
+
+      <section anchor="algorithm">
+        <name>Discovery Algorithm</name>
+        <t>
+          When an AID client is given a domain, it MUST perform the following steps:
+        </t>
+        <ol>
+          <li>Normalize the domain. If the input contains non-ASCII labels, convert them to A-label form as described in <xref target="RFC5890"/>.</li>
+          <li>Query the TXT record at `_agent.&lt;exact-host-user-entered&gt;`. The client MUST NOT walk up the DNS hierarchy. If no record is found or the lookup fails, the client MAY try the `.well-known` fallback on the same exact host; see <xref target="well-known-fallback"/>.</li>
+          <li>Parse the TXT answer set as semicolon-delimited `key=value` records. If exactly one valid AID record is present at the queried DNS name, use it. If more than one valid AID record is present at the same queried DNS name, the client MUST fail due to ambiguity. Malformed answers do not matter when there is exactly one valid AID record.</li>
+          <li>If `docs` is present, the client MAY display it. If `dep` is in the future, the client SHOULD warn. If `dep` is in the past, the client SHOULD fail gracefully.</li>
+          <li>If `pka` is present, the client MUST perform the endpoint-proof procedure in <xref target="pka-handshake"/>. Providers MUST publish `kid` whenever `pka` is present.</li>
+          <li>If validation succeeds, return the discovered details. If the client does not support the selected protocol token, it MUST fail with the appropriate error.</li>
+        </ol>
+      </section>
+
+      <section anchor="error-codes">
+        <name>Standard Client Error Codes</name>
+        <table anchor="aid-client-errors-table">
+          <name>Client Error Codes</name>
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Name</th>
+              <th>Meaning</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1000</td>
+              <td>ERR_NO_RECORD</td>
+              <td>No `_agent` TXT record was found for the domain.</td>
+            </tr>
+            <tr>
+              <td>1001</td>
+              <td>ERR_INVALID_TXT</td>
+              <td>A record was found but is malformed or missing required keys.</td>
+            </tr>
+            <tr>
+              <td>1002</td>
+              <td>ERR_UNSUPPORTED_PROTO</td>
+              <td>The record is valid, but the client does not support the selected protocol.</td>
+            </tr>
+            <tr>
+              <td>1003</td>
+              <td>ERR_SECURITY</td>
+              <td>Discovery failed due to a security policy or verification failure.</td>
+            </tr>
+            <tr>
+              <td>1004</td>
+              <td>ERR_DNS_LOOKUP_FAILED</td>
+              <td>The DNS query failed for a network-related reason.</td>
+            </tr>
+            <tr>
+              <td>1005</td>
+              <td>ERR_FALLBACK_FAILED</td>
+              <td>The `.well-known` fallback failed or returned invalid data.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section anchor="exact-host">
+        <name>Exact-Host Semantics and Explicit Delegation</name>
+        <t>
+          Discovery is exact-host by default. If the application asks for `app.team.example.com`, the
+          canonical AID query name is `_agent.app.team.example.com`.
+        </t>
+        <t>
+          Clients MUST NOT walk up the DNS hierarchy looking for `_agent.team.example.com` or
+          `_agent.example.com`. If an operator wants a child host to inherit a shared record, that
+          inheritance MUST be expressed in DNS for the exact queried name, for example by using a
+          `CNAME` at the child host's `_agent` label.
+        </t>
+
+        <figure anchor="example-exact-host">
+          <name>Exact-Host and Delegated Examples</name>
+          <sourcecode type="dns"><![CDATA[
+_agent.app.team.example.com. 300 IN TXT (
+  "v=aid1;p=mcp;"
+  "u=https://app.team.example.com/mcp"
+)
+
+_agent.app.team.example.com. 300 IN CNAME (
+  _agent.shared.team.example.com.
+)
+_agent.shared.team.example.com. 300 IN TXT (
+  "v=aid1;p=mcp;"
+  "u=https://gateway.team.example.com/mcp"
+)
+          ]]></sourcecode>
+        </figure>
+
+        <t>
+          Protocol-specific lookups follow the same exact-host rule. If an application explicitly asks
+          for a given protocol token, a client MAY query `_agent._&lt;proto&gt;.&lt;exact-host&gt;` before the
+          base `_agent.&lt;exact-host&gt;` name, but it MUST NOT query parent hosts implicitly.
+        </t>
+      </section>
+
+      <section anchor="multiple-protocols">
+        <name>Exposing Multiple Protocols</name>
+        <t>
+          The canonical location for discovery is the base record `_agent.&lt;domain&gt;`. Providers MAY
+          additionally expose distinct agent services on protocol-specific subdomains of the form
+          `_agent._&lt;proto&gt;.&lt;domain&gt;`.
+        </t>
+
+        <figure anchor="example-multi-protocol">
+          <name>Protocol-Specific Records</name>
+          <sourcecode type="dns"><![CDATA[
+_agent._mcp.example.com. 300 IN TXT (
+  "v=aid1;p=mcp;"
+  "u=https://api.example.com/mcp"
+)
+_agent._a2a.example.com. 300 IN TXT (
+  "v=aid1;p=a2a;"
+  "u=https://api.example.com/a2a"
+)
+          ]]></sourcecode>
+        </figure>
+
+        <t>
+          By default, clients query the base record. When a specific protocol token is explicitly
+          requested by the calling application, clients MAY first query the corresponding
+          protocol-specific name and then fall back to the base record for the same exact host.
+        </t>
+      </section>
+    </section>
+
+    <section anchor="security">
+      <name>Security Considerations</name>
+      <t>
+        AID publishes public discovery metadata. The TXT record MUST NOT contain secrets. The protocol
+        depends on DNS integrity, TLS for remote endpoints, and explicit client safeguards for local
+        execution.
+      </t>
+      <ul>
+        <li>Providers SHOULD sign AID records with DNSSEC when available.</li>
+        <li>Remote HTTPS endpoints MUST perform standard TLS certificate and hostname validation as described in <xref target="RFC6125"/>.</li>
+        <li>When `pka` is present, clients MUST verify endpoint control of the private key as described in <xref target="pka-handshake"/>.</li>
+        <li>Clients SHOULD warn if a previously observed `pka` disappears.</li>
+        <li>Clients that support `proto=local` MUST implement the safeguards described below.</li>
+        <li>Clients MUST NOT automatically follow cross-origin redirects from a discovered endpoint.</li>
+      </ul>
+      <t>
+        Clients that support `proto=local` MUST implement the following safeguards:
+      </t>
+      <ol>
+        <li>Explicit consent: before first execution, the client MUST display the full resolved command and require explicit confirmation.</li>
+        <li>Integrity check: the client MUST compute and cache a cryptographic fingerprint of the `uri` and `proto` values. If these values change on a later lookup, the client MUST re-trigger the full consent process.</li>
+        <li>No shell interpretation: arguments derived from the `uri` MUST be passed atomically to the underlying OS execution call to prevent command injection.</li>
+        <li>No nested discovery: the client MUST reject a `local` execution `uri` that could be interpreted as a command that initiates another AID discovery request.</li>
+        <li>Sandboxing: clients SHOULD run local agents in a sandboxed environment with minimum necessary permissions.</li>
+      </ol>
+      <t>
+        If an initial request to the discovered `uri` returns an HTTP redirect (`301`, `302`, `307`,
+        or `308`) to a different origin, clients SHOULD treat this as a potential security risk.
+        Clients MUST NOT follow such cross-origin redirects automatically. Implementations MAY either
+        terminate with `ERR_SECURITY` or require explicit user confirmation before proceeding.
+      </t>
+
+      <section anchor="threat-model">
+        <name>Threat Model</name>
+        <t>
+          AID addresses DNS spoofing and cache poisoning with optional DNSSEC validation, endpoint
+          impersonation with optional public-key attestation, downgrade detection with remembered key
+          state, command injection risks for local execution, and cross-origin redirect abuse for remote
+          endpoints.
+        </t>
+        <t>
+          Compromised authoritative DNS servers, active network attackers beyond the protections of TLS,
+          and revocation beyond DNS record update remain outside the direct scope of AID v1.2.
+        </t>
+      </section>
+
+      <section anchor="enterprise-policy">
+        <name>Enterprise Policy Modes</name>
+        <t>
+          Clients that expose enterprise controls SHOULD provide policy presets and MAY expose the
+          underlying policy knobs directly.
+        </t>
+        <table anchor="aid-policy-presets-table">
+          <name>Normative Policy Presets</name>
+          <thead>
+            <tr>
+              <th>Preset</th>
+              <th>PKA</th>
+              <th>DNSSEC</th>
+              <th>Well-known</th>
+              <th>Downgrade</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>balanced</td>
+              <td>if-present</td>
+              <td>prefer</td>
+              <td>auto</td>
+              <td>warn</td>
+            </tr>
+            <tr>
+              <td>strict</td>
+              <td>require</td>
+              <td>require</td>
+              <td>disable</td>
+              <td>fail</td>
+            </tr>
+          </tbody>
+        </table>
+        <t>
+          The underlying policy knobs are:
+        </t>
+        <ul>
+          <li>PKA policy: `if-present | require`</li>
+          <li>DNSSEC policy: `off | prefer | require`</li>
+          <li>Well-known policy: `auto | disable`</li>
+          <li>Downgrade policy: `off | warn | fail`</li>
+        </ul>
+        <t>
+          Policy semantics are as follows:
+        </t>
+        <ul>
+          <li>PKA `require`: discovery MUST fail with `ERR_SECURITY` if the selected record does not publish `pka` and `kid`.</li>
+          <li>DNSSEC `prefer`: clients SHOULD continue when DNSSEC cannot be validated, but SHOULD surface a warning.</li>
+          <li>DNSSEC `require`: clients MUST fail with `ERR_SECURITY` when DNSSEC validation is unavailable or unsuccessful for the selected DNS answer.</li>
+          <li>Well-known `disable`: clients MUST NOT use `/.well-known/agent` fallback.</li>
+          <li>Downgrade `warn`: if a previously seen `pka` disappears or `pka` or `kid` changes, clients SHOULD surface a warning.</li>
+          <li>Downgrade `fail`: if a previously seen `pka` disappears or `pka` or `kid` changes, clients MUST fail with `ERR_SECURITY`.</li>
+        </ul>
+        <t>
+          If discovery succeeds only through `.well-known`, that result cannot satisfy a policy that
+          requires DNSSEC validation.
+        </t>
+      </section>
+    </section>
+
+    <section anchor="dns-caching">
+      <name>DNS and Caching</name>
+      <t>
+        Providers are RECOMMENDED to publish `_agent` TXT records with a TTL between 300 and 900
+        seconds. Clients MUST respect the received TTL and MUST NOT cache the record longer than that.
+      </t>
+    </section>
+
+    <section anchor="future-path">
+      <name>Future Path</name>
+      <t>
+        AID v2 or later may adopt a more structured DNS record type such as SRV <xref target="RFC2782"/>
+        or SVCB <xref target="RFC9460"/>, depending on operational deployment support. TXT remains the
+        canonical mechanism for AID v1.x.
+      </t>
+      <t>
+        Formal requests are expected for the `_agent` underscored DNS node name under
+        <xref target="RFC8552"/> and the `agent` service name under <xref target="RFC6335"/>.
+      </t>
+
+      <section anchor="label-stability">
+        <name>Label Stability</name>
+        <t>
+          The stable DNS label for AID is `_agent`. Record types may evolve, but the discovery label
+          remains `_agent` across versions and the record version field identifies the wire-format
+          expectations. This is the main reason the RFC 8552 registration is valuable even if later AID
+          versions use a different DNS RR type.
+        </t>
+      </section>
+    </section>
+
+    <section anchor="registries-governance">
+      <name>Registries and Governance</name>
+      <t>
+        To support interoperability, token registries and community resources are maintained publicly.
+      </t>
+      <ul>
+        <li>Token registries: the canonical lists for `auth` and `proto` tokens are maintained at <eref target="https://github.com/agentcommunity/aid-tokens">https://github.com/agentcommunity/aid-tokens</eref>. Additions require a pull request and are governed by a first-come, first-served policy with expert review.</li>
+        <li>Global index: an open DNS crawler and community dashboard showing AID adoption is maintained at <eref target="https://github.com/agentcommunity/aid-registry">https://github.com/agentcommunity/aid-registry</eref>.</li>
+      </ul>
+    </section>
+
+    <section anchor="iana">
+      <name>IANA Considerations</name>
+      <t>
+        This document requests registration in two IANA registries. The registrations serve different
+        purposes. The RFC 8552 request covers AID v1.x TXT discovery at `_agent.&lt;domain&gt;`. The RFC
+        6335 request reserves the service name `agent` for potential future DNS service discovery usage
+        under `_agent._tcp.&lt;domain&gt;`.
+      </t>
+
+      <section anchor="iana-rfc8552">
+        <name>Registration in the Underscored and Globally Scoped DNS Node Names Registry</name>
+        <t>
+          IANA is requested to register the following entry in the "Underscored and Globally Scoped DNS
+          Node Names" registry established by <xref target="RFC8552"/>.
+        </t>
+        <table anchor="aid-iana-rfc8552-table">
+          <name>Requested RFC 8552 Registration</name>
+          <tbody>
+            <tr>
+              <td>RR Type</td>
+              <td>TXT</td>
+            </tr>
+            <tr>
+              <td>Node Name</td>
+              <td>_agent</td>
+            </tr>
+            <tr>
+              <td>Reference</td>
+              <td>This document</td>
+            </tr>
+          </tbody>
+        </table>
+        <t>
+          The `_agent` node name is used exclusively for Agent Identity and Discovery. A single TXT
+          record published at `_agent.&lt;domain&gt;` contains semicolon-delimited key/value pairs that
+          identify an agent endpoint, protocol token, and optional metadata as defined in
+          <xref target="record-format"/> and <xref target="discovery-procedure"/>.
+        </t>
+        <t>
+          The requested node name is specific to AID and does not reserve the broader concept of agents
+          or agent-related discovery generally. Protocol-specific labels of the form
+          `_agent._&lt;proto&gt;.&lt;domain&gt;` are subordinate names beneath the registered `_agent` node and do
+          not require separate global registration.
+        </t>
+      </section>
+
+      <section anchor="iana-rfc6335">
+        <name>Registration in the Service Name and Transport Protocol Port Number Registry</name>
+        <t>
+          IANA is requested to register the following service-name-only entry in the "Service Name and
+          Transport Protocol Port Number" registry defined by <xref target="RFC6335"/>.
+        </t>
+        <table anchor="aid-iana-rfc6335-table">
+          <name>Requested RFC 6335 Registration</name>
+          <tbody>
+            <tr>
+              <td>Service Name</td>
+              <td>agent</td>
+            </tr>
+            <tr>
+              <td>Transport Protocol(s)</td>
+              <td>tcp</td>
+            </tr>
+            <tr>
+              <td>Description</td>
+              <td>Agent Identity and Discovery (AID): DNS-based discovery of agent service endpoints</td>
+            </tr>
+            <tr>
+              <td>Port Number</td>
+              <td>N/A</td>
+            </tr>
+            <tr>
+              <td>Assignment Notes</td>
+              <td>No port number is requested. This is a service-name-only registration intended to establish `agent` for possible future SRV-based discovery under `_agent._tcp.&lt;domain&gt;` while preserving the stable `_agent` label.</td>
+            </tr>
+            <tr>
+              <td>Reference</td>
+              <td>This document</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </section>
+  </middle>
+
+  <back>
+    <references>
+      <name>References</name>
+      <references>
+        <name>Normative References</name>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.2119.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.5890.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.6125.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.6335.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8174.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8552.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.9421.xml"/>
+      </references>
+      <references>
+        <name>Informative References</name>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.2782.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8615.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.9460.xml"/>
+      </references>
+    </references>
+
+    <section anchor="auth-registry">
+      <name>Authentication Scheme Registry</name>
+      <t>All authentication tokens are case-sensitive and use lowercase ASCII.</t>
+      <ul>
+        <li>none</li>
+        <li>pat</li>
+        <li>apikey</li>
+        <li>basic</li>
+        <li>oauth2_device</li>
+        <li>oauth2_code</li>
+        <li>mtls</li>
+        <li>custom</li>
+      </ul>
+    </section>
+
+    <section anchor="proto-registry">
+      <name>Protocol Registry</name>
+      <t>All protocol tokens are case-sensitive and use lowercase ASCII.</t>
+      <table anchor="aid-proto-registry-table">
+        <name>Protocol Tokens</name>
+        <thead>
+          <tr>
+            <th>Token</th>
+            <th>Meaning</th>
+            <th>Allowed `uri` scheme(s)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>mcp</td>
+            <td>Model Context Protocol</td>
+            <td>https://</td>
+          </tr>
+          <tr>
+            <td>a2a</td>
+            <td>Agent-to-Agent Protocol</td>
+            <td>https://</td>
+          </tr>
+          <tr>
+            <td>openapi</td>
+            <td>OpenAPI specification document</td>
+            <td>https://</td>
+          </tr>
+          <tr>
+            <td>grpc</td>
+            <td>gRPC over HTTP/2 or HTTP/3</td>
+            <td>https://</td>
+          </tr>
+          <tr>
+            <td>graphql</td>
+            <td>GraphQL over HTTP</td>
+            <td>https://</td>
+          </tr>
+          <tr>
+            <td>websocket</td>
+            <td>WebSocket transport</td>
+            <td>wss://</td>
+          </tr>
+          <tr>
+            <td>local</td>
+            <td>The agent runs locally on the client machine</td>
+            <td>docker:, npx:, pip:</td>
+          </tr>
+          <tr>
+            <td>zeroconf</td>
+            <td>mDNS or DNS-SD service discovery</td>
+            <td>zeroconf:&lt;service_type&gt;</td>
+          </tr>
+          <tr>
+            <td>ucp</td>
+            <td>Universal Commerce Protocol</td>
+            <td>https://</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section anchor="client-error-constants">
+      <name>Client Error Constants</name>
+      <t>For cross-language SDK consistency, clients SHOULD use the following numeric constants.</t>
+      <table anchor="aid-error-constants-table">
+        <name>Error Constant Values</name>
+        <thead>
+          <tr>
+            <th>Constant</th>
+            <th>Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ERR_NO_RECORD</td>
+            <td>1000</td>
+          </tr>
+          <tr>
+            <td>ERR_INVALID_TXT</td>
+            <td>1001</td>
+          </tr>
+          <tr>
+            <td>ERR_UNSUPPORTED_PROTO</td>
+            <td>1002</td>
+          </tr>
+          <tr>
+            <td>ERR_SECURITY</td>
+            <td>1003</td>
+          </tr>
+          <tr>
+            <td>ERR_DNS_LOOKUP_FAILED</td>
+            <td>1004</td>
+          </tr>
+          <tr>
+            <td>ERR_FALLBACK_FAILED</td>
+            <td>1005</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section anchor="pka-handshake">
+      <name>PKA Handshake</name>
+      <t>
+        When `pka` is present, the client MUST verify control of the corresponding private key using
+        HTTP Message Signatures with Ed25519 as specified in <xref target="RFC9421"/>.
+      </t>
+      <figure anchor="pka-pseudocode-figure">
+        <name>PKA Handshake Pseudocode</name>
+        <sourcecode type="pseudocode"><![CDATA[
+function performPKAHandshake(uri, pka, kid):
+    nonce = generateRandomBytes(32)
+    challenge = base64urlEncode(nonce)
+    headers = {
+        "AID-Challenge": challenge,
+        "Date": currentUTCTime()
+    }
+    response = sendGET(uri, headers)
+
+    if response.status != 200:
+        failWith(ERR_SECURITY)
+
+    sigInput = response.headers["Signature-Input"]
+    signature = response.headers["Signature"]
+
+    created = parseCreated(sigInput)
+    if |currentTime() - created| > 300 seconds:
+        failWith(ERR_SECURITY)
+
+    pubKey = multibaseDecode(pka)
+    if not verifyEd25519(signature, sigInput.coveredFields, pubKey):
+        failWith(ERR_SECURITY)
+        ]]></sourcecode>
+      </figure>
+      <t>
+        Providers MUST include `kid` whenever `pka` is present. Clients SHOULD warn on downgrade if a
+        previously observed `pka` disappears.
+      </t>
+    </section>
+
+    <section anchor="well-known-fallback">
+      <name>.well-known Fallback</name>
+      <t>
+        AID is a DNS-based discovery protocol. The fallback defined here is a non-normative
+        convenience for environments where publishing DNS TXT records is difficult. It does not change
+        the RFC 8552 scope of `_agent`.
+      </t>
+      <ul>
+        <li>Path: `GET https://&lt;domain&gt;/.well-known/agent`</li>
+        <li>Format: JSON mirroring the TXT keys, including aliases</li>
+        <li>Security: TLS certificate validation still applies, and `pka` still applies when present</li>
+        <li>Client behavior: use DNS first and fall back only on `ERR_NO_RECORD` or `ERR_DNS_LOOKUP_FAILED`</li>
+        <li>Error mapping: use `ERR_FALLBACK_FAILED` when the fallback fails or is invalid</li>
+      </ul>
+      <t>
+        The `.well-known` URI convention itself is described in <xref target="RFC8615"/>.
+      </t>
+    </section>
+  </back>
+</rfc>
