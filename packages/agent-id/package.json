@@ -1,0 +1,50 @@
+{
+  "name": "agent-id",
+  "version": "1.2.0",
+  "description": "Agent Identity & Discovery (AID) — alias for @agentcommunity/aid",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js",
+      "default": "./index.js"
+    }
+  },
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "dependencies": {
+    "@agentcommunity/aid": "workspace:*"
+  },
+  "keywords": [
+    "agent",
+    "identity",
+    "discovery",
+    "dns",
+    "aid",
+    "mcp",
+    "a2a",
+    "ai"
+  ],
+  "license": "MIT",
+  "author": "Agent Community",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/agentcommunity/agent-identity-discovery.git",
+    "directory": "packages/agent-id"
+  },
+  "homepage": "https://aid.agentcommunity.org",
+  "bugs": {
+    "url": "https://github.com/agentcommunity/agent-identity-discovery/issues"
+  },
+  "engines": {
+    "node": ">=18.17"
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}
