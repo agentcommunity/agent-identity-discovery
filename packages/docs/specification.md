@@ -19,6 +19,7 @@ _Minimal, DNS-first agent bootstrap standard_
 **Date:** 6 February 2026
 **Editor:** Agent Community
 **Status:** Final
+**Internet-Draft:** [draft-nemethi-aid-agent-identity-discovery-00](https://datatracker.ietf.org/doc/draft-nemethi-aid-agent-identity-discovery/) (submitted 16 March 2026)
 
 ---
 
@@ -189,11 +190,13 @@ _agent._a2a.example.com. 300 IN TXT "v=aid1;p=a2a;u=..."
 AID's security model addresses the following threat landscape:
 
 **Assumptions:**
+
 - DNS resolvers are trusted for transport. DNSSEC is recommended but not required, preserving deployability across all registrars.
 - HTTPS endpoints are verified via standard TLS certificate validation ([RFC6125]).
 - The TXT record is public data. No secrets are transmitted via DNS.
 
 **Mitigations provided:**
+
 - **DNS spoofing/cache poisoning:** DNSSEC validation (when available) provides cryptographic proof of record authenticity. Enterprise deployments can mandate DNSSEC via policy modes (Section 3.2).
 - **Endpoint impersonation:** PKA (Appendix D) provides endpoint proof using Ed25519 HTTP Message Signatures ([RFC9421]). AID's Ed25519 key material is also compatible with other external key-distribution systems, though AID v1.2 does not depend on or require them.
 - **Downgrade attacks:** Clients track previously seen PKA keys and detect removal or rotation (configurable via policy).
@@ -201,6 +204,7 @@ AID's security model addresses the following threat landscape:
 - **Cross-origin redirect:** Clients reject or flag cross-origin HTTP redirects from discovered endpoints.
 
 **Explicitly out of scope:**
+
 - Compromised authoritative DNS servers (DNSSEC is the mitigation; AID does not replace it)
 - Active network attackers between client and HTTPS endpoint (TLS provides this defense)
 - Revocation of compromised PKA keys beyond DNS record update (future work; see Section 5)
@@ -280,11 +284,11 @@ This specification requests registration in two IANA registries. The two registr
 
 ### **7.1. Underscored and Globally Scoped DNS Node Names (RFC 8552)**
 
-| Field | Value |
-| ----- | ----- |
-| RR Type | TXT |
-| _NODE NAME | _agent |
-| Reference | This document |
+| Field       | Value         |
+| ----------- | ------------- |
+| RR Type     | TXT           |
+| \_NODE NAME | \_agent       |
+| Reference   | This document |
 
 The `_agent` global underscored node name is used exclusively for Agent Identity & Discovery (AID) service discovery. A single TXT record published at `_agent.<domain>` contains semicolon-delimited key=value pairs specifying an agent service endpoint, protocol type, and optional metadata as defined in Section 2 of this specification.
 
@@ -294,14 +298,14 @@ Protocol-specific labels of the form `_agent._<proto>.<domain>` (e.g., `_agent._
 
 ### **7.2. Service Name and Transport Protocol Port Number Registry (RFC 6335)**
 
-| Field | Value |
-| ----- | ----- |
-| Service Name | agent |
-| Transport Protocol(s) | tcp |
-| Description | Agent Identity & Discovery (AID): DNS-based discovery of agent service endpoints |
-| Reference | This document |
-| Port Number | N/A |
-| Assignment Notes | No port number is requested. This is a service-name-only registration intended to establish `agent` for future DNS service discovery usage at `_agent._tcp.<domain>` if a later AID version adopts SRV-based discovery under the same `_agent` label. |
+| Field                 | Value                                                                                                                                                                                                                                                 |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Service Name          | agent                                                                                                                                                                                                                                                 |
+| Transport Protocol(s) | tcp                                                                                                                                                                                                                                                   |
+| Description           | Agent Identity & Discovery (AID): DNS-based discovery of agent service endpoints                                                                                                                                                                      |
+| Reference             | This document                                                                                                                                                                                                                                         |
+| Port Number           | N/A                                                                                                                                                                                                                                                   |
+| Assignment Notes      | No port number is requested. This is a service-name-only registration intended to establish `agent` for future DNS service discovery usage at `_agent._tcp.<domain>` if a later AID version adopts SRV-based discovery under the same `_agent` label. |
 
 ---
 
