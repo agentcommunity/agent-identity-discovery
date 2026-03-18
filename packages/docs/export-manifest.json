@@ -104,8 +104,8 @@
     },
     {
       "path": "specification.md",
-      "bytes": 25485,
-      "sha256": "0f9dc32a44896035fad285becb390f757f3ab8875be9d7b8566c828f4c4f0537"
+      "bytes": 27652,
+      "sha256": "8769a6c067431e997d89483070efdb02d07709ae13c46fce23cf55dcff311c83"
     },
     {
       "path": "Tooling/aid_doctor.md",
@@ -143,5 +143,5 @@
       "sha256": "985c0214d91997524c53b078da3a8b87599709ee71c1d39b0cfa96764bcbd117"
     }
   ],
-  "aggregateSha256": "ea80e441e41dfdda127e657c3e4d21e236c74227f4d50987c8cbfa8a5b41b250"
+  "aggregateSha256": "d47a72146c2b1fa63a05c6e846941be1601bf68e211ee01eddb437df0978660e"
 }
