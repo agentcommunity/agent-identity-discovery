@@ -32,7 +32,7 @@
 
 - [.agent Community](https://agentcommunity.org): Main site, pre-register a .agent domain
 - [Community Docs](https://docs.agentcommunity.org): Governance, guides, and key concepts
-- [AgentBrief Blog](https://blog.agentcommunity.org): Daily news and updates
+- [AgentBrief Blog](https://agentcommunity.org/blog): Daily news and updates
 
 ## Key Concepts
 

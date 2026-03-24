@@ -45,7 +45,7 @@ Key rotation uses the `kid` field. Clients detect downgrade if a previously pres
 
 **The cross-boundary problem (Question Areas 4 and 5).** This is the one that motivated much of our recent work. When an enterprise agent crosses organizational boundaries to call partner APIs or external MCP servers, the internal identity infrastructure (SSO, SPIFFE SVIDs, scoped OAuth tokens) is invisible to the receiving party. An SVID from your internal SPIRE deployment means nothing to me.
 
-PKA gives the receiving party something it can actually verify: the calling agent's domain publishes a public key in DNS, and the agent proved it controls the corresponding private key. Think of it as SPF + connection-time DKIM for agents. We're exploring extensions that would let organizational identity travel with requests (PKA-signed JWTs, attestation headers), closer to how full DKIM signatures travel with email. We published a longer analysis here: https://blog.agentcommunity.org/external_identity_anchor
+PKA gives the receiving party something it can actually verify: the calling agent's domain publishes a public key in DNS, and the agent proved it controls the corresponding private key. Think of it as SPF + connection-time DKIM for agents. We're exploring extensions that would let organizational identity travel with requests (PKA-signed JWTs, attestation headers), closer to how full DKIM signatures travel with email. We published a longer analysis here: https://agentcommunity.org/blog/external_identity_anchor
 
 ## Where AID sits relative to the standards you listed
 
