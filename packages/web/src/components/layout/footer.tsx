@@ -157,21 +157,11 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="https://github.com/agentcommunity/agent-identity-discovery/discussions"
-                  className="text-muted-foreground hover:text-foreground inline-flex items-center transition-all duration-200 hover:translate-x-1 group"
-                  target="_blank"
-                >
-                  Discussions
-                  <ExternalLink className="ml-1 h-3 w-3 transition-transform duration-200 group-hover:translate-x-0.5" />
-                </Link>
-              </li>
-              <li>
-                <Link
                   href="https://github.com/agentcommunity/agent-identity-discovery/issues"
                   className="text-muted-foreground hover:text-foreground inline-flex items-center transition-all duration-200 hover:translate-x-1 group"
                   target="_blank"
                 >
-                  Issues
+                  Issues &amp; Feedback
                   <ExternalLink className="ml-1 h-3 w-3 transition-transform duration-200 group-hover:translate-x-0.5" />
                 </Link>
               </li>

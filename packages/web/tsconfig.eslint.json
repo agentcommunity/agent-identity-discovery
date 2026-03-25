@@ -6,6 +6,7 @@
     "src/**/*.ts",
     "src/**/*.tsx",
     "src/**/*.d.ts",
+    "src/app/.well-known/**/*.ts",
     "next-env.d.ts" // keeps Next’s auto-gen file in the program
   ],
 
