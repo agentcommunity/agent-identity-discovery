@@ -93,7 +93,7 @@ examples:
   protocols:
     a2a_showcase:
       domain: 'a2a.agentcommunity.org'
-      record: 'v=aid1;u=https://a2a.agentcommunity.org/.well-known/agent.json;p=a2a;d=https://google.github.io/A2A/;s=A2A Protocol Showcase'
+      record: 'v=aid1;u=https://a2a.agentcommunity.org/.well-known/agent.json;p=a2a;d=https://a2aprotocol.ai/;s=A2A Protocol Showcase'
       icon: '🤝'
       description: 'Agent-to-Agent protocol example'
       category: 'protocols'

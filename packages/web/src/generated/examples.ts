@@ -135,7 +135,7 @@ export const PROTOCOL_EXAMPLES: Example[] = [
     domain: 'a2a.agentcommunity.org',
     icon: '🤝',
     content:
-      'v=aid1;u=https://a2a.agentcommunity.org/.well-known/agent.json;p=a2a;d=https://google.github.io/A2A/;s=A2A Protocol Showcase',
+      'v=aid1;u=https://a2a.agentcommunity.org/.well-known/agent.json;p=a2a;d=https://a2aprotocol.ai/;s=A2A Protocol Showcase',
     category: 'protocols',
   },
   {

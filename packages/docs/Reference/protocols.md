@@ -25,7 +25,7 @@ v=aid1;u=https://api.example.com/mcp;p=mcp;a=oauth2_code;s=AI Assistant
 
 ### `a2a` — Agent-to-Agent Protocol
 
-URL to an [A2A AgentCard](https://google.github.io/A2A/) (`agent.json`). Used for agent-to-agent interoperability.
+URL to an [A2A AgentCard](https://a2aprotocol.ai/) (`agent.json`). Used for agent-to-agent interoperability.
 
 - **URI scheme:** `https://`
 - **Use case:** Multi-agent orchestration, agent marketplaces
