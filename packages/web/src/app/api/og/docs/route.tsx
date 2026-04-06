@@ -87,7 +87,7 @@ export function GET(request: NextRequest) {
         }}
       >
         <div style={{ fontSize: '18px', color: '#555' }}>
-          aid.agentcommunity.org/docs{slug ? `/${slug}` : ''}
+          {`aid.agentcommunity.org/docs${slug ? `/${slug}` : ''}`}
         </div>
         <div style={{ fontSize: '14px', fontWeight: 600, color: '#0196FF' }}>DNS for Agents</div>
       </div>
