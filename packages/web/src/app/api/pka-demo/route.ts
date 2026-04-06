@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { webcrypto } from 'node:crypto';
 
 export const runtime = 'nodejs';
 
@@ -11,14 +10,14 @@ const KID = 'p1';
 
 const COVERED_FIELDS = ['aid-challenge', '@method', '@target-uri', 'host', 'date'];
 
-let cachedKey: webcrypto.CryptoKey | null = null;
+let cachedKey: CryptoKey | null = null;
 
-async function getPrivateKey(): Promise<webcrypto.CryptoKey> {
+async function getPrivateKey(): Promise<CryptoKey> {
   if (cachedKey) return cachedKey;
   const der = Buffer.from(PRIVATE_KEY_B64, 'base64');
-  cachedKey = (await webcrypto.subtle.importKey('pkcs8', der, { name: 'Ed25519' }, false, [
+  cachedKey = await globalThis.crypto.subtle.importKey('pkcs8', der, { name: 'Ed25519' }, false, [
     'sign',
-  ]));
+  ]);
   return cachedKey;
 }
 
@@ -61,7 +60,7 @@ export async function GET(request: Request) {
   const base = new TextEncoder().encode(lines.join('\n'));
 
   const privateKey = await getPrivateKey();
-  const sig = new Uint8Array(await webcrypto.subtle.sign('Ed25519', privateKey, base));
+  const sig = new Uint8Array(await globalThis.crypto.subtle.sign('Ed25519', privateKey, base));
 
   return new NextResponse(JSON.stringify({ ok: true, kid: KID }), {
     status: 200,
