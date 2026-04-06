@@ -14,9 +14,12 @@
     "node": ">=20.10"
   },
   "scripts": {
-    "dev": "next dev --webpack",
-    "prebuild": "tsx scripts/generate-version.ts",
-    "build": "next build --webpack",
+    "gen:content": "tsx scripts/generate-version.ts && tsx scripts/generate-docs-index.ts",
+    "dev": "pnpm gen:content && next dev --webpack",
+    "build": "pnpm gen:content && next build --webpack",
+    "build:cf": "pnpm gen:content && opennextjs-cloudflare build",
+    "deploy:cf": "opennextjs-cloudflare deploy",
+    "preview:cf": "opennextjs-cloudflare preview",
     "start": "next start",
     "lint": "pnpm -w exec eslint --max-warnings 0 packages/web/src packages/web/next.config.js packages/web/postcss.config.js packages/web/tailwind.config.js packages/web/vitest.config.ts",
     "type-check": "tsc --noEmit",
@@ -80,6 +83,7 @@
     "jsdom": "^26.1.0",
     "postcss": "^8.4.38",
     "tailwindcss-animate": "^1.0.7",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4",
     "wrangler": "^4.80.0"

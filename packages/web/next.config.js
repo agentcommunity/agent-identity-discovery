@@ -1,7 +1,10 @@
+const { initOpenNextCloudflareForDev } = require('@opennextjs/cloudflare');
+
+initOpenNextCloudflareForDev();
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   devIndicators: false,
-  output: 'standalone',
   poweredByHeader: false,
   images: {
     formats: ['image/avif', 'image/webp'],
