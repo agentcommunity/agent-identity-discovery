@@ -137,3 +137,11 @@ tracking/iana/IANA-ICANN-Research-Report.md
 
 # Competitive intelligence (internal only)
 tracking/ANS/
+
+# OpenNext / Wrangler outputs (packages/web)
+packages/web/.open-next/
+packages/web/.wrangler/
+
+# Build-time generated (packages/web)
+packages/web/src/generated/version.ts
+packages/web/src/generated/docs-index.json
