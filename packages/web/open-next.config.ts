@@ -13,12 +13,15 @@ import staticAssetsIncrementalCache from '@opennextjs/cloudflare/overrides/incre
 // request time hits libraries that use `eval()` (disallowed on the Workers
 // runtime).
 //
-// disableTagCache: with no revalidateTag() / unstable_cache calls anywhere in
-// AID, the default in-memory tag cache is dead code (per-isolate, useless for
-// invalidation) and emits dev-mode warnings. Disabling it documents intent.
+// tagCache: 'dummy' — with no revalidateTag() / unstable_cache calls anywhere
+// in AID, the default in-memory tag cache is dead code (per-isolate, useless
+// for invalidation) and emits dev-mode warnings. The dummy adapter is a no-op
+// that documents intent. (`dangerous.disableTagCache` lives on the underlying
+// AWS config, not on CloudflareOverrides — `tagCache: 'dummy'` is the
+// type-safe equivalent at this API level.)
 //
 // No R2/D1/DO bindings required → $5/mo Workers paid plan covers everything.
 export default defineCloudflareConfig({
   incrementalCache: staticAssetsIncrementalCache,
-  dangerous: { disableTagCache: true },
+  tagCache: 'dummy',
 });
