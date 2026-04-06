@@ -1,7 +1,11 @@
 import { ImageResponse } from 'next/og';
 import type { NextRequest } from 'next/server';
 
-export const runtime = 'edge';
+// Note: `export const runtime = 'edge'` is intentionally omitted.
+// On Cloudflare Workers the entire Worker runs at the edge — there is no
+// separate Node runtime to opt out of. OpenNext (opennextjs-cloudflare) cannot
+// bundle edge-runtime-flagged routes into a single Worker bundle; omitting the
+// flag lets it bundle the route normally while ImageResponse still works fine.
 
 export function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
