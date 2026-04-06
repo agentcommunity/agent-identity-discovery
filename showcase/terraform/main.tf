@@ -1,27 +1,22 @@
 terraform {
   required_version = ">= 1.3.0"
   required_providers {
-    vercel = {
-      source  = "vercel/vercel"
-      version = "~> 1.4"
+    cloudflare = {
+      source  = "cloudflare/cloudflare"
+      version = "~> 4.0"
     }
   }
 }
 
-# Provider config expects `VERCEL_API_TOKEN` env var supplied via GitHub Actions secret
-provider "vercel" {}
+# Provider config expects `CLOUDFLARE_API_TOKEN` env var supplied via GitHub Actions secret
+provider "cloudflare" {}
 
 ########################
 # Variables
 ########################
 
-variable "zone" {
-  description = "The apex domain managed by Vercel (agentcommunity.org)"
-  type        = string
-}
-
-variable "team_id" {
-  description = "Vercel team ID"
+variable "cloudflare_zone_id" {
+  description = "Cloudflare zone ID for the apex domain (agentcommunity.org). Get this from the Cloudflare dashboard → zone overview after adding the zone."
   type        = string
 }
 
@@ -71,17 +66,16 @@ locals {
 }
 
 # Iterate and create DNS TXT records
-resource "vercel_dns_record" "showcase" {
+resource "cloudflare_record" "showcase" {
   for_each = local.records
 
-  # The 'domain' is our main apex domain
-  domain = var.zone
+  # Cloudflare zone ID (not the apex domain string — CF uses zone IDs)
+  zone_id = var.cloudflare_zone_id
 
-  # The 'name' is the subdomain part
+  # The 'name' is the subdomain part (e.g. _agent.simple)
   name = each.value.name
 
-  type    = "TXT"
-  value   = each.value.value
-  ttl     = var.record_ttl
-  team_id = var.team_id
-} 
+  type  = "TXT"
+  value = each.value.value
+  ttl   = var.record_ttl
+}
