@@ -5,13 +5,20 @@ import staticAssetsIncrementalCache from '@opennextjs/cloudflare/overrides/incre
 // Every page is either fully SSG (docs, landing, workbench) or a dynamic route
 // handler (api/version, api/og/docs, api/pka-demo, etc.).
 //
-// staticAssetsIncrementalCache copies SSG'd HTML into .open-next/assets at
-// build time and reads it from the ASSETS binding at request time, so the
-// Worker never re-renders pages that were already prerendered on Node. This is
-// critical because re-rendering MDX docs at request time hits libraries that
-// use `eval()` (disallowed on the Workers runtime).
+// staticAssetsIncrementalCache copies SSG'd HTML into
+// .open-next/assets/cdn-cgi/_next_cache/ at deploy time (via the populateCache
+// step that deploy:cf auto-runs) and reads it from the ASSETS binding at
+// request time, so the Worker never re-renders pages that were already
+// prerendered on Node. This is critical because re-rendering MDX docs at
+// request time hits libraries that use `eval()` (disallowed on the Workers
+// runtime).
+//
+// disableTagCache: with no revalidateTag() / unstable_cache calls anywhere in
+// AID, the default in-memory tag cache is dead code (per-isolate, useless for
+// invalidation) and emits dev-mode warnings. Disabling it documents intent.
 //
 // No R2/D1/DO bindings required → $5/mo Workers paid plan covers everything.
 export default defineCloudflareConfig({
   incrementalCache: staticAssetsIncrementalCache,
+  dangerous: { disableTagCache: true },
 });

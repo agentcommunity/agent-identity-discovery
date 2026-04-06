@@ -92,6 +92,15 @@ export function GET(request: NextRequest) {
         <div style={{ fontSize: '14px', fontWeight: 600, color: '#0196FF' }}>DNS for Agents</div>
       </div>
     </div>,
-    { width: 1200, height: 630 },
+    {
+      width: 1200,
+      height: 630,
+      headers: {
+        // OG images for the same query string are deterministic — cache hard
+        // at the edge, modestly in the browser. If the design ever changes,
+        // bump the route or add a version query param to bust.
+        'Cache-Control': 'public, max-age=86400, s-maxage=31536000',
+      },
+    },
   );
 }
