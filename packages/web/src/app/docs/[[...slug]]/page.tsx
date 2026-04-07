@@ -15,6 +15,12 @@ interface PageProps {
   params: Promise<{ slug?: string[] }>;
 }
 
+// Required for CF Workers: next-mdx-remote/rsc is marked as a Turbopack external
+// and fails at runtime on Workers with `Context.externalImport`. Forcing static-only
+// rendering means unknown slugs return a clean 404 instead of invoking the dynamic
+// renderer.
+export const dynamicParams = false;
+
 export function generateStaticParams() {
   const slugs = getAllDocRouteSlugs();
   return [
