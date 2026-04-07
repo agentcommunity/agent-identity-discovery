@@ -52,11 +52,11 @@ locals {
   protocol_specific_records = {
     mcp_simple = {
       name  = "${local.record_prefix}._mcp.simple"
-      value = "v=aid1;uri=https://api.example.com/mcp;p=mcp;desc=Example via protocol-specific subdomain (optional)"
+      value = "v=aid1;u=https://api.example.com/mcp;p=mcp;s=Example via protocol-specific subdomain (optional)"
     }
     a2a_gateway = {
       name  = "${local.record_prefix}._a2a.gateway"
-      value = "v=aid1;uri=https://a2a.example.com/ping;p=a2a;desc=A2A gateway (optional)"
+      value = "v=aid1;u=https://a2a.example.com/ping;p=a2a;s=A2A gateway (optional)"
     }
   }
 

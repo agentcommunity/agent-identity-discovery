@@ -114,7 +114,7 @@ examples:
 
     grpc_showcase:
       domain: 'grpc.agentcommunity.org'
-      record: 'v=aid1;u=grpc://grpc.agentcommunity.org:443;p=grpc;d=https://grpc.io/;s=gRPC Agent Showcase'
+      record: 'v=aid1;u=https://grpc.agentcommunity.org;p=grpc;d=https://grpc.io/;s=gRPC Agent Showcase'
       icon: '⚡'
       description: 'gRPC protocol example'
       category: 'protocols'

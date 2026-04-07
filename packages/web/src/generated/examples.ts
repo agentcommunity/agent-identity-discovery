@@ -162,7 +162,7 @@ export const PROTOCOL_EXAMPLES: Example[] = [
     domain: 'grpc.agentcommunity.org',
     icon: '⚡',
     content:
-      'v=aid1;u=grpc://grpc.agentcommunity.org:443;p=grpc;d=https://grpc.io/;s=gRPC Agent Showcase',
+      'v=aid1;u=https://grpc.agentcommunity.org;p=grpc;d=https://grpc.io/;s=gRPC Agent Showcase',
     category: 'protocols',
   },
 ];

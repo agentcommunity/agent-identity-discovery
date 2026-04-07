@@ -41,7 +41,7 @@ locals {
 
   grpc_showcase = {
     name  = "_agent.grpc"
-    value = "v=aid1;u=grpc://grpc.agentcommunity.org:443;p=grpc;d=https://grpc.io/;s=gRPC Agent Showcase"
+    value = "v=aid1;u=https://grpc.agentcommunity.org;p=grpc;d=https://grpc.io/;s=gRPC Agent Showcase"
   }
 
   local_docker = {
