@@ -4,8 +4,7 @@ Nearest-agent instructions for files under `tracking/iana/`.
 
 ## Scope
 
-This directory contains IANA and Internet-Draft working material for AID.
-Use the root `AGENTS.md` plus the rules below.
+This directory contains IANA evidence and operational material for AID. The Internet-Draft XML source no longer lives here — it moved to a dedicated repository at [`agentcommunity/draft-nemethi-aid-agent-identity-discovery`](https://github.com/agentcommunity/draft-nemethi-aid-agent-identity-discovery). See `DRAFT_REPO.md` for the pointer. Edits to the draft should happen in that repo, not this directory. Use the root `AGENTS.md` plus the rules below.
 
 ## Canonical sources
 
@@ -18,7 +17,9 @@ Use the root `AGENTS.md` plus the rules below.
 Do not invent protocol fields, registry entries, or security behavior in `tracking/iana/`.
 Pull them from the sources above.
 
-## Internet-Draft XML rules
+## Internet-Draft XML rules (for the separate draft repo)
+
+These rules apply to the XML source in the separate [`agentcommunity/draft-nemethi-aid-agent-identity-discovery`](https://github.com/agentcommunity/draft-nemethi-aid-agent-identity-discovery) repo, not to this directory.
 
 - Use current RFCXML v3, not legacy v2.
 - Follow the current IETF template model with `version="3"` and `xml:lang="en"`.
@@ -32,23 +33,7 @@ Pull them from the sources above.
 
 ## Validation workflow
 
-Preferred validation order:
-
-1. XML well-formedness
-2. `xml2rfc` local render
-3. IETF Author Tools or Datatracker validation
-
-Useful local command:
-
-```bash
-xml2rfc --cache .tmp-xml2rfc-cache --text tracking/iana/draft-nemethi-aid-agent-identity-discovery-00.xml
-```
-
-## Environment hygiene
-
-- Do not add global Python tooling requirements to the repo root for I-D work.
-- If `xml2rfc` is unavailable, prefer a temporary workspace-local virtualenv and delete it after validation.
-- Do not modify SDK or root packaging files just to validate the draft.
+Validation and `xml2rfc` rendering happens in the draft repo's CI pipeline (`martinthomson/i-d-template` toolchain). Do not attempt to validate a copy of the XML from this monorepo — there is no copy to validate. If you need to check rendering, clone the draft repo and run `make` there.
 
 ## Content style
 

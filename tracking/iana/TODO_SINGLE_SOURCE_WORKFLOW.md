@@ -4,12 +4,14 @@
 
 Not for today. This is a future cleanup task for the next agent or maintainer.
 
+**Update 2026-04-07:** The Internet-Draft XML has since moved out of this monorepo and into a dedicated repository at [`agentcommunity/draft-nemethi-aid-agent-identity-discovery`](https://github.com/agentcommunity/draft-nemethi-aid-agent-identity-discovery). The two-place drift problem described below still applies — the paths are just different now.
+
 ## Problem
 
 Right now the normative AID content exists in two hand-maintained forms:
 
-- `packages/docs/specification.md`
-- `tracking/iana/draft-nemethi-aid-agent-identity-discovery-00.xml`
+- `packages/docs/specification.md` (this repo)
+- `draft-nemethi-aid-agent-identity-discovery.xml` (in the separate draft repo)
 
 Even when both are aligned, this is brittle. Normative drift can happen easily.
 
@@ -80,9 +82,9 @@ The next agent tackling this should produce:
 
 - one canonical source
 - one reproducible generation command
-- generated `tracking/iana/draft-nemethi-aid-agent-identity-discovery-00.xml`
-- generated review outputs (`txt` and optionally `html`)
-- updated instructions in `tracking/iana/AGENTS.md`
+- generated XML committed to the draft repo (`agentcommunity/draft-nemethi-aid-agent-identity-discovery`)
+- generated review outputs (`txt` and optionally `html`) via that repo's CI pipeline
+- updated instructions in `tracking/iana/AGENTS.md` and the draft repo's AGENTS.md (if any)
 
 ## Success criterion
 
