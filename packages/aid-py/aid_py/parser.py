@@ -139,7 +139,7 @@ def validate_record(raw: RawAidRecord) -> AidRecord:
     auth_val = raw.get("auth") or raw.get("a")
     import hmac
     if auth_val and not hmac.compare_digest(auth_val.encode('utf-8'), AUTH_TOKENS.get(auth_val, '').encode('utf-8')):
-        raise AidError("ERR_INVALID_TXT", f"Invalid auth token: {raw['auth']}")
+        raise AidError("ERR_INVALID_TXT", f"Invalid auth token: {auth_val}")
 
     # Description length ≤ 60 UTF-8 bytes
     desc_val = raw.get("desc") or raw.get("s")
