@@ -14,8 +14,14 @@
     "node": ">=20.10"
   },
   "scripts": {
-    "dev": "next dev --webpack",
-    "build": "next build --webpack",
+    "gen:content": "tsx scripts/generate-version.ts && tsx scripts/generate-docs-index.ts",
+    "dev": "pnpm gen:content && next dev --webpack",
+    "build": "pnpm gen:content && next build --webpack",
+    "build:cf:deps": "pnpm -w exec turbo run build --filter='@agentcommunity/aid-web^...'",
+    "build:cf": "pnpm build:cf:deps && pnpm gen:content && opennextjs-cloudflare build",
+    "deploy:cf": "pnpm build:cf:deps && opennextjs-cloudflare deploy",
+    "upload:cf": "pnpm build:cf:deps && opennextjs-cloudflare upload",
+    "preview:cf": "pnpm build:cf:deps && opennextjs-cloudflare preview",
     "start": "next start",
     "lint": "pnpm -w exec eslint --max-warnings 0 packages/web/src packages/web/next.config.js packages/web/postcss.config.js packages/web/tailwind.config.js packages/web/vitest.config.ts",
     "type-check": "tsc --noEmit",
@@ -68,6 +74,7 @@
     "ws": "^8.16.0"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "^1.18.0",
     "@types/node": "^24.10.11",
     "@types/react": "^19.2.13",
     "@types/react-dom": "^19.2.3",
@@ -78,7 +85,9 @@
     "jsdom": "^26.1.0",
     "postcss": "^8.4.38",
     "tailwindcss-animate": "^1.0.7",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "wrangler": "^4.80.0"
   }
 }

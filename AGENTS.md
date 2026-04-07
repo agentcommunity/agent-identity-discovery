@@ -9,6 +9,7 @@ Single source of truth for humans and coding agents. Subprojects can override wi
 - Spec source of truth: `protocol/constants.yml`
 - Normative docs: `packages/docs/specification.md`
 - Workbench architecture: `packages/web/WORKBENCH_COMPONENTS.md`
+- **Web deployment:** Cloudflare Workers via `@opennextjs/cloudflare`. Worker `agentcommunity-aid` on Taqanu account. Deploy: `pnpm deploy:cf` from `main`. Showcase `_agent.*` records via Terraform in `showcase/terraform/`. Full context: `docs/admin/CLOUDFLARE-MIGRATION.md` in the `agentcommunity_page` repo.
 
 ## Repo structure
 

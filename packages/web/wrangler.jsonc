@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "agentcommunity-aid",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-03-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "account_id": "9a551fc3ff2c0e9ac70baa42a0138896",
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  // Workers Observability — enables logs/metrics in CF Dashboard.
+  "observability": {
+    "enabled": true
+  }
+  // Taqanu account (same as main agentcommunity.org site).
+  // No R2/D1/DO bindings — AID has no ISR, no persistent cache needs.
+}

@@ -1,7 +1,11 @@
 import { ImageResponse } from 'next/og';
 import type { NextRequest } from 'next/server';
 
-export const runtime = 'edge';
+// Note: `export const runtime = 'edge'` is intentionally omitted.
+// On Cloudflare Workers the entire Worker runs at the edge — there is no
+// separate Node runtime to opt out of. OpenNext (opennextjs-cloudflare) cannot
+// bundle edge-runtime-flagged routes into a single Worker bundle; omitting the
+// flag lets it bundle the route normally while ImageResponse still works fine.
 
 export function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -83,11 +87,20 @@ export function GET(request: NextRequest) {
         }}
       >
         <div style={{ fontSize: '18px', color: '#555' }}>
-          aid.agentcommunity.org/docs{slug ? `/${slug}` : ''}
+          {`aid.agentcommunity.org/docs${slug ? `/${slug}` : ''}`}
         </div>
         <div style={{ fontSize: '14px', fontWeight: 600, color: '#0196FF' }}>DNS for Agents</div>
       </div>
     </div>,
-    { width: 1200, height: 630 },
+    {
+      width: 1200,
+      height: 630,
+      headers: {
+        // OG images for the same query string are deterministic — cache hard
+        // at the edge, modestly in the browser. If the design ever changes,
+        // bump the route or add a version query param to bust.
+        'Cache-Control': 'public, max-age=86400, s-maxage=31536000',
+      },
+    },
   );
 }
