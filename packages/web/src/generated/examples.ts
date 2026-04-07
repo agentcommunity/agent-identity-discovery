@@ -70,12 +70,12 @@ export const TUTORIAL_EXAMPLES: Example[] = [
 
 export const REFERENCE_EXAMPLES: Example[] = [
   {
-    title: 'Complete V1 1',
-    label: 'Complete V1 1',
+    title: 'Complete V1 2',
+    label: 'Complete V1 2',
     domain: 'complete.agentcommunity.org',
     icon: '✨',
     content:
-      'v=aid1;p=mcp;u=https://api.complete.agentcommunity.org/mcp;d=https://docs.agentcommunity.org/complete;e=2026-12-31T23:59:59Z;s=Complete v1.1 with all features',
+      'v=aid1;p=mcp;u=https://api.complete.agentcommunity.org/mcp;d=https://docs.agentcommunity.org/complete;e=2026-12-31T23:59:59Z;s=Complete v1.2 with all features',
     category: 'reference',
   },
   {

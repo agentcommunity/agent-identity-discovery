@@ -45,11 +45,11 @@ examples:
 
   # Feature complete & Reference examples
   reference:
-    complete_v1_1:
+    complete_v1_2:
       domain: 'complete.agentcommunity.org'
-      record: 'v=aid1;p=mcp;u=https://api.complete.agentcommunity.org/mcp;d=https://docs.agentcommunity.org/complete;e=2026-12-31T23:59:59Z;s=Complete v1.1 with all features'
+      record: 'v=aid1;p=mcp;u=https://api.complete.agentcommunity.org/mcp;d=https://docs.agentcommunity.org/complete;e=2026-12-31T23:59:59Z;s=Complete v1.2 with all features'
       icon: '✨'
-      description: 'Complete v1.1 example with all features'
+      description: 'Complete v1.2 example with all features'
       category: 'reference'
 
     secure:

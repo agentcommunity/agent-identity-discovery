@@ -19,9 +19,9 @@ locals {
     value = "v=aid1;u=https://ai.auth0.com/mcp;p=mcp;a=pat;d=https://auth0.com/docs/get-started/auth0-mcp-server;s=Auth0 MCP (Mock Service)"
   }
 
-  complete_v1_1 = {
+  complete_v1_2 = {
     name  = "_agent.complete"
-    value = "v=aid1;p=mcp;u=https://api.complete.agentcommunity.org/mcp;d=https://docs.agentcommunity.org/complete;e=2026-12-31T23:59:59Z;s=Complete v1.1 with all features"
+    value = "v=aid1;p=mcp;u=https://api.complete.agentcommunity.org/mcp;d=https://docs.agentcommunity.org/complete;e=2026-12-31T23:59:59Z;s=Complete v1.2 with all features"
   }
 
   deprecated = {
@@ -98,7 +98,7 @@ locals {
   all_examples = {
     a2a_showcase = local.a2a_showcase
     auth0 = local.auth0
-    complete_v1_1 = local.complete_v1_1
+    complete_v1_2 = local.complete_v1_2
     deprecated = local.deprecated
     firecrawl = local.firecrawl
     graphql_showcase = local.graphql_showcase
