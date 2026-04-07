@@ -78,4 +78,12 @@ resource "cloudflare_record" "showcase" {
   type  = "TXT"
   value = each.value.value
   ttl   = var.record_ttl
+
+  # CI runs on ephemeral local state (no backend configured), so every apply
+  # sees all records as "new". Allow overwriting pre-existing records with the
+  # same name so the provider adopts and updates them instead of erroring with
+  # "expected DNS record to not already be present but already exists".
+  # Caveat: removing a record from examples.yml will orphan it in CF (no state
+  # → no destroy plan). Clean up orphans manually in the CF dashboard if needed.
+  allow_overwrite = true
 }
