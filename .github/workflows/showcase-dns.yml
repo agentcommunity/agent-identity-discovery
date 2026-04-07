@@ -35,6 +35,40 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: terraform init -backend-config=""
 
+      # Terraform state is ephemeral on every CI run (no remote backend), so the
+      # CF zone is the source of truth between runs. To make every push a clean
+      # reconciliation against examples.yml, delete every existing _agent.* TXT
+      # record before applying. Terraform then creates the full set fresh, in
+      # exactly the shape examples.yml describes. This eliminates duplicates,
+      # orphans, and content drift in one shot.
+      #
+      # Gated to push/manual: PR runs still do plan-only and never touch CF.
+      - name: Purge stale _agent.* TXT records
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+        run: |
+          set -euo pipefail
+          deleted=0
+          page=1
+          while :; do
+            resp=$(curl -fsS \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              "https://api.cloudflare.com/client/v4/zones/$CF_ZONE_ID/dns_records?type=TXT&per_page=100&page=$page")
+            ids=$(echo "$resp" | jq -r '.result[] | select(.name | startswith("_agent.")) | .id')
+            for id in $ids; do
+              curl -fsS -X DELETE \
+                -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+                "https://api.cloudflare.com/client/v4/zones/$CF_ZONE_ID/dns_records/$id" > /dev/null
+              deleted=$((deleted+1))
+            done
+            total=$(echo "$resp" | jq -r '.result_info.total_pages // 1')
+            [ "$page" -ge "$total" ] && break
+            page=$((page+1))
+          done
+          echo "purged $deleted _agent.* TXT record(s)"
+
       - name: Terraform Plan
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
