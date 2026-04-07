@@ -20,7 +20,6 @@ This `tracking/iana/` directory retains operational and evidence files for the I
 - `AID_DEVELOPMENT_TIMELINE.md` — protocol development history
 - `EVIDENCE_ANNEX.md` — reproducible evidence for reviewer questions
 - `TODO_SINGLE_SOURCE_WORKFLOW.md` — planned single-source workflow for spec and I-D generation
-- `draft-nemethi-aid-agent-identity-discovery-00.xml` — historical snapshot of the -00 draft, kept for archival reference only. The canonical source is the separate repo above.
 
 ## IANA status
 
