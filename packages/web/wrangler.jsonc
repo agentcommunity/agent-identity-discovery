@@ -8,6 +8,10 @@
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
+  },
+  // Workers Observability — enables logs/metrics in CF Dashboard.
+  "observability": {
+    "enabled": true
   }
   // Taqanu account (same as main agentcommunity.org site).
   // No R2/D1/DO bindings — AID has no ISR, no persistent cache needs.
