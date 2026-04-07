@@ -60,4 +60,18 @@ def test_is_valid_proto():
 def test_duplicate_keys():
     txt = "v=aid1;v=aid1;uri=https://api.example.com/mcp;proto=mcp"
     with pytest.raises(AidError, match="Duplicate key: v"):
-        parse(txt) 
+        parse(txt)
+
+
+@pytest.mark.parametrize("auth_field", ["auth", "a"])
+def test_invalid_auth_token_both_aliases(auth_field):
+    """Regression for #123: invalid auth passed via `a=` alias used to
+    raise a raw KeyError instead of AidError, because the error path
+    referenced raw['auth'] instead of the normalized value. Both the
+    long key and the short alias must produce the same structured
+    AidError with code ERR_INVALID_TXT."""
+    txt = f"v=aid1;uri=https://api.example.com/mcp;proto=mcp;{auth_field}=bad"
+    with pytest.raises(AidError) as exc_info:
+        parse(txt)
+    assert exc_info.value.error_code == "ERR_INVALID_TXT"
+    assert "Invalid auth token: bad" in str(exc_info.value)
