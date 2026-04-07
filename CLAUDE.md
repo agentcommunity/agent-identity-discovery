@@ -8,6 +8,8 @@ Agent Identity & Discovery (AID) is a DNS-based standard for discovering AI agen
 
 This is a PNPM + Turborepo monorepo with SDKs in 6 languages plus a Next.js web workbench and CLI tool.
 
+**Web app deployment** (`packages/web`, `aid.agentcommunity.org` + 4 protocol test sub-subdomains): Cloudflare Workers via `@opennextjs/cloudflare`. Worker `agentcommunity-aid` on Taqanu account. Deploy: `pnpm deploy:cf` from `main`. Showcase `_agent.*` TXT records managed by Terraform in `showcase/terraform/` (auto-applies on push to main via `.github/workflows/showcase-dns.yml`). Full context: `docs/admin/CLOUDFLARE-MIGRATION.md` in the `agentcommunity_page` repo.
+
 ## Common Commands
 
 ```bash
