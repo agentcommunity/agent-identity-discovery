@@ -24,6 +24,7 @@ pnpm add @agentcommunity/aid
 npm install @agentcommunity/aid
 # or
 yarn add @agentcommunity/aid
+# or: pnpm add agent-id
 ```
 
 ## Quick Start (Node.js)

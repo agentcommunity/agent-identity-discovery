@@ -9,8 +9,8 @@
     },
     {
       "path": "quickstart/index.md",
-      "bytes": 10770,
-      "sha256": "ac53eaa506c203b07a07341901160a67cfcd1e99ac3dd0490fd0e5f70c44e701"
+      "bytes": 11037,
+      "sha256": "c4e21afd9a81d1066848299f1825e5b4525c56628462a282318a0993b023af5b"
     },
     {
       "path": "quickstart/quickstart_a2a.md",
@@ -19,8 +19,8 @@
     },
     {
       "path": "quickstart/quickstart_browser.md",
-      "bytes": 1105,
-      "sha256": "35389c75632e75c0c02baa56eca69cd45c2c29e0163034c32830ed4308a06ecf"
+      "bytes": 1129,
+      "sha256": "4a0edde108a8716962fad51402a748b932a2b5e816a68e55675ce981cf672a76"
     },
     {
       "path": "quickstart/quickstart_dotnet.md",
@@ -59,8 +59,8 @@
     },
     {
       "path": "quickstart/quickstart_ts.md",
-      "bytes": 1974,
-      "sha256": "1f36521058e38836188380584af8a305e14d90bb0dbcc6c8b94ddc9ad8372c09"
+      "bytes": 1998,
+      "sha256": "b248b3e9f7035b5c0be038f6f71e85166a2f1ec089040fe5d69ccb939c1f020f"
     },
     {
       "path": "Reference/discovery_api.md",
@@ -143,5 +143,5 @@
       "sha256": "985c0214d91997524c53b078da3a8b87599709ee71c1d39b0cfa96764bcbd117"
     }
   ],
-  "aggregateSha256": "7cbc5741c0feec973f7643b6eeb90c1a4429cad450601fd8109cd641939acb65"
+  "aggregateSha256": "29d3ee07bd0a88084ea86f64bbe27861687216a7173ba543e20def63da6b56db"
 }

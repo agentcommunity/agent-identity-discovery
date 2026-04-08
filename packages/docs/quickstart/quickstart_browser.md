@@ -12,6 +12,7 @@ Uses DNS-over-HTTPS under the hood.
 
 ```bash
 pnpm add @agentcommunity/aid
+# or: pnpm add agent-id
 ```
 
 ## Discover by Domain
