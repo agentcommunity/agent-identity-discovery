@@ -87,7 +87,7 @@ export interface PkaBlock {
 export interface DowngradeBlock {
   checked: boolean;
   previous: { pka: string | null; kid: string | null } | null;
-  status: 'no_change' | 'downgrade' | 'first_seen' | null;
+  status: 'no_change' | 'downgrade' | 'key_rotation' | 'first_seen' | null;
 }
 
 export interface DoctorReport {

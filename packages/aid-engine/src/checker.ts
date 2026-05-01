@@ -230,17 +230,14 @@ export async function runCheck(domain: string, opts: CheckOptions): Promise<Doct
             code: 'DOWNGRADE',
             message: ERROR_MESSAGES.DOWNGRADE_DETECTED,
           });
-        } else if (prev.pka && nowPka && prev.pka !== nowPka) {
-          report.downgrade.status = 'downgrade';
+        } else if (
+          (prev.pka && nowPka && prev.pka !== nowPka) ||
+          (prev.kid && nowKid && prev.kid !== nowKid)
+        ) {
+          report.downgrade.status = 'key_rotation';
           report.record.warnings.push({
-            code: 'DOWNGRADE',
-            message: ERROR_MESSAGES.DOWNGRADE_DETECTED,
-          });
-        } else if (prev.kid && nowKid && prev.kid !== nowKid) {
-          report.downgrade.status = 'downgrade';
-          report.record.warnings.push({
-            code: 'DOWNGRADE',
-            message: ERROR_MESSAGES.DOWNGRADE_DETECTED,
+            code: 'KEY_ROTATION',
+            message: ERROR_MESSAGES.KEY_ROTATION_DETECTED,
           });
         } else {
           report.downgrade.status = 'no_change';

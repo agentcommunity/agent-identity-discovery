@@ -238,8 +238,8 @@ Policy semantics:
 - **DNSSEC `prefer`:** clients **SHOULD** continue when DNSSEC cannot be validated, but **SHOULD** surface a warning.
 - **DNSSEC `require`:** clients **MUST** fail with `ERR_SECURITY` when DNSSEC validation is unavailable or unsuccessful for the selected DNS answer.
 - **Well-known `disable`:** clients **MUST NOT** use `/.well-known/agent` fallback.
-- **Downgrade `warn`:** if a previously seen `pka` disappears or `pka`/`kid` changes, clients **SHOULD** surface a warning.
-- **Downgrade `fail`:** if a previously seen `pka` disappears or `pka`/`kid` changes, clients **MUST** fail with `ERR_SECURITY`.
+- **Downgrade `warn`:** if a previously seen `pka` disappears, clients **SHOULD** surface a warning. If `pka` is still present but `kid` has changed, clients **SHOULD** surface a key-rotation notice regardless of policy.
+- **Downgrade `fail`:** if a previously seen `pka` disappears, clients **MUST** fail with `ERR_SECURITY`. If `pka` is still present but `kid` has changed, clients **SHOULD** surface a key-rotation notice but **SHOULD NOT** fail, as key rotation is a normal operational event.
 
 If discovery succeeds only through `.well-known`, that result cannot satisfy `dnssec=require`.
 
@@ -382,6 +382,18 @@ function performPKAHandshake(uri, pka, kid):
 
 Providers MUST include `kid`/`i` with `pka`/`k`. Clients SHOULD warn on downgrade if a previously present `pka` is removed.
 
+### **D.1. Key Format Interoperability**
+
+An AID `pka` value encodes a raw Ed25519 public key (32 bytes) in multibase format. This key material **MUST** be convertible to the JSON Web Key (JWK) form defined in [RFC8037]:
+
+```json
+{ "kty": "OKP", "crv": "Ed25519", "x": "<base64url of 32 bytes>" }
+```
+
+The conversion is: decode the multibase `pka` value to obtain 32 raw bytes, then base64url-encode those bytes to produce the JWK `x` parameter. The JWK Thumbprint ([RFC7638]) is then computable as `base64url(SHA-256({"crv":"Ed25519","kty":"OKP","x":"<base64url>"}))` with keys in lexicographic order.
+
+This enables AID key material to interoperate with systems that use JWK for Ed25519 key publication, including HTTP Message Signatures ([RFC9421]) deployments. Future AID versions **MAY** adopt base64url encoding directly for alignment with JWK.
+
 ## **Appendix E: .well-known Fallback (Non-Normative)**
 
 AID is a DNS-based discovery protocol. The `.well-known` fallback described here is a non-normative convenience for environments where DNS TXT record creation is restricted (e.g., certain managed hosting platforms). It does not affect the `_agent` DNS registration or its scope under RFC 8552.
@@ -392,6 +404,14 @@ AID is a DNS-based discovery protocol. The `.well-known` fallback described here
 - Client algorithm: Use DNS first. Fallback only on `ERR_NO_RECORD` or `ERR_DNS_LOOKUP_FAILED`.
 - Errors: Use `ERR_FALLBACK_FAILED` when the fallback fails or is invalid.
 
+## **Appendix F: Composition with Workload Identity Frameworks (Non-Normative)**
+
+AID's PKA mechanism uses the same HTTP Message Signatures primitive ([RFC9421]) used by workload identity systems for request authentication. In cross-domain scenarios where such frameworks require a trust-domain bootstrap, an AID record at `_agent.<domain>` provides publicly discoverable, DNS-rooted first-hop resolution that maps a domain to an endpoint and optional endpoint-proof key.
+
+This positions AID beneath credential provisioning and authorization layers. Discovery mechanisms such as OAuth Authorization Server Metadata ([RFC8414]) and Protected Resource Metadata ([RFC9728]) answer "what can this URL do?" but assume the client already possesses the URL. AID answers the prior question: "given a domain, what is the URL?"
+
+Implementations that bridge AID with workload identity systems **SHOULD** use the JWK interoperability defined in Appendix D.1 to align key material across layers.
+
 ## **References**
 
 - [RFC1035] Domain Names - Implementation and Specification
@@ -400,10 +420,14 @@ AID is a DNS-based discovery protocol. The `.well-known` fallback described here
 - [RFC5890] Internationalized Domain Names for Applications (IDNA)
 - [RFC6125] Representation and Verification of Domain-Based Application Service Identity (TLS)
 - [RFC6335] Service Name and Transport Protocol Port Number Registry
+- [RFC7638] JSON Web Key (JWK) Thumbprint
+- [RFC8037] CFRG Elliptic Curves for JSON Object Signing and Encryption (JOSE)
 - [RFC8174] Ambiguity of Uppercase vs Lowercase in RFC 2119 Key Words
+- [RFC8414] OAuth 2.0 Authorization Server Metadata
 - [RFC8552] Scoped Interpretation of DNS Resource Records through "Underscored" Naming of Attribute Leaves
 - [RFC9421] HTTP Message Signatures
 - [RFC9460] Service Binding and Parameter Specification (SVCB/HTTPS)
+- [RFC9728] OAuth 2.0 Protected Resource Metadata
 
 ---
 
