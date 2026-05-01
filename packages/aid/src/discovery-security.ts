@@ -189,29 +189,28 @@ export function enforceDowngradePolicy(
   const currentPka = record.pka ?? null;
   const currentKid = record.kid ?? null;
 
-  let reason: string | null = null;
-  if (previousPka && !currentPka) {
-    reason = 'previously present pka was removed';
-  } else if (previousPka && currentPka && previousPka !== currentPka) {
-    reason = 'pka value changed';
-  } else if (previousKid && currentKid && previousKid !== currentKid) {
-    reason = 'kid value changed';
-  }
+  const isRemoval = Boolean(previousPka && !currentPka);
+  const isKeyChange =
+    Boolean(previousPka && currentPka && previousPka !== currentPka) ||
+    Boolean(previousKid && currentKid && previousKid !== currentKid);
 
-  if (!reason) {
+  if (!isRemoval && !isKeyChange) {
     return;
   }
+
+  const reason = isRemoval
+    ? 'previously present pka was removed'
+    : 'pka/kid value changed (key rotation)';
 
   security.downgrade.detected = true;
   security.downgrade.reason = reason;
 
-  const message = `Security downgrade detected for ${queryName}: ${reason}`;
-  if (policy.downgradePolicy === 'fail') {
-    throw new AidError('ERR_SECURITY', message);
+  if (isRemoval && policy.downgradePolicy === 'fail') {
+    throw new AidError('ERR_SECURITY', `Security downgrade detected for ${queryName}: ${reason}`);
   }
   addSecurityWarning(security, {
     code: 'DOWNGRADE_DETECTED',
-    message,
+    message: `Security downgrade detected for ${queryName}: ${reason}`,
   });
 }
 

@@ -41,8 +41,8 @@ export const ERROR_MESSAGES = {
   PKA_NOT_PRESENT: 'Endpoint proof (PKA) not present. Consider adding for security.',
   LONG_KEY_COMPAT:
     'Long TXT keys are compatibility-only in v1.x. Publish short keys (v,u,p,a,s,d,e,k,i) as the canonical wire format.',
-  DOWNGRADE_DETECTED:
-    'Security downgrade detected: a previously present PKA or KID has been removed.',
+  DOWNGRADE_DETECTED: 'Security downgrade detected: a previously present PKA has been removed.',
+  KEY_ROTATION_DETECTED: 'Key rotation detected: PKA or KID value has changed.',
 
   // Recommendations
   ENABLE_DNSSEC: 'Enable DNSSEC at your domain registrar to improve DNS integrity.',
