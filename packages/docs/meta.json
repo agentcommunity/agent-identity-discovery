@@ -1,5 +1,5 @@
 {
-  "pages": ["index", "specification"],
+  "pages": ["index", "specification", "specification_v2_explained"],
   "groups": [
     { "slug": "Understand", "title": "Understand" },
     { "slug": "quickstart", "title": "Quick Start" },
