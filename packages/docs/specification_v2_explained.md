@@ -85,6 +85,24 @@ AID v2 keeps the v1 design goals and sharpens the boundary.
 
 > **Explainer:** v2 is not trying to make AID a full identity stack. It makes AID a cleaner first-contact anchor that other identity and authorization systems can safely build on.
 
+### 1.1 Discovery Scope (Use Cases) — Idea, Not Yet Spec
+
+> **Note: this section is exploratory, not normative.** It captures a framing we want to keep thinking about before any of it becomes spec text. The use-case scope decisions, the case-2 design space, and how AID should reference adjacent work are all open.
+
+The agent-discovery problem space appears to contain at least three generic use cases, in increasing computational and latency cost:
+
+1. **Known organization and known agent.** The requestor knows both the domain and the specific agent it wants to reach.
+2. **Known organization, unknown agent.** The requestor knows the domain but needs to find which agents that organization publishes.
+3. **Known capability, unknown organization or agent.** The requestor knows what it needs done but has no specific organization in mind.
+
+AID v2 addresses **use case 1 directly**. Given `_agent.<exact-host>`, a client resolves to one endpoint, one protocol, and an optional endpoint-proof key.
+
+**Use case 2 is an open design space.** Several patterns are conceivable — additional DNS labels, off-DNS organization indexes, or relying on protocol-layer mechanisms once first contact is made — and the choice between them deserves its own treatment rather than being bundled into the v2 PKA cleanup. Capability descriptors themselves remain a protocol-layer concern: MCP, A2A, and OpenAPI already define how an agent advertises its tools and resources, and AID does not duplicate or hash that surface in DNS.
+
+**Use case 3 is out of scope for AID.** Capability-only discovery requires an indexing or search service that aggregates across organizations. The architectural assumption is that such services operate on top of AID and other discovery primitives, not within them.
+
+> **Explainer:** Naming the layers explicitly helps position AID as the bottom of the stack: a small, stable, DNS-rooted anchor that other systems can compose above. AID does not aim to be the registry, the directory, the capability index, or the trust framework — it aims to be the thing all of those can begin from. How AID relates to other proposals in this space is being worked out separately and is not addressed here.
+
 ---
 
 ## 2. TXT Record Specification
