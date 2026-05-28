@@ -35,9 +35,14 @@ pnpm vitest run -t "<test name>"                    # TS (from package dir)
 # Constants generation (after editing protocol/constants.yml)
 pnpm gen                      # Regenerates constants for all languages
 
+# Docs export manifest (required after editing packages/docs/**)
+pnpm docs:verify              # Runs docs:check + docs:export, fails if manifest changed
+
 # CLI tool
 pnpm -C packages/aid-doctor build && node packages/aid-doctor/dist/cli.js check <domain>
 ```
+
+**Docs export manifest:** Any edit to a file under `packages/docs/**` shifts its byte count and sha256, which changes the aggregate hash in `packages/docs/export-manifest.json` and `packages/docs/export-manifest.sha256`. The `CI (Docs Authority)` check enforces these stay in sync. Always run `pnpm docs:verify` (or `pnpm docs:check && pnpm docs:export`) after editing any docs markdown file and commit the regenerated manifest files alongside the doc change. This applies to `specification.md`, the explainer draft, anything under `Understand/`, `Reference/`, `Tooling/`, `quickstart/` — every markdown file under `packages/docs/`.
 
 ## Architecture
 
@@ -82,6 +87,7 @@ pnpm -C packages/aid-doctor build && node packages/aid-doctor/dist/cli.js check 
 - Conventional commits: `feat(aid):`, `fix(web):`, `chore(ci):`
 - Add a Changeset for user-visible changes: `pnpm changeset`
 - PR checklist: tests, `turbo run build test lint`, changeset, docs update, `tracking/PHASE_X.md` update
+- **If the PR touches any file under `packages/docs/**`:** run `pnpm docs:verify` and commit the resulting `packages/docs/export-manifest.json` and `packages/docs/export-manifest.sha256` in the same PR, or `CI (Docs Authority)` will fail.
 
 ## Project Tracking
 
