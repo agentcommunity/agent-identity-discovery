@@ -104,8 +104,8 @@
     },
     {
       "path": "specification_v2_explained.md",
-      "bytes": 29878,
-      "sha256": "81aa8284d390f0e32bb7e03e7ebb56a655f3c95a3376a0a7a9b2a0bf9e8f68f0"
+      "bytes": 32090,
+      "sha256": "06b20bb12addf0318a2c61428cc0800dac14a168eb92d323002d6ce916610c1b"
     },
     {
       "path": "specification.md",
@@ -148,5 +148,5 @@
       "sha256": "985c0214d91997524c53b078da3a8b87599709ee71c1d39b0cfa96764bcbd117"
     }
   ],
-  "aggregateSha256": "9d709917c81a8296351c5ff8b07f7a383f01f451756942a2c9ab69842aa9fa94"
+  "aggregateSha256": "6f440eeddabb317a305fa5bd41061ce45c2ca95187c41d52ed71826a4bb0e99f"
 }
