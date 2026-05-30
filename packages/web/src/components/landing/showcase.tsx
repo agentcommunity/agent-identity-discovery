@@ -126,10 +126,10 @@ export function Toolkit() {
         <div className="mx-auto max-w-6xl">
           <Reveal direction="up" className="mb-12 text-center">
             <h2 className="mb-4 text-4xl md:text-5xl font-bold tracking-tight">
-              Complete Developer Toolkit
+              Developer Toolkit
             </h2>
             <p className="text-xl md:text-2xl leading-relaxed text-muted-foreground">
-              Everything you need to build AID-powered applications
+              SDKs in six languages, a CLI, a conformance suite, and a browser workbench.
             </p>
           </Reveal>
 

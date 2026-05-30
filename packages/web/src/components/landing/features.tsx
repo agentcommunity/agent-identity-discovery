@@ -8,7 +8,7 @@ const problems = [
   {
     icon: AlertTriangle,
     title: 'Manual Integration Hell',
-    description: 'Each agent needs bespoke code, doc digging and manual config.',
+    description: 'Every new system means bespoke code, doc digging, and manual config.',
     iconColor: 'text-red-500',
     iconBg: 'bg-red-50 dark:bg-red-950/30',
   },
@@ -29,7 +29,7 @@ const problems = [
   {
     icon: Settings,
     title: 'No Discovery & Identity Standard',
-    description: 'No universal way to discover agents and verify who runs them.',
+    description: 'No universal way to find an endpoint and verify who runs it.',
     iconColor: 'text-rose-500',
     iconBg: 'bg-rose-50 dark:bg-rose-950/30',
   },
@@ -42,10 +42,10 @@ export function Problem() {
         <div className="mx-auto max-w-6xl">
           <Reveal direction="up" className="mb-12 text-center">
             <h2 className="mb-4 text-4xl md:text-5xl font-bold tracking-tight">
-              The Agent/Tooling Integration Problem
+              The Integration Problem
             </h2>
             <p className="text-xl md:text-2xl leading-relaxed text-muted-foreground">
-              Connecting to AI agents shouldn&apos;t require a PhD in API archaeology
+              An agent reaching a new system shouldn&apos;t need a PhD in API archaeology
             </p>
           </Reveal>
 

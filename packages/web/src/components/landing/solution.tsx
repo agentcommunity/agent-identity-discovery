@@ -33,7 +33,7 @@ const solutions: Array<{
     icon: Zap,
     title: 'Instant Discovery',
     description:
-      'Any tool can find your agent by looking up the _agent subdomain. Falls back to .well-known/agent when DNS is restricted.',
+      'Any client resolves the _agent subdomain to your endpoint. Falls back to .well-known/agent when DNS is restricted.',
     iconColor: 'text-amber-600',
     iconBg: 'bg-amber-50 dark:bg-amber-950/30',
     links: [
@@ -90,10 +90,10 @@ export function Solution() {
         <div className="mx-auto max-w-6xl">
           <Reveal direction="up" className="mb-12 text-center">
             <h2 className="mb-4 text-4xl md:text-5xl font-bold tracking-tight">
-              How <span className="text-gradient">Agent Discovery</span> Solves This
+              How <span className="text-gradient">AID</span> Solves It
             </h2>
             <p className="text-xl md:text-2xl leading-relaxed text-muted-foreground">
-              Four core principles that eliminate integration complexity
+              One DNS record. Discovery, protocol, and endpoint proof.
             </p>
           </Reveal>
 

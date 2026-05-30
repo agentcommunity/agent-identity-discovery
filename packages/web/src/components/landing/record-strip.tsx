@@ -76,7 +76,8 @@ export function RecordStrip() {
         <div className="mx-auto max-w-4xl text-center">
           <p className="text-base md:text-lg text-muted-foreground">
             One <code className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono">_agent</code> TXT
-            record for instant discovery and agent identity you can verify.
+            record. An agent looks up a domain and learns where to connect, what protocol to speak,
+            and how to check the endpoint is real.
           </p>
 
           <div className="mt-4 flex flex-col items-center gap-2">

@@ -32,9 +32,9 @@ export function Identity() {
                   How it works
                 </CardTitle>
                 <CardDescription>
-                  PKA adds a public key (`k`) and a key id (`i`) to your `_agent` TXT record.
-                  Clients send a small challenge and verify an HTTP signature from your server using
-                  that key.
+                  PKA adds a public key (<code>k</code>) and a key id (<code>i</code>) to your{' '}
+                  <code>_agent</code> TXT record. Clients send a small challenge and verify an HTTP
+                  signature from your server using that key.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -48,10 +48,17 @@ export function Identity() {
                       ).
                     </p>
                     <ul className="space-y-2 list-disc pl-5">
-                      <li>Publish `k` (public key) and `i` (key id) in your TXT record</li>
-                      <li>Client sends an `AID-Challenge` to your `uri`</li>
+                      <li>
+                        Publish <code>k</code> (public key) and <code>i</code> (key id) in your TXT
+                        record
+                      </li>
+                      <li>
+                        Client sends an <code>AID-Challenge</code> to your <code>uri</code>
+                      </li>
                       <li>Server returns an HTTP signature (Ed25519) covering the request</li>
-                      <li>Client verifies the signature using `k`</li>
+                      <li>
+                        Client verifies the signature using <code>k</code>
+                      </li>
                     </ul>
                     <div>
                       <Button variant="outline" asChild>

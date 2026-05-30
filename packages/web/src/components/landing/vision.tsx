@@ -12,14 +12,14 @@ const visionFeatures = [
     iconColor: 'text-indigo-600',
     iconBg: 'bg-indigo-50 dark:bg-indigo-950/30',
     dotColor: 'bg-indigo-500',
-    title: 'Universal Agent Ecosystem',
+    title: 'A discovery layer agents can rely on',
     description:
-      'Imagine a world where every AI service is instantly discoverable. No more hunting through documentation, no more custom integration code. Just type a domain and connect to any agent, anywhere.',
+      'When an agent meets a domain it has never seen, it can find the endpoint, learn the protocol, and verify the endpoint before connecting. No documentation hunt, no bespoke integration code.',
     highlights: [
-      'Cross-platform interoperability',
-      'Automatic capability discovery',
-      'Zero-config networking',
-      'Verifiable agent identity (PKA)',
+      'Works in public or private DNS',
+      'Endpoint proof with Ed25519 (PKA)',
+      'Composes upward to OAuth and MCP',
+      'Zero config for the client',
     ],
   },
   {
@@ -45,11 +45,9 @@ export function Vision() {
       <div className="container mx-auto container-padding">
         <div className="mx-auto max-w-6xl">
           <Reveal direction="up" className="mb-12 text-center">
-            <h2 className="mb-4 text-4xl md:text-5xl font-bold tracking-tight">
-              The Future of AI Integration
-            </h2>
+            <h2 className="mb-4 text-4xl md:text-5xl font-bold tracking-tight">Where AID Fits</h2>
             <p className="text-xl md:text-2xl leading-relaxed text-muted-foreground">
-              Building the infrastructure for the next generation of AI applications
+              A small, boring discovery layer that other systems build on.
             </p>
           </Reveal>
 
