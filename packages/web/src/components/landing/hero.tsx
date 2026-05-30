@@ -91,7 +91,7 @@ export function Hero() {
           </h1>
 
           <p className="mx-auto mb-4 max-w-4xl text-xl md:text-2xl leading-relaxed text-muted-foreground animate-fade-in-up">
-            DNS for agents. Discover endpoints and verify identity.
+            DKIM for Agents.
           </p>
 
           {/* cycling domain */}
