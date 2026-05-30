@@ -4,6 +4,7 @@ import { QuickStart } from '@/components/landing/quick-start';
 import { RecordStrip } from '@/components/landing/record-strip';
 import { Problem } from '@/components/landing/features';
 import { Solution } from '@/components/landing/solution';
+import { Directions } from '@/components/landing/directions';
 import { Toolkit } from '@/components/landing/showcase';
 import { Vision } from '@/components/landing/vision';
 import { Identity } from '@/components/landing/identity';
@@ -31,6 +32,7 @@ export default function Home() {
       <QuickStart />
       <Problem />
       <Solution />
+      <Directions />
       <Identity />
       <Toolkit />
       <Vision />
