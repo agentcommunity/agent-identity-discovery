@@ -3,12 +3,11 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Compass, Rocket, ShieldCheck } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { Codeblock } from '@/components/ui/codeblock';
+import { CodePanel } from './code-panel';
 import { Reveal } from './reveal';
+import { SectionHeader } from './section-header';
 
 // --- Code snippets identical to README / docs ------------------------------
 const DISCOVER_SNIPPETS: Record<string, string> = {
@@ -65,6 +64,12 @@ const TERRAFORM_SNIPPET = `resource "cloudflare_record" "aid" {
 const VALIDATE_SNIPPET = `# Validate your record from the CLI
 npx @agentcommunity/aid-doctor check example.com`;
 
+const PUBLISH_SNIPPETS: Record<'dns' | 'terraform' | 'dns+identity', string> = {
+  dns: DNS_SNIPPET,
+  terraform: TERRAFORM_SNIPPET,
+  'dns+identity': DNS_PKA_SNIPPET,
+};
+
 // ---------------------------------------------------------------------------
 
 export function QuickStart() {
@@ -82,22 +87,20 @@ export function QuickStart() {
     ];
 
   return (
-    <section className="section-padding bg-muted/30">
+    <section className="section-padding border-t border-border">
       <div className="container mx-auto container-padding">
         <div className="mx-auto max-w-4xl">
-          {/* Heading */}
-          <Reveal direction="up" className="mb-12 text-center">
-            <h2 className="mb-4 text-4xl md:text-5xl font-bold tracking-tight">Quick Start</h2>
-            <p className="text-xl md:text-2xl leading-relaxed text-muted-foreground">
-              Discover, publish and validate in minutes
-            </p>
-          </Reveal>
+          <SectionHeader
+            eyebrow="Quick start"
+            title="Discover, publish, validate"
+            lede="In minutes, from your language of choice or the CLI."
+          />
 
-          {/* Hero Card */}
-          <Card className="card-feature shadow-soft-lg hover:shadow-soft-xl transition-all duration-300">
-            <CardHeader className="pb-6">
-              {/* Step toggle group (iconic, theme-aligned) */}
-              <div className="flex justify-center gap-3">
+          {/* Console */}
+          <Reveal direction="up">
+            <div className="overflow-hidden rounded-lg border border-border">
+              {/* step tabs */}
+              <div className="flex gap-px border-b border-border bg-border">
                 {STEPS.map((item, idx) => {
                   const active = step === item.id;
                   const Icon: LucideIcon = item.Icon;
@@ -105,124 +108,119 @@ export function QuickStart() {
                     <button
                       key={item.id}
                       onClick={() => setStep(item.id)}
-                      className={`card-interactive px-4 py-3 rounded-xl transition-all duration-200 flex items-center gap-3 text-sm font-medium border border-border/50 shadow-soft-xs hover:shadow-soft-md ${
-                        active ? 'bg-primary/10 border-primary/30' : 'bg-card/50'
+                      aria-pressed={active}
+                      className={`flex flex-1 items-center justify-center gap-2 px-3 py-3 font-mono text-sm transition-colors duration-150 ${
+                        active
+                          ? 'bg-card font-medium text-foreground'
+                          : 'bg-muted/40 text-muted-foreground hover:bg-card/60'
                       }`}
                     >
-                      <div
-                        className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200 ${
-                          active ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'
-                        }`}
-                      >
-                        <Icon className="h-4 w-4" />
-                      </div>
-                      <div className="text-left">
-                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                          Step {idx + 1}
-                        </div>
-                        <div className={`leading-tight ${active ? 'text-foreground' : ''}`}>
-                          {item.label}
-                        </div>
-                      </div>
+                      <span className="text-muted-foreground/50">{`0${idx + 1}`}</span>
+                      <Icon className="hidden h-4 w-4 sm:block" />
+                      {item.label}
                     </button>
                   );
                 })}
               </div>
-            </CardHeader>
 
-            <CardContent>
               {step === 'discover' && (
-                <div className="space-y-4">
-                  <Codeblock
-                    title="discover"
-                    content={DISCOVER_SNIPPETS[lang]}
-                    rightSlot={
-                      <div className="flex gap-1 flex-wrap">
-                        {(['typescript', 'python', 'go', 'rust', 'java', 'dotnet'] as const).map(
-                          (l) => (
-                            <Button
-                              key={l}
-                              size="sm"
-                              variant={lang === l ? 'default' : 'outline'}
-                              className="capitalize text-xs"
-                              onClick={() => setLang(l)}
-                            >
-                              {l === 'dotnet' ? '.NET' : l}
-                            </Button>
-                          ),
-                        )}
-                      </div>
-                    }
-                  />
-                </div>
+                <CodePanel
+                  bordered={false}
+                  title="discover"
+                  content={DISCOVER_SNIPPETS[lang]}
+                  rightSlot={
+                    <div className="flex flex-wrap gap-2.5">
+                      {(['typescript', 'python', 'go', 'rust', 'java', 'dotnet'] as const).map(
+                        (l) => (
+                          <button
+                            key={l}
+                            onClick={() => setLang(l)}
+                            aria-pressed={lang === l}
+                            className={`font-mono text-xs capitalize transition-colors ${
+                              lang === l
+                                ? 'font-medium text-foreground'
+                                : 'text-muted-foreground/60 hover:text-foreground'
+                            }`}
+                          >
+                            {l === 'dotnet' ? '.NET' : l}
+                          </button>
+                        ),
+                      )}
+                    </div>
+                  }
+                />
               )}
 
               {step === 'publish' && (
-                <div className="space-y-4">
-                  <Codeblock
+                <>
+                  <CodePanel
+                    bordered={false}
                     title={publishTab}
-                    content={
-                      publishTab === 'dns'
-                        ? DNS_SNIPPET
-                        : (publishTab === 'terraform'
-                          ? TERRAFORM_SNIPPET
-                          : DNS_PKA_SNIPPET)
-                    }
+                    content={PUBLISH_SNIPPETS[publishTab]}
                     rightSlot={
-                      <div className="flex gap-1">
+                      <div className="flex gap-2.5">
                         {(['dns', 'terraform', 'dns+identity'] as const).map((t) => (
-                          <Button
+                          <button
                             key={t}
-                            size="sm"
-                            variant={publishTab === t ? 'default' : 'outline'}
-                            className="capitalize text-xs"
                             onClick={() => setPublishTab(t)}
+                            aria-pressed={publishTab === t}
+                            className={`font-mono text-xs transition-colors ${
+                              publishTab === t
+                                ? 'font-medium text-foreground'
+                                : 'text-muted-foreground/60 hover:text-foreground'
+                            }`}
                           >
                             {t}
-                          </Button>
+                          </button>
                         ))}
                       </div>
                     }
                   />
-                  <div className="flex flex-wrap gap-2 justify-center">
-                    <Button variant="ghost" asChild className="text-sm">
-                      <Link href="/docs/quickstart">Quick Start Guide</Link>
-                    </Button>
-                    <Button variant="ghost" asChild className="text-sm">
-                      <Link href="/docs/specification">Specification</Link>
-                    </Button>
-                    <Button variant="ghost" asChild className="text-sm">
-                      <Link href="/docs/Tooling/aid_doctor">aid-doctor CLI</Link>
-                    </Button>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-border bg-card px-4 py-3">
+                    {[
+                      { href: '/docs/quickstart', label: 'Quick Start Guide' },
+                      { href: '/docs/specification', label: 'Specification' },
+                      { href: '/docs/Tooling/aid_doctor', label: 'aid-doctor CLI' },
+                    ].map((l) => (
+                      <Link
+                        key={l.href}
+                        href={l.href}
+                        className="font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        {l.label}
+                      </Link>
+                    ))}
                   </div>
-                </div>
+                </>
               )}
 
               {step === 'validate' && (
-                <div className="space-y-4">
-                  <Codeblock title="terminal" content={VALIDATE_SNIPPET} />
-                  <div className="text-sm text-muted-foreground">
-                    Lint your record, verify DNS resolution, and test PKA identity — all from one
+                <>
+                  <CodePanel bordered={false} title="terminal" content={VALIDATE_SNIPPET} />
+                  <div className="border-t border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+                    Lint your record, verify DNS resolution, and test PKA identity, all from one
                     command.
                   </div>
-                  <div className="flex flex-wrap gap-2 justify-center">
-                    <Button variant="ghost" asChild className="text-sm">
-                      <Link href="/docs/Tooling/aid_doctor">aid-doctor CLI</Link>
-                    </Button>
-                    <Button variant="ghost" asChild className="text-sm">
-                      <Link href="/docs/Tooling/aid_engine">Engine Docs</Link>
-                    </Button>
-                    <Button variant="ghost" asChild className="text-sm">
-                      <Link href="/docs/Tooling/conformance">Conformance Suite</Link>
-                    </Button>
-                    <Button variant="ghost" asChild className="text-sm">
-                      <Link href="/docs/Reference/identity_pka">PKA Identity</Link>
-                    </Button>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-border bg-card px-4 py-3">
+                    {[
+                      { href: '/docs/Tooling/aid_doctor', label: 'aid-doctor CLI' },
+                      { href: '/docs/Tooling/aid_engine', label: 'Engine Docs' },
+                      { href: '/docs/Tooling/conformance', label: 'Conformance Suite' },
+                      { href: '/docs/Reference/identity_pka', label: 'PKA Identity' },
+                    ].map((l) => (
+                      <Link
+                        key={l.href}
+                        href={l.href}
+                        className="font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        {l.label}
+                      </Link>
+                    ))}
                   </div>
-                </div>
+                </>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </Reveal>
 
           {/* Docs link */}
           <div className="mt-8 text-center">

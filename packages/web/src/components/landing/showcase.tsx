@@ -1,235 +1,202 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { CheckCircle, ExternalLink, Languages, Hammer } from 'lucide-react';
-import { Reveal, RevealStagger } from './reveal';
+import { ArrowUpRight, ArrowRight } from 'lucide-react';
+import { CopyButton } from '@/components/ui/copybutton';
+import { Reveal } from './reveal';
+import { SectionHeader } from './section-header';
 
-const toolkitPackages = [
-  // Tools first
+type Lang = {
+  id: string;
+  label: string;
+  cmd: string;
+  shell: boolean;
+  docsHref: string;
+  ext: { label: string; href: string };
+};
+
+const LANGUAGES: Lang[] = [
   {
-    name: 'Core Engine',
-    package: '@agentcommunity/aid-engine',
-    description: 'Pure business logic for discovery, validation, identity',
-    features: ['Discovery', 'Validation', 'Identity (PKA)'],
-    href: 'https://www.npmjs.com/package/@agentcommunity/aid-engine',
-    docsHref: '/docs/Tooling/aid_engine',
-    badge: 'Stable',
-    kind: 'Tool',
+    id: 'ts',
+    label: 'TypeScript',
+    cmd: 'npm install @agentcommunity/aid',
+    shell: true,
+    docsHref: '/docs/quickstart/quickstart_ts',
+    ext: { label: 'npm', href: 'https://www.npmjs.com/package/@agentcommunity/aid' },
   },
   {
-    name: 'CLI – AID Doctor',
-    package: '@agentcommunity/aid-doctor',
-    description: 'CLI wrapper around aid-engine: validate & generate records',
-    features: ['Record linting', 'Security checks', 'JSON/YAML output'],
-    href: 'https://www.npmjs.com/package/@agentcommunity/aid-doctor',
-    docsHref: '/docs/Tooling/aid_doctor',
-    badge: 'Stable',
-    kind: 'Tool',
+    id: 'py',
+    label: 'Python',
+    cmd: 'pip install aid-discovery',
+    shell: true,
+    docsHref: '/docs/quickstart/quickstart_python',
+    ext: { label: 'PyPI', href: 'https://pypi.org/project/aid-discovery/' },
+  },
+  {
+    id: 'go',
+    label: 'Go',
+    cmd: 'go get github.com/agentcommunity/aid-go',
+    shell: true,
+    docsHref: '/docs/quickstart/quickstart_go',
+    ext: { label: 'pkg.go.dev', href: 'https://pkg.go.dev/github.com/agentcommunity/aid-go' },
+  },
+  {
+    id: 'rust',
+    label: 'Rust',
+    cmd: 'use aid_rs::discover;',
+    shell: false,
+    docsHref: '/docs/quickstart/quickstart_rust',
+    ext: {
+      label: 'source',
+      href: 'https://github.com/agentcommunity/agent-identity-discovery/tree/main/packages/aid-rs',
+    },
+  },
+  {
+    id: 'java',
+    label: 'Java',
+    cmd: 'import org.agentcommunity.aid.Discovery;',
+    shell: false,
+    docsHref: '/docs/quickstart/quickstart_java',
+    ext: {
+      label: 'source',
+      href: 'https://github.com/agentcommunity/agent-identity-discovery/tree/main/packages/aid-java',
+    },
+  },
+  {
+    id: 'dotnet',
+    label: '.NET',
+    cmd: 'using AidDiscovery;',
+    shell: false,
+    docsHref: '/docs/quickstart/quickstart_dotnet',
+    ext: {
+      label: 'source',
+      href: 'https://github.com/agentcommunity/agent-identity-discovery/tree/main/packages/aid-dotnet',
+    },
+  },
+];
+
+const TOOLS = [
+  {
+    name: 'Core Engine',
+    blurb: 'Pure discovery, validation, and identity logic.',
+    href: 'https://www.npmjs.com/package/@agentcommunity/aid-engine',
+  },
+  {
+    name: 'AID Doctor (CLI)',
+    blurb: 'Validate and generate records from the terminal.',
+    href: '/docs/Tooling/aid_doctor',
   },
   {
     name: 'Conformance Suite',
-    package: '@agentcommunity/aid-conformance',
-    description: 'Golden fixtures and CLI runner for parity checks',
-    features: ['Golden fixtures', 'CLI runner', 'Cross-language parity'],
+    blurb: 'Golden fixtures and a cross-language parity runner.',
     href: 'https://www.npmjs.com/package/@agentcommunity/aid-conformance',
-    badge: 'Stable',
-    kind: 'Tool',
   },
   {
     name: 'Web Workbench',
-    package: 'Interactive tool',
-    description: 'Try AID in the browser – no install',
-    features: ['Live DNS lookup', 'Shareable links', 'Export configs'],
+    blurb: 'Resolve and generate records in the browser. No install.',
     href: '/workbench',
-    badge: 'Stable',
-    kind: 'Tool',
   },
   {
-    name: 'Coming soon',
-    package: 'more tooling',
-    description: 'Open a PR',
-    features: ['more tooling', 'Language support', 'New ideas'],
+    name: 'More tooling',
+    blurb: 'Planned. Open a PR.',
     href: 'https://github.com/agentcommunity/agent-identity-discovery',
-    badge: 'Planned',
-    kind: 'Tool',
-  },
-  // Languages after tools
-  {
-    name: 'TypeScript / JS',
-    package: '@agentcommunity/aid',
-    description: 'SDK for Node.js & browser',
-    features: ['Promise-based API', 'TypeScript types', 'Built-in validation'],
-    href: 'https://www.npmjs.com/package/@agentcommunity/aid',
-    docsHref: '/docs/quickstart/quickstart_ts',
-    badge: 'Stable',
-    kind: 'Language',
-  },
-  {
-    name: 'Go',
-    package: 'github.com/agentcommunity/aid-go',
-    description: 'High-performance Go client',
-    features: ['Context support', 'No external deps'],
-    href: 'https://pkg.go.dev/github.com/agentcommunity/aid-go',
-    docsHref: '/docs/quickstart/quickstart_go',
-    badge: 'Stable',
-    kind: 'Language',
-  },
-  {
-    name: 'Python',
-    package: 'aid-discovery',
-    description: 'Idiomatic Python client',
-    features: ['Type hints', 'Clean API'],
-    href: 'https://pypi.org/project/aid-discovery/',
-    docsHref: '/docs/quickstart/quickstart_python',
-    badge: 'Stable',
-    kind: 'Language',
-  },
-  {
-    name: 'Rust',
-    package: 'packages/aid-rs',
-    description: 'Idiomatic Rust client',
-    features: ['Generated constants', 'Parser parity', 'Discovery support'],
-    href: 'https://github.com/agentcommunity/agent-identity-discovery/tree/main/packages/aid-rs',
-    docsHref: '/docs/quickstart/quickstart_rust',
-    badge: 'Stable',
-    kind: 'Language',
-  },
-  {
-    name: 'Java',
-    package: 'packages/aid-java',
-    description: 'Idiomatic Java client',
-    features: ['Generated constants', 'Parser parity', 'Discovery support'],
-    href: 'https://github.com/agentcommunity/agent-identity-discovery/tree/main/packages/aid-java',
-    docsHref: '/docs/quickstart/quickstart_java',
-    badge: 'Stable',
-    kind: 'Language',
-  },
-  {
-    name: '.NET',
-    package: 'packages/aid-dotnet',
-    description: 'C#/.NET client',
-    features: ['Generated constants', 'Parser parity', 'Discovery support'],
-    href: 'https://github.com/agentcommunity/agent-identity-discovery/tree/main/packages/aid-dotnet',
-    docsHref: '/docs/quickstart/quickstart_dotnet',
-    badge: 'Stable',
-    kind: 'Language',
   },
 ];
 
 export function Toolkit() {
+  const [langId, setLangId] = useState('ts');
+  const lang = LANGUAGES.find((l) => l.id === langId) ?? LANGUAGES[0];
+
   return (
-    <section className="section-padding bg-muted/30">
+    <section className="section-padding border-t border-border">
       <div className="container mx-auto container-padding">
-        <div className="mx-auto max-w-6xl">
-          <Reveal direction="up" className="mb-12 text-center">
-            <h2 className="mb-4 text-4xl md:text-5xl font-bold tracking-tight">
-              Complete Developer Toolkit
-            </h2>
-            <p className="text-xl md:text-2xl leading-relaxed text-muted-foreground">
-              Everything you need to build AID-powered applications
+        <div className="mx-auto max-w-4xl">
+          <SectionHeader
+            eyebrow="Tooling"
+            title="Developer toolkit"
+            lede="SDKs in six languages, plus a CLI, a conformance suite, and a browser workbench."
+          />
+
+          {/* SDKs */}
+          <Reveal direction="up">
+            <p className="mb-3 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
+              SDKs
             </p>
+            <div className="overflow-hidden rounded-lg border border-border">
+              {/* language tabs */}
+              <div className="flex flex-wrap gap-px border-b border-border bg-border">
+                {LANGUAGES.map((l) => {
+                  const active = l.id === lang.id;
+                  return (
+                    <button
+                      key={l.id}
+                      onClick={() => setLangId(l.id)}
+                      aria-pressed={active}
+                      className={`flex-1 px-4 py-2.5 font-mono text-sm transition-colors duration-150 ${
+                        active
+                          ? 'bg-card font-medium text-foreground'
+                          : 'bg-muted/40 text-muted-foreground hover:bg-card/60'
+                      }`}
+                    >
+                      {l.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {/* install line */}
+              <div className="flex items-center justify-between gap-4 bg-card px-4 py-4 font-mono text-sm">
+                <span className="truncate">
+                  {lang.shell ? <span className="text-muted-foreground/50">$ </span> : null}
+                  <span className="text-foreground">{lang.cmd}</span>
+                </span>
+                <CopyButton textToCopy={lang.cmd} />
+              </div>
+              {/* links */}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border bg-card px-4 py-2.5">
+                <Link
+                  href={lang.docsHref}
+                  className="inline-flex items-center gap-1 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  Quickstart
+                  <ArrowRight className="h-3 w-3" />
+                </Link>
+                <Link
+                  href={lang.ext.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  {lang.ext.label}
+                  <ArrowUpRight className="h-3 w-3" />
+                </Link>
+              </div>
+            </div>
           </Reveal>
 
-          <RevealStagger
-            direction="up"
-            staggerMs={60}
-            className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
-          >
-            {toolkitPackages.map((pkg, index) => (
-              <Card
-                key={index}
-                className="card-feature flex flex-col shadow-soft-lg hover:shadow-soft-xl transition-all duration-300 hover:-translate-y-2 group"
-              >
-                <CardHeader className="pb-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        variant="secondary"
-                        className={`text-xs flex items-center gap-1 border ${pkg.kind === 'Language' ? 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800' : 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800'}`}
-                      >
-                        {pkg.kind === 'Language' ? (
-                          <Languages className="h-3.5 w-3.5" />
-                        ) : (
-                          <Hammer className="h-3.5 w-3.5" />
-                        )}
-                        <span>{pkg.kind}</span>
-                      </Badge>
-                      <Badge
-                        variant={
-                          pkg.badge === 'Stable'
-                            ? 'success'
-                            : (pkg.badge === 'Beta'
-                              ? 'warning'
-                              : 'default')
-                        }
-                        className="text-xs shadow-soft-xs transition-all duration-300 group-hover:shadow-soft-md group-hover:scale-105"
-                      >
-                        {pkg.badge}
-                      </Badge>
-                    </div>
-                  </div>
-                  <CardTitle className="text-lg transition-colors duration-300 group-hover:text-foreground">
-                    {pkg.name}
-                  </CardTitle>
-                  <div className="text-sm font-mono text-muted-foreground bg-muted/50 px-2 py-1 rounded border border-border/30 shadow-soft-xs transition-all duration-300 group-hover:bg-muted/70">
-                    {pkg.package}
-                  </div>
-                  <CardDescription className="text-sm transition-colors duration-300 group-hover:text-muted-foreground/80">
-                    {pkg.description}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="flex-1 flex flex-col">
-                  <div className="space-y-2 mb-6 flex-1">
-                    {pkg.features.map((feature, featureIndex) => (
-                      <div
-                        key={featureIndex}
-                        className="flex items-center gap-2 text-sm transition-colors duration-300 group-hover:text-muted-foreground/90"
-                      >
-                        <CheckCircle className="h-4 w-4 text-primary flex-shrink-0 transition-all duration-300 group-hover:scale-110" />
-                        <span>{feature}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Button
-                      variant="outline"
-                      className="w-full group-button shadow-soft hover:shadow-soft-md transition-all duration-200 hover:scale-105"
-                      asChild
-                    >
-                      <Link
-                        href={pkg.href}
-                        target={pkg.href.startsWith('http') ? '_blank' : undefined}
-                      >
-                        {pkg.href.startsWith('/') ? 'Try Now' : 'View Package'}
-                        <ExternalLink className="ml-2 h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
-                      </Link>
-                    </Button>
-                    {pkg.docsHref && (
-                      <Button variant="ghost" size="sm" className="w-full text-xs" asChild>
-                        <Link href={pkg.docsHref}>Documentation</Link>
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </RevealStagger>
-
-          <Reveal direction="up" delay={200} className="mt-12 text-center">
-            <Button
-              size="lg"
-              asChild
-              className="shadow-soft-md hover:shadow-soft-lg transition-all duration-300 hover:scale-105"
-            >
-              <Link href="https://github.com/agentcommunity" target="_blank">
-                <ExternalLink className="mr-2 h-5 w-5" />
-                View All on GitHub
-              </Link>
-            </Button>
+          {/* Tools */}
+          <Reveal direction="up" delay={100} className="mt-12">
+            <p className="mb-3 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
+              Tools
+            </p>
+            <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+              {TOOLS.map((tool) => (
+                <li key={tool.name}>
+                  <Link
+                    href={tool.href}
+                    target={tool.href.startsWith('http') ? '_blank' : undefined}
+                    rel={tool.href.startsWith('http') ? 'noopener noreferrer' : undefined}
+                    className="group flex items-center justify-between gap-4 px-4 py-3.5 transition-colors hover:bg-muted/40"
+                  >
+                    <span className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-3">
+                      <span className="font-medium text-foreground">{tool.name}</span>
+                      <span className="text-sm text-muted-foreground">{tool.blurb}</span>
+                    </span>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </Reveal>
         </div>
       </div>
