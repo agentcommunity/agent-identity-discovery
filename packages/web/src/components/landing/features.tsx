@@ -1,29 +1,30 @@
 'use client';
 
-import { AlertTriangle, Puzzle, Clock, Settings } from 'lucide-react';
+import { Flame, ShieldAlert, Puzzle, Compass } from 'lucide-react';
 import { RevealStagger } from './reveal';
 import { SectionHeader } from './section-header';
 
 const problems = [
   {
-    icon: AlertTriangle,
-    title: 'Manual integration hell',
-    description: 'Every new system means bespoke code, doc digging, and manual config.',
+    icon: Flame,
+    title: 'Agents burn tokens guessing',
+    description:
+      'With no map, an agent retries dead endpoints and scrapes docs just to find the way in.',
+  },
+  {
+    icon: ShieldAlert,
+    title: 'No way to verify the endpoint',
+    description: 'Nothing proves the server an agent reached is the one the domain intended.',
   },
   {
     icon: Puzzle,
-    title: 'Protocol fragmentation',
-    description: 'Agents speak MCP, A2A, OpenAPI and more. Auth flows vary wildly.',
+    title: 'Protocol guesswork',
+    description: 'MCP? A2A? OpenAPI? The agent has to probe, or be told out of band.',
   },
   {
-    icon: Clock,
-    title: 'Wasted development time',
-    description: 'Teams lose weeks wiring basic discovery and connection logic.',
-  },
-  {
-    icon: Settings,
-    title: 'No discovery or identity standard',
-    description: 'No universal way to find an endpoint and verify who runs it.',
+    icon: Compass,
+    title: 'No discovery standard',
+    description: 'Every agent-to-system link is hand-wired, one integration at a time.',
   },
 ];
 
@@ -34,19 +35,20 @@ export function Problem() {
         <div className="mx-auto max-w-5xl">
           <SectionHeader
             eyebrow="The problem"
-            title="The integration problem"
+            title="Agents are flying blind"
             lede="An agent reaching a new system shouldn't need a PhD in API archaeology."
           />
 
           <RevealStagger
             direction="up"
             staggerMs={80}
+            itemClassName="h-full"
             className="grid gap-px overflow-hidden rounded-lg border border-border bg-border md:grid-cols-2"
           >
             {problems.map((problem, index) => (
               <div
                 key={index}
-                className="flex gap-4 bg-card p-6 transition-colors duration-200 hover:bg-muted/40"
+                className="flex h-full gap-4 bg-card p-6 transition-colors duration-200 hover:bg-muted/40"
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground">
                   <problem.icon className="h-5 w-5" />

@@ -27,11 +27,11 @@ export default function Home() {
   return (
     <div className="flex flex-col">
       <Hero />
-      <QuickStart />
+      <Directions />
       <Problem />
       <Solution />
-      <Directions />
       <Identity />
+      <QuickStart />
       <Toolkit />
       <Vision />
       <Footer />

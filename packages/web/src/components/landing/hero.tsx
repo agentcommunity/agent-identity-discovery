@@ -97,12 +97,13 @@ export function Hero() {
       <div className="container mx-auto container-padding">
         <div className="mx-auto max-w-3xl text-center">
           {/* eyebrow */}
-          <div className="mb-8 inline-flex items-center gap-2.5 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground animate-fade-in">
-            <span className="relative flex h-1.5 w-1.5">
+          <div className="mb-8 inline-flex items-center gap-2.5 font-mono text-sm uppercase tracking-[0.2em] text-foreground animate-fade-in">
+            <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400/60 animate-ping" />
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
             </span>
-            v{aidVersion} · Agent Identity &amp; Discovery
+            Agent Identity &amp; Discovery
+            <span className="text-muted-foreground/60">v{aidVersion}</span>
           </div>
 
           {/* headline */}

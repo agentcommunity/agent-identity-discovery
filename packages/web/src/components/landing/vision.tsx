@@ -42,15 +42,17 @@ export function Vision() {
             eyebrow="Vision"
             title="Where AID fits"
             lede="A small, boring discovery layer that other systems build on."
+            titleClassName="text-4xl md:text-5xl"
           />
 
           <RevealStagger
             direction="up"
             staggerMs={120}
+            itemClassName="h-full"
             className="grid gap-px overflow-hidden rounded-lg border border-border bg-border md:grid-cols-2"
           >
             {visionFeatures.map((feature) => (
-              <div key={feature.title} className="flex flex-col gap-5 bg-card p-6 md:p-8">
+              <div key={feature.title} className="flex h-full flex-col gap-5 bg-card p-6 md:p-8">
                 <span className="flex h-10 w-10 items-center justify-center rounded-md border border-border text-foreground">
                   <feature.icon className="h-5 w-5" />
                 </span>

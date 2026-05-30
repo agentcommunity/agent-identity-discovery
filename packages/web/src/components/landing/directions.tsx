@@ -46,7 +46,11 @@ export function Directions() {
     <section className="section-padding border-t border-border">
       <div className="container mx-auto container-padding">
         <div className="mx-auto max-w-5xl">
-          <SectionHeader eyebrow="How agents use it" title="Three ways an agent reaches out" />
+          <SectionHeader
+            eyebrow="How agents use it"
+            title="Three ways an agent reaches out"
+            titleClassName="text-4xl md:text-5xl lg:text-6xl"
+          />
 
           <div className="grid border-t border-border md:grid-cols-3">
             {DIRECTIONS.map((d) => (
@@ -59,12 +63,10 @@ export function Directions() {
                 }`}
               >
                 {/* direction label */}
-                <div className="flex items-center gap-2 font-mono text-sm">
-                  <span className="font-medium text-foreground">{d.from}</span>
-                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span
-                    className={d.native ? 'font-medium text-foreground' : 'text-muted-foreground'}
-                  >
+                <div className="flex items-center gap-2.5 font-mono text-lg font-semibold md:text-xl">
+                  <span className="text-foreground">{d.from}</span>
+                  <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                  <span className={d.native ? 'text-foreground' : 'text-muted-foreground'}>
                     {d.to}
                   </span>
                 </div>

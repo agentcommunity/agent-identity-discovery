@@ -78,26 +78,31 @@ export function Solution() {
           <RevealStagger
             direction="up"
             staggerMs={80}
+            itemClassName="h-full"
             className="grid gap-px overflow-hidden rounded-lg border border-border bg-border md:grid-cols-2 lg:grid-cols-4"
           >
             {solutions.map((solution) => (
               <div
                 key={solution.n}
-                className="flex flex-col gap-4 bg-card p-6 transition-colors duration-200 hover:bg-muted/40"
+                className="flex h-full flex-col gap-5 bg-card p-6 transition-colors duration-200 hover:bg-muted/40"
               >
-                <div className="flex items-center justify-between">
+                <div className="flex items-start justify-between">
                   <span
-                    className={`flex h-10 w-10 items-center justify-center rounded-md border border-border ${
+                    className={`flex h-11 w-11 items-center justify-center rounded-md border border-border ${
                       solution.accent ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground'
                     }`}
                   >
                     <solution.icon className="h-5 w-5" />
                   </span>
-                  <span className="font-mono text-xs text-muted-foreground/50">{solution.n}</span>
+                  <span className="font-mono text-sm font-medium text-muted-foreground/60">
+                    {solution.n}
+                  </span>
                 </div>
 
                 <div className="flex-1">
-                  <h3 className="text-base font-semibold text-foreground">{solution.title}</h3>
+                  <h3 className="text-lg font-semibold leading-snug text-foreground">
+                    {solution.title}
+                  </h3>
                   <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
                     {solution.description}
                   </p>

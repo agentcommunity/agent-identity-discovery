@@ -3,11 +3,11 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Compass, Rocket, ShieldCheck } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Codeblock } from '@/components/ui/codeblock';
+import { Reveal } from './reveal';
 import { SectionHeader } from './section-header';
 
 // --- Code snippets identical to README / docs ------------------------------
@@ -91,11 +91,11 @@ export function QuickStart() {
             lede="In minutes, from your language of choice or the CLI."
           />
 
-          {/* Hero Card */}
-          <Card className="border-border shadow-soft">
-            <CardHeader className="pb-6">
-              {/* Step toggle group (iconic, theme-aligned) */}
-              <div className="flex justify-center gap-3">
+          {/* Console */}
+          <Reveal direction="up">
+            <div className="overflow-hidden rounded-lg border border-border">
+              {/* step tabs */}
+              <div className="flex gap-px border-b border-border bg-border">
                 {STEPS.map((item, idx) => {
                   const active = step === item.id;
                   const Icon: LucideIcon = item.Icon;
@@ -103,128 +103,114 @@ export function QuickStart() {
                     <button
                       key={item.id}
                       onClick={() => setStep(item.id)}
-                      className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-sm font-medium transition-colors duration-200 ${
+                      className={`flex flex-1 items-center justify-center gap-2 px-3 py-3 font-mono text-sm transition-colors duration-150 ${
                         active
-                          ? 'border-foreground/30 bg-muted'
-                          : 'border-border bg-card hover:bg-muted/40'
+                          ? 'bg-card font-medium text-foreground'
+                          : 'bg-muted/40 text-muted-foreground hover:bg-card/60'
                       }`}
                     >
-                      <div
-                        className={`flex h-9 w-9 items-center justify-center rounded-md transition-colors duration-200 ${
-                          active
-                            ? 'bg-foreground text-background'
-                            : 'bg-muted text-muted-foreground'
-                        }`}
-                      >
-                        <Icon className="h-4 w-4" />
-                      </div>
-                      <div className="text-left">
-                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                          Step {idx + 1}
-                        </div>
-                        <div className={`leading-tight ${active ? 'text-foreground' : ''}`}>
-                          {item.label}
-                        </div>
-                      </div>
+                      <span className="text-muted-foreground/50">{`0${idx + 1}`}</span>
+                      <Icon className="hidden h-4 w-4 sm:block" />
+                      {item.label}
                     </button>
                   );
                 })}
               </div>
-            </CardHeader>
 
-            <CardContent>
-              {step === 'discover' && (
-                <div className="space-y-4">
-                  <Codeblock
-                    title="discover"
-                    content={DISCOVER_SNIPPETS[lang]}
-                    rightSlot={
-                      <div className="flex gap-1 flex-wrap">
-                        {(['typescript', 'python', 'go', 'rust', 'java', 'dotnet'] as const).map(
-                          (l) => (
+              <div className="bg-card p-4 md:p-6">
+                {step === 'discover' && (
+                  <div className="space-y-4">
+                    <Codeblock
+                      title="discover"
+                      content={DISCOVER_SNIPPETS[lang]}
+                      rightSlot={
+                        <div className="flex gap-1 flex-wrap">
+                          {(['typescript', 'python', 'go', 'rust', 'java', 'dotnet'] as const).map(
+                            (l) => (
+                              <Button
+                                key={l}
+                                size="sm"
+                                variant={lang === l ? 'default' : 'outline'}
+                                className="capitalize text-xs"
+                                onClick={() => setLang(l)}
+                              >
+                                {l === 'dotnet' ? '.NET' : l}
+                              </Button>
+                            ),
+                          )}
+                        </div>
+                      }
+                    />
+                  </div>
+                )}
+
+                {step === 'publish' && (
+                  <div className="space-y-4">
+                    <Codeblock
+                      title={publishTab}
+                      content={
+                        publishTab === 'dns'
+                          ? DNS_SNIPPET
+                          : (publishTab === 'terraform'
+                            ? TERRAFORM_SNIPPET
+                            : DNS_PKA_SNIPPET)
+                      }
+                      rightSlot={
+                        <div className="flex gap-1">
+                          {(['dns', 'terraform', 'dns+identity'] as const).map((t) => (
                             <Button
-                              key={l}
+                              key={t}
                               size="sm"
-                              variant={lang === l ? 'default' : 'outline'}
+                              variant={publishTab === t ? 'default' : 'outline'}
                               className="capitalize text-xs"
-                              onClick={() => setLang(l)}
+                              onClick={() => setPublishTab(t)}
                             >
-                              {l === 'dotnet' ? '.NET' : l}
+                              {t}
                             </Button>
-                          ),
-                        )}
-                      </div>
-                    }
-                  />
-                </div>
-              )}
+                          ))}
+                        </div>
+                      }
+                    />
+                    <div className="flex flex-wrap gap-2 justify-center">
+                      <Button variant="ghost" asChild className="text-sm">
+                        <Link href="/docs/quickstart">Quick Start Guide</Link>
+                      </Button>
+                      <Button variant="ghost" asChild className="text-sm">
+                        <Link href="/docs/specification">Specification</Link>
+                      </Button>
+                      <Button variant="ghost" asChild className="text-sm">
+                        <Link href="/docs/Tooling/aid_doctor">aid-doctor CLI</Link>
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
-              {step === 'publish' && (
-                <div className="space-y-4">
-                  <Codeblock
-                    title={publishTab}
-                    content={
-                      publishTab === 'dns'
-                        ? DNS_SNIPPET
-                        : (publishTab === 'terraform'
-                          ? TERRAFORM_SNIPPET
-                          : DNS_PKA_SNIPPET)
-                    }
-                    rightSlot={
-                      <div className="flex gap-1">
-                        {(['dns', 'terraform', 'dns+identity'] as const).map((t) => (
-                          <Button
-                            key={t}
-                            size="sm"
-                            variant={publishTab === t ? 'default' : 'outline'}
-                            className="capitalize text-xs"
-                            onClick={() => setPublishTab(t)}
-                          >
-                            {t}
-                          </Button>
-                        ))}
-                      </div>
-                    }
-                  />
-                  <div className="flex flex-wrap gap-2 justify-center">
-                    <Button variant="ghost" asChild className="text-sm">
-                      <Link href="/docs/quickstart">Quick Start Guide</Link>
-                    </Button>
-                    <Button variant="ghost" asChild className="text-sm">
-                      <Link href="/docs/specification">Specification</Link>
-                    </Button>
-                    <Button variant="ghost" asChild className="text-sm">
-                      <Link href="/docs/Tooling/aid_doctor">aid-doctor CLI</Link>
-                    </Button>
+                {step === 'validate' && (
+                  <div className="space-y-4">
+                    <Codeblock title="terminal" content={VALIDATE_SNIPPET} />
+                    <div className="text-sm text-muted-foreground">
+                      Lint your record, verify DNS resolution, and test PKA identity, all from one
+                      command.
+                    </div>
+                    <div className="flex flex-wrap gap-2 justify-center">
+                      <Button variant="ghost" asChild className="text-sm">
+                        <Link href="/docs/Tooling/aid_doctor">aid-doctor CLI</Link>
+                      </Button>
+                      <Button variant="ghost" asChild className="text-sm">
+                        <Link href="/docs/Tooling/aid_engine">Engine Docs</Link>
+                      </Button>
+                      <Button variant="ghost" asChild className="text-sm">
+                        <Link href="/docs/Tooling/conformance">Conformance Suite</Link>
+                      </Button>
+                      <Button variant="ghost" asChild className="text-sm">
+                        <Link href="/docs/Reference/identity_pka">PKA Identity</Link>
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              )}
-
-              {step === 'validate' && (
-                <div className="space-y-4">
-                  <Codeblock title="terminal" content={VALIDATE_SNIPPET} />
-                  <div className="text-sm text-muted-foreground">
-                    Lint your record, verify DNS resolution, and test PKA identity — all from one
-                    command.
-                  </div>
-                  <div className="flex flex-wrap gap-2 justify-center">
-                    <Button variant="ghost" asChild className="text-sm">
-                      <Link href="/docs/Tooling/aid_doctor">aid-doctor CLI</Link>
-                    </Button>
-                    <Button variant="ghost" asChild className="text-sm">
-                      <Link href="/docs/Tooling/aid_engine">Engine Docs</Link>
-                    </Button>
-                    <Button variant="ghost" asChild className="text-sm">
-                      <Link href="/docs/Tooling/conformance">Conformance Suite</Link>
-                    </Button>
-                    <Button variant="ghost" asChild className="text-sm">
-                      <Link href="/docs/Reference/identity_pka">PKA Identity</Link>
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                )}
+              </div>
+            </div>
+          </Reveal>
 
           {/* Docs link */}
           <div className="mt-8 text-center">
