@@ -113,8 +113,7 @@ export function Hero() {
 
           {/* lede — the payoff */}
           <p className="mx-auto mb-12 max-w-2xl text-lg md:text-xl leading-relaxed text-muted-foreground animate-fade-in-up">
-            An agent looks up a domain and learns where to connect, what protocol to speak, and how
-            to verify the endpoint is real.
+            Discovery and origin verification for agents and their tooling.
           </p>
         </div>
 
