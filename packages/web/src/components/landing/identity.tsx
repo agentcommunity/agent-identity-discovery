@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copybutton';
-import { ShieldCheck } from 'lucide-react';
+import { ShieldCheck, ArrowUpRight } from 'lucide-react';
 import { Reveal } from './reveal';
 import { SectionHeader } from './section-header';
 
@@ -81,9 +81,19 @@ export function Identity() {
                     </li>
                   </ol>
 
-                  <Button variant="outline" asChild>
-                    <Link href="/docs/Reference/identity_pka">Learn more</Link>
-                  </Button>
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-1">
+                    <Button variant="outline" asChild>
+                      <Link href="/docs/Reference/identity_pka">Learn more</Link>
+                    </Button>
+                    <Link
+                      href="https://agentcommunity.org/blog/external_identity_anchor"
+                      target="_blank"
+                      className="inline-flex items-center gap-1 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      PKA as an external trust anchor
+                      <ArrowUpRight className="h-3 w-3" />
+                    </Link>
+                  </div>
                 </div>
 
                 {/* structured DNS record */}
