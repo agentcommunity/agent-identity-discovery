@@ -82,6 +82,7 @@ export function Vision() {
               <Link
                 href="https://github.com/agentcommunity/agent-identity-discovery/blob/main/README.md#roadmap"
                 target="_blank"
+                rel="noopener noreferrer"
               >
                 View the roadmap
                 <ArrowUpRight className="ml-2 h-4 w-4" />

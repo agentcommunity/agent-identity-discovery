@@ -88,6 +88,7 @@ export function Identity() {
                     <Link
                       href="https://agentcommunity.org/blog/external_identity_anchor"
                       target="_blank"
+                      rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
                     >
                       PKA as an external trust anchor

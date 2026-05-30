@@ -132,6 +132,7 @@ export function Toolkit() {
                     <button
                       key={l.id}
                       onClick={() => setLangId(l.id)}
+                      aria-pressed={active}
                       className={`flex-1 px-4 py-2.5 font-mono text-sm transition-colors duration-150 ${
                         active
                           ? 'bg-card font-medium text-foreground'
@@ -163,6 +164,7 @@ export function Toolkit() {
                 <Link
                   href={lang.ext.href}
                   target="_blank"
+                  rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
                 >
                   {lang.ext.label}
@@ -183,6 +185,7 @@ export function Toolkit() {
                   <Link
                     href={tool.href}
                     target={tool.href.startsWith('http') ? '_blank' : undefined}
+                    rel={tool.href.startsWith('http') ? 'noopener noreferrer' : undefined}
                     className="group flex items-center justify-between gap-4 px-4 py-3.5 transition-colors hover:bg-muted/40"
                   >
                     <span className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-3">

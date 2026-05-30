@@ -108,6 +108,7 @@ export function QuickStart() {
                     <button
                       key={item.id}
                       onClick={() => setStep(item.id)}
+                      aria-pressed={active}
                       className={`flex flex-1 items-center justify-center gap-2 px-3 py-3 font-mono text-sm transition-colors duration-150 ${
                         active
                           ? 'bg-card font-medium text-foreground'
@@ -134,6 +135,7 @@ export function QuickStart() {
                           <button
                             key={l}
                             onClick={() => setLang(l)}
+                            aria-pressed={lang === l}
                             className={`font-mono text-xs capitalize transition-colors ${
                               lang === l
                                 ? 'font-medium text-foreground'
@@ -161,6 +163,7 @@ export function QuickStart() {
                           <button
                             key={t}
                             onClick={() => setPublishTab(t)}
+                            aria-pressed={publishTab === t}
                             className={`font-mono text-xs transition-colors ${
                               publishTab === t
                                 ? 'font-medium text-foreground'
