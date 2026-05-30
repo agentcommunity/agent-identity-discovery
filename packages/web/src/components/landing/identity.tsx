@@ -2,13 +2,28 @@
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Codeblock } from '@/components/ui/codeblock';
+import { CopyButton } from '@/components/ui/copybutton';
 import { ShieldCheck } from 'lucide-react';
 import { Reveal } from './reveal';
 import { SectionHeader } from './section-header';
 
-const TXT_PKA_SNIPPET = `_agent.example.com. 300 IN TXT \
-  "v=aid1;\\\n  u=https://api.example.com/mcp;\\\n  p=mcp;\\\n  k=z7rW8rTq8o4mM6vVf7w1k3m4uQn9p2YxCAbcDeFgHiJ;\\\n  i=g1"`;
+const RECORD_NAME = '_agent.example.com';
+const RECORD_VALUE =
+  'v=aid1;u=https://api.example.com/mcp;p=mcp;k=z7rW8rTq8o4mM6vVf7w1k3m4uQn9p2YxCAbcDeFgHiJ;i=g1';
+const RECORD_VALUE_DISPLAY =
+  'v=aid1;u=https://api.example.com/mcp;p=mcp;k=z7rW8rTq8o4mM6vVf7w…;i=g1';
+const RECORD_FULL = `${RECORD_NAME}. 300 IN TXT "${RECORD_VALUE}"`;
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="grid grid-cols-[4.5rem_1fr] gap-3 bg-muted/50 px-4 py-3">
+      <dt className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground/70">
+        {label}
+      </dt>
+      <dd className="break-all font-mono text-sm text-foreground">{children}</dd>
+    </div>
+  );
+}
 
 export function Identity() {
   return (
@@ -71,9 +86,27 @@ export function Identity() {
                   </Button>
                 </div>
 
-                {/* record */}
+                {/* structured DNS record */}
                 <div className="bg-card p-6 md:p-8">
-                  <Codeblock title="txt" content={TXT_PKA_SNIPPET} />
+                  <div className="overflow-hidden rounded-lg border border-border">
+                    <div className="flex items-center justify-between border-b border-border bg-card px-4 py-2">
+                      <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+                        DNS record
+                      </span>
+                      <CopyButton textToCopy={RECORD_FULL} />
+                    </div>
+                    <dl className="divide-y divide-border">
+                      <Field label="Name">{RECORD_NAME}</Field>
+                      <Field label="Type">
+                        TXT <span className="text-muted-foreground/50">· TTL 300</span>
+                      </Field>
+                      <Field label="Value">{RECORD_VALUE_DISPLAY}</Field>
+                    </dl>
+                  </div>
+                  <p className="mt-3 text-xs leading-relaxed text-muted-foreground/70">
+                    One TXT record at the <code>_agent</code> subdomain. The same shape your DNS
+                    provider already understands.
+                  </p>
                 </div>
               </div>
             </div>

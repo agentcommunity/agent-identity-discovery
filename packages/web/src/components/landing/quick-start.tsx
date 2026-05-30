@@ -3,10 +3,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
 import { Compass, Rocket, ShieldCheck } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { Codeblock } from '@/components/ui/codeblock';
+import { CodePanel } from './code-panel';
 import { Reveal } from './reveal';
 import { SectionHeader } from './section-header';
 
@@ -65,6 +64,12 @@ const TERRAFORM_SNIPPET = `resource "cloudflare_record" "aid" {
 const VALIDATE_SNIPPET = `# Validate your record from the CLI
 npx @agentcommunity/aid-doctor check example.com`;
 
+const PUBLISH_SNIPPETS: Record<'dns' | 'terraform' | 'dns+identity', string> = {
+  dns: DNS_SNIPPET,
+  terraform: TERRAFORM_SNIPPET,
+  'dns+identity': DNS_PKA_SNIPPET,
+};
+
 // ---------------------------------------------------------------------------
 
 export function QuickStart() {
@@ -117,98 +122,100 @@ export function QuickStart() {
                 })}
               </div>
 
-              <div className="bg-card p-4 md:p-6">
-                {step === 'discover' && (
-                  <div className="space-y-4">
-                    <Codeblock
-                      title="discover"
-                      content={DISCOVER_SNIPPETS[lang]}
-                      rightSlot={
-                        <div className="flex gap-1 flex-wrap">
-                          {(['typescript', 'python', 'go', 'rust', 'java', 'dotnet'] as const).map(
-                            (l) => (
-                              <Button
-                                key={l}
-                                size="sm"
-                                variant={lang === l ? 'default' : 'outline'}
-                                className="capitalize text-xs"
-                                onClick={() => setLang(l)}
-                              >
-                                {l === 'dotnet' ? '.NET' : l}
-                              </Button>
-                            ),
-                          )}
-                        </div>
-                      }
-                    />
-                  </div>
-                )}
+              {step === 'discover' && (
+                <CodePanel
+                  bordered={false}
+                  title="discover"
+                  content={DISCOVER_SNIPPETS[lang]}
+                  rightSlot={
+                    <div className="flex flex-wrap gap-2.5">
+                      {(['typescript', 'python', 'go', 'rust', 'java', 'dotnet'] as const).map(
+                        (l) => (
+                          <button
+                            key={l}
+                            onClick={() => setLang(l)}
+                            className={`font-mono text-xs capitalize transition-colors ${
+                              lang === l
+                                ? 'font-medium text-foreground'
+                                : 'text-muted-foreground/60 hover:text-foreground'
+                            }`}
+                          >
+                            {l === 'dotnet' ? '.NET' : l}
+                          </button>
+                        ),
+                      )}
+                    </div>
+                  }
+                />
+              )}
 
-                {step === 'publish' && (
-                  <div className="space-y-4">
-                    <Codeblock
-                      title={publishTab}
-                      content={
-                        publishTab === 'dns'
-                          ? DNS_SNIPPET
-                          : (publishTab === 'terraform'
-                            ? TERRAFORM_SNIPPET
-                            : DNS_PKA_SNIPPET)
-                      }
-                      rightSlot={
-                        <div className="flex gap-1">
-                          {(['dns', 'terraform', 'dns+identity'] as const).map((t) => (
-                            <Button
-                              key={t}
-                              size="sm"
-                              variant={publishTab === t ? 'default' : 'outline'}
-                              className="capitalize text-xs"
-                              onClick={() => setPublishTab(t)}
-                            >
-                              {t}
-                            </Button>
-                          ))}
-                        </div>
-                      }
-                    />
-                    <div className="flex flex-wrap gap-2 justify-center">
-                      <Button variant="ghost" asChild className="text-sm">
-                        <Link href="/docs/quickstart">Quick Start Guide</Link>
-                      </Button>
-                      <Button variant="ghost" asChild className="text-sm">
-                        <Link href="/docs/specification">Specification</Link>
-                      </Button>
-                      <Button variant="ghost" asChild className="text-sm">
-                        <Link href="/docs/Tooling/aid_doctor">aid-doctor CLI</Link>
-                      </Button>
-                    </div>
+              {step === 'publish' && (
+                <>
+                  <CodePanel
+                    bordered={false}
+                    title={publishTab}
+                    content={PUBLISH_SNIPPETS[publishTab]}
+                    rightSlot={
+                      <div className="flex gap-2.5">
+                        {(['dns', 'terraform', 'dns+identity'] as const).map((t) => (
+                          <button
+                            key={t}
+                            onClick={() => setPublishTab(t)}
+                            className={`font-mono text-xs transition-colors ${
+                              publishTab === t
+                                ? 'font-medium text-foreground'
+                                : 'text-muted-foreground/60 hover:text-foreground'
+                            }`}
+                          >
+                            {t}
+                          </button>
+                        ))}
+                      </div>
+                    }
+                  />
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-border bg-card px-4 py-3">
+                    {[
+                      { href: '/docs/quickstart', label: 'Quick Start Guide' },
+                      { href: '/docs/specification', label: 'Specification' },
+                      { href: '/docs/Tooling/aid_doctor', label: 'aid-doctor CLI' },
+                    ].map((l) => (
+                      <Link
+                        key={l.href}
+                        href={l.href}
+                        className="font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        {l.label}
+                      </Link>
+                    ))}
                   </div>
-                )}
+                </>
+              )}
 
-                {step === 'validate' && (
-                  <div className="space-y-4">
-                    <Codeblock title="terminal" content={VALIDATE_SNIPPET} />
-                    <div className="text-sm text-muted-foreground">
-                      Lint your record, verify DNS resolution, and test PKA identity, all from one
-                      command.
-                    </div>
-                    <div className="flex flex-wrap gap-2 justify-center">
-                      <Button variant="ghost" asChild className="text-sm">
-                        <Link href="/docs/Tooling/aid_doctor">aid-doctor CLI</Link>
-                      </Button>
-                      <Button variant="ghost" asChild className="text-sm">
-                        <Link href="/docs/Tooling/aid_engine">Engine Docs</Link>
-                      </Button>
-                      <Button variant="ghost" asChild className="text-sm">
-                        <Link href="/docs/Tooling/conformance">Conformance Suite</Link>
-                      </Button>
-                      <Button variant="ghost" asChild className="text-sm">
-                        <Link href="/docs/Reference/identity_pka">PKA Identity</Link>
-                      </Button>
-                    </div>
+              {step === 'validate' && (
+                <>
+                  <CodePanel bordered={false} title="terminal" content={VALIDATE_SNIPPET} />
+                  <div className="border-t border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+                    Lint your record, verify DNS resolution, and test PKA identity, all from one
+                    command.
                   </div>
-                )}
-              </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-border bg-card px-4 py-3">
+                    {[
+                      { href: '/docs/Tooling/aid_doctor', label: 'aid-doctor CLI' },
+                      { href: '/docs/Tooling/aid_engine', label: 'Engine Docs' },
+                      { href: '/docs/Tooling/conformance', label: 'Conformance Suite' },
+                      { href: '/docs/Reference/identity_pka', label: 'PKA Identity' },
+                    ].map((l) => (
+                      <Link
+                        key={l.href}
+                        href={l.href}
+                        className="font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        {l.label}
+                      </Link>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           </Reveal>
 
