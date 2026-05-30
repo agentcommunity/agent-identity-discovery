@@ -2,6 +2,7 @@
 
 import { ArrowRight, ArrowUp } from 'lucide-react';
 import { Reveal } from './reveal';
+import { SectionHeader } from './section-header';
 
 type Direction = {
   from: string;
@@ -42,17 +43,10 @@ const DIRECTIONS: Direction[] = [
 
 export function Directions() {
   return (
-    <section className="section-padding">
+    <section className="section-padding border-t border-border">
       <div className="container mx-auto container-padding">
         <div className="mx-auto max-w-5xl">
-          <Reveal direction="up" className="mb-12 md:mb-16">
-            <p className="mb-4 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
-              How agents use it
-            </p>
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">
-              Three ways an agent reaches out
-            </h2>
-          </Reveal>
+          <SectionHeader eyebrow="How agents use it" title="Three ways an agent reaches out" />
 
           <div className="grid border-t border-border md:grid-cols-3">
             {DIRECTIONS.map((d) => (

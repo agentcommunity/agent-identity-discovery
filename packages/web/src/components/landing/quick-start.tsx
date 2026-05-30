@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Compass, Rocket, ShieldCheck } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Codeblock } from '@/components/ui/codeblock';
-import { Reveal } from './reveal';
+import { SectionHeader } from './section-header';
 
 // --- Code snippets identical to README / docs ------------------------------
 const DISCOVER_SNIPPETS: Record<string, string> = {
@@ -82,19 +82,17 @@ export function QuickStart() {
     ];
 
   return (
-    <section className="section-padding bg-muted/30">
+    <section className="section-padding border-t border-border">
       <div className="container mx-auto container-padding">
         <div className="mx-auto max-w-4xl">
-          {/* Heading */}
-          <Reveal direction="up" className="mb-12 text-center">
-            <h2 className="mb-4 text-4xl md:text-5xl font-bold tracking-tight">Quick Start</h2>
-            <p className="text-xl md:text-2xl leading-relaxed text-muted-foreground">
-              Discover, publish and validate in minutes
-            </p>
-          </Reveal>
+          <SectionHeader
+            eyebrow="Quick start"
+            title="Discover, publish, validate"
+            lede="In minutes, from your language of choice or the CLI."
+          />
 
           {/* Hero Card */}
-          <Card className="card-feature shadow-soft-lg hover:shadow-soft-xl transition-all duration-300">
+          <Card className="border-border shadow-soft">
             <CardHeader className="pb-6">
               {/* Step toggle group (iconic, theme-aligned) */}
               <div className="flex justify-center gap-3">
@@ -105,13 +103,17 @@ export function QuickStart() {
                     <button
                       key={item.id}
                       onClick={() => setStep(item.id)}
-                      className={`card-interactive px-4 py-3 rounded-xl transition-all duration-200 flex items-center gap-3 text-sm font-medium border border-border/50 shadow-soft-xs hover:shadow-soft-md ${
-                        active ? 'bg-primary/10 border-primary/30' : 'bg-card/50'
+                      className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-sm font-medium transition-colors duration-200 ${
+                        active
+                          ? 'border-foreground/30 bg-muted'
+                          : 'border-border bg-card hover:bg-muted/40'
                       }`}
                     >
                       <div
-                        className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200 ${
-                          active ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'
+                        className={`flex h-9 w-9 items-center justify-center rounded-md transition-colors duration-200 ${
+                          active
+                            ? 'bg-foreground text-background'
+                            : 'bg-muted text-muted-foreground'
                         }`}
                       >
                         <Icon className="h-4 w-4" />

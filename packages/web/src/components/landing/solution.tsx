@@ -1,83 +1,64 @@
 'use client';
 
 import Link from 'next/link';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Globe, Zap, Layers, ShieldCheck } from 'lucide-react';
-import { Reveal, RevealStagger } from './reveal';
+import { RevealStagger } from './reveal';
+import { SectionHeader } from './section-header';
 
-const solutions: Array<{
-  number: string;
+type SolutionItem = {
+  n: string;
   icon: typeof Globe;
   title: string;
   description: string;
-  iconColor: string;
-  iconBg: string;
   links: Array<{ label: string; href: string }>;
   badges?: string[];
-}> = [
+  accent?: boolean;
+};
+
+const solutions: SolutionItem[] = [
   {
-    number: '1',
+    n: '01',
     icon: Globe,
-    title: 'One DNS TXT Record',
+    title: 'One DNS TXT record',
     description:
-      "Add a single _agent.example.com TXT record. That's it. No registries, no APIs, no complexity.",
-    iconColor: 'text-blue-600',
-    iconBg: 'bg-blue-50 dark:bg-blue-950/30',
+      'Add a single _agent.example.com TXT record. No registries, no APIs, no complexity.',
     links: [
       { label: 'Quick Start', href: '/docs/quickstart' },
       { label: 'Specification', href: '/docs/specification' },
     ],
   },
   {
-    number: '2',
+    n: '02',
     icon: Zap,
-    title: 'Instant Discovery',
+    title: 'Instant discovery',
     description:
       'Any client resolves the _agent subdomain to your endpoint. Falls back to .well-known/agent when DNS is restricted.',
-    iconColor: 'text-amber-600',
-    iconBg: 'bg-amber-50 dark:bg-amber-950/30',
     links: [
-      {
-        label: 'Discovery API',
-        href: '/docs/Reference/discovery_api',
-      },
-      {
-        label: 'Troubleshooting',
-        href: '/docs/Reference/troubleshooting',
-      },
+      { label: 'Discovery API', href: '/docs/Reference/discovery_api' },
+      { label: 'Troubleshooting', href: '/docs/Reference/troubleshooting' },
     ],
   },
   {
-    number: '3',
+    n: '03',
     icon: Layers,
-    title: 'Protocol-Agnostic',
-    description: 'Works with any agent protocol — just change the p= token in your record.',
+    title: 'Protocol-agnostic',
+    description: 'Works with any agent protocol. Change the p= token in your record.',
     badges: ['mcp', 'a2a', 'openapi', 'grpc', 'graphql', 'websocket', 'ucp'],
-    iconColor: 'text-purple-600',
-    iconBg: 'bg-purple-50 dark:bg-purple-950/30',
     links: [
       { label: 'MCP Guide', href: '/docs/quickstart/quickstart_mcp' },
       { label: 'A2A Guide', href: '/docs/quickstart/quickstart_a2a' },
-      {
-        label: 'OpenAPI Guide',
-        href: '/docs/quickstart/quickstart_openapi',
-      },
       { label: 'Protocols', href: '/docs/Reference/protocols' },
     ],
   },
   {
-    number: '4',
+    n: '04',
     icon: ShieldCheck,
-    title: 'Agent Identity',
+    title: 'Agent identity',
     description:
-      'Publish a public key (PKA) and let clients verify your endpoint using HTTP Message Signatures (Ed25519).',
-    iconColor: 'text-emerald-600',
-    iconBg: 'bg-emerald-50 dark:bg-emerald-950/30',
+      'Publish a public key (PKA) and let clients verify your endpoint with HTTP Message Signatures (Ed25519).',
+    accent: true,
     links: [
-      {
-        label: 'Identity & PKA',
-        href: '/docs/Reference/identity_pka',
-      },
+      { label: 'Identity & PKA', href: '/docs/Reference/identity_pka' },
       { label: 'Security', href: '/docs/Reference/security' },
     ],
   },
@@ -85,72 +66,67 @@ const solutions: Array<{
 
 export function Solution() {
   return (
-    <section className="section-padding">
+    <section className="section-padding border-t border-border">
       <div className="container mx-auto container-padding">
-        <div className="mx-auto max-w-6xl">
-          <Reveal direction="up" className="mb-12 text-center">
-            <h2 className="mb-4 text-4xl md:text-5xl font-bold tracking-tight">
-              How <span className="text-gradient">AID</span> Solves It
-            </h2>
-            <p className="text-xl md:text-2xl leading-relaxed text-muted-foreground">
-              One DNS record. Discovery, protocol, and endpoint proof.
-            </p>
-          </Reveal>
+        <div className="mx-auto max-w-5xl">
+          <SectionHeader
+            eyebrow="The solution"
+            title="How AID solves it"
+            lede="One DNS record. Discovery, protocol, and endpoint proof."
+          />
 
           <RevealStagger
             direction="up"
-            staggerMs={120}
-            className="grid gap-6 md:grid-cols-2 lg:grid-cols-4"
+            staggerMs={80}
+            className="grid gap-px overflow-hidden rounded-lg border border-border bg-border md:grid-cols-2 lg:grid-cols-4"
           >
-            {solutions.map((solution, index) => (
-              <Card
-                key={index}
-                className="card-feature relative overflow-hidden shadow-soft-lg hover:shadow-soft-xl transition-all duration-300 hover:-translate-y-2 group"
+            {solutions.map((solution) => (
+              <div
+                key={solution.n}
+                className="flex flex-col gap-4 bg-card p-6 transition-colors duration-200 hover:bg-muted/40"
               >
-                <div className="absolute top-4 right-4 text-8xl font-bold text-muted-foreground/10 select-none transition-all duration-300 group-hover:text-muted-foreground/20 group-hover:scale-110">
-                  {solution.number}
-                </div>
-                <CardHeader className="pb-4 relative z-10">
-                  <div
-                    className={`w-12 h-12 ${solution.iconBg} rounded-xl flex items-center justify-center ${solution.iconColor} mb-4 shadow-soft-xs transition-all duration-300 group-hover:scale-110 group-hover:shadow-soft-md`}
+                <div className="flex items-center justify-between">
+                  <span
+                    className={`flex h-10 w-10 items-center justify-center rounded-md border border-border ${
+                      solution.accent ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground'
+                    }`}
                   >
-                    <solution.icon className="h-6 w-6 transition-transform duration-300 group-hover:scale-110" />
-                  </div>
-                  <CardTitle className="text-xl transition-colors duration-300 group-hover:text-foreground">
-                    {solution.title}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="relative z-10">
-                  <CardDescription className="text-base leading-relaxed transition-colors duration-300 group-hover:text-muted-foreground/80">
+                    <solution.icon className="h-5 w-5" />
+                  </span>
+                  <span className="font-mono text-xs text-muted-foreground/50">{solution.n}</span>
+                </div>
+
+                <div className="flex-1">
+                  <h3 className="text-base font-semibold text-foreground">{solution.title}</h3>
+                  <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
                     {solution.description}
-                  </CardDescription>
-                  {solution.badges && solution.badges.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-1.5">
+                  </p>
+                  {solution.badges ? (
+                    <div className="mt-3 flex flex-wrap gap-1">
                       {solution.badges.map((b) => (
                         <span
                           key={b}
-                          className="inline-block text-xs font-mono bg-muted px-2 py-0.5 rounded-md border border-border/50 transition-colors duration-200 group-hover:bg-muted/80"
+                          className="rounded border border-border px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground"
                         >
                           {b}
                         </span>
                       ))}
                     </div>
-                  )}
-                  {solution.links && (
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {solution.links.map((link, linkIndex) => (
-                        <Link
-                          key={linkIndex}
-                          href={link.href}
-                          className="text-xs text-muted-foreground hover:text-primary transition-colors duration-200 underline decoration-1 underline-offset-2"
-                        >
-                          {link.label}
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                  ) : null}
+                </div>
+
+                <div className="flex flex-wrap gap-x-3 gap-y-1">
+                  {solution.links.map((link) => (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      className="font-mono text-xs text-muted-foreground underline decoration-border underline-offset-4 transition-colors hover:text-foreground hover:decoration-foreground"
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
             ))}
           </RevealStagger>
         </div>

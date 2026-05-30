@@ -85,7 +85,7 @@ export function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/80 backdrop-blur-soft shadow-soft">
+    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/80 backdrop-blur-soft">
       <div className="container flex h-16 items-center justify-between">
         {/* === Left Side: Logo === */}
         <Logo className="flex-shrink-0" asLink />
@@ -99,7 +99,7 @@ export function Header() {
               href={centeredLink.href}
               target={centeredLink.external ? '_blank' : undefined}
               rel={centeredLink.external ? 'noopener noreferrer' : undefined}
-              className="transition-all duration-200 hover:text-foreground flex items-center gap-1 hover:scale-105 text-sm font-medium text-muted-foreground"
+              className="transition-all duration-200 hover:text-foreground flex items-center gap-1 text-sm font-medium text-muted-foreground"
             >
               {centeredLink.name}
               {centeredLink.external && <ExternalLink className="h-3 w-3" />}
@@ -117,7 +117,7 @@ export function Header() {
                 href={centeredLink.href}
                 target={centeredLink.external ? '_blank' : undefined}
                 rel={centeredLink.external ? 'noopener noreferrer' : undefined}
-                className="transition-all duration-200 hover:text-foreground flex items-center gap-1 hover:scale-105 text-muted-foreground"
+                className="transition-all duration-200 hover:text-foreground flex items-center gap-1 text-muted-foreground"
               >
                 {centeredLink.name}
                 {centeredLink.external && <ExternalLink className="h-3 w-3" />}
@@ -129,7 +129,7 @@ export function Header() {
                 href={item.href}
                 target={item.external ? '_blank' : undefined}
                 rel={item.external ? 'noopener noreferrer' : undefined}
-                className="transition-all duration-200 hover:text-foreground flex items-center gap-1 hover:scale-105 text-muted-foreground"
+                className="transition-all duration-200 hover:text-foreground flex items-center gap-1 text-muted-foreground"
               >
                 {item.name}
                 {item.external && <ExternalLink className="h-3 w-3" />}
@@ -142,7 +142,7 @@ export function Header() {
             {isWorkbench ? null : ( // <Button disabled className="shadow-soft-md">Workbench</Button> // as the switcher already indicates the page. You can re-enable if desired. // This button is now hidden on the workbench page to reduce clutter,
               <Button
                 asChild
-                className="bg-primary text-primary-foreground hover:text-primary-foreground hover:bg-primary-hover shadow-soft-md hover:shadow-soft-lg transition-all duration-300 hover:scale-105"
+                className="bg-primary text-primary-foreground hover:text-primary-foreground hover:bg-primary-hover shadow-soft-md hover:shadow-soft-lg transition-all duration-300"
               >
                 <Link href="/workbench">Try the Workbench</Link>
               </Button>

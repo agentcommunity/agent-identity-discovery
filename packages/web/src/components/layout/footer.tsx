@@ -3,7 +3,7 @@ import { ExternalLink } from 'lucide-react';
 
 export function Footer() {
   return (
-    <footer className="border-t border-border/50 bg-background/95 backdrop-blur-soft shadow-soft-xs">
+    <footer className="border-t border-border bg-background/95">
       <div className="container mx-auto px-4 py-6">
         <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
           <div className="space-y-3">

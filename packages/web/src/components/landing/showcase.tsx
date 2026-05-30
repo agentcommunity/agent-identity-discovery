@@ -1,14 +1,23 @@
 'use client';
 
 import Link from 'next/link';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, ExternalLink, Languages, Hammer } from 'lucide-react';
+import { Check, ArrowUpRight } from 'lucide-react';
 import { Reveal, RevealStagger } from './reveal';
+import { SectionHeader } from './section-header';
 
-const toolkitPackages = [
-  // Tools first
+type Pkg = {
+  name: string;
+  package: string;
+  description: string;
+  features: string[];
+  href: string;
+  docsHref?: string;
+  badge: string;
+  kind: 'Tool' | 'Language';
+};
+
+const toolkitPackages: Pkg[] = [
   {
     name: 'Core Engine',
     package: '@agentcommunity/aid-engine',
@@ -56,7 +65,6 @@ const toolkitPackages = [
     badge: 'Planned',
     kind: 'Tool',
   },
-  // Languages after tools
   {
     name: 'TypeScript / JS',
     package: '@agentcommunity/aid',
@@ -121,113 +129,79 @@ const toolkitPackages = [
 
 export function Toolkit() {
   return (
-    <section className="section-padding bg-muted/30">
+    <section className="section-padding border-t border-border">
       <div className="container mx-auto container-padding">
         <div className="mx-auto max-w-6xl">
-          <Reveal direction="up" className="mb-12 text-center">
-            <h2 className="mb-4 text-4xl md:text-5xl font-bold tracking-tight">
-              Developer Toolkit
-            </h2>
-            <p className="text-xl md:text-2xl leading-relaxed text-muted-foreground">
-              SDKs in six languages, a CLI, a conformance suite, and a browser workbench.
-            </p>
-          </Reveal>
+          <SectionHeader
+            eyebrow="Tooling"
+            title="Developer toolkit"
+            lede="SDKs in six languages, a CLI, a conformance suite, and a browser workbench."
+          />
 
           <RevealStagger
             direction="up"
-            staggerMs={60}
-            className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
+            staggerMs={50}
+            className="grid gap-px overflow-hidden rounded-lg border border-border bg-border md:grid-cols-2 lg:grid-cols-3"
           >
-            {toolkitPackages.map((pkg, index) => (
-              <Card
-                key={index}
-                className="card-feature flex flex-col shadow-soft-lg hover:shadow-soft-xl transition-all duration-300 hover:-translate-y-2 group"
-              >
-                <CardHeader className="pb-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        variant="secondary"
-                        className={`text-xs flex items-center gap-1 border ${pkg.kind === 'Language' ? 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800' : 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800'}`}
-                      >
-                        {pkg.kind === 'Language' ? (
-                          <Languages className="h-3.5 w-3.5" />
-                        ) : (
-                          <Hammer className="h-3.5 w-3.5" />
-                        )}
-                        <span>{pkg.kind}</span>
-                      </Badge>
-                      <Badge
-                        variant={
-                          pkg.badge === 'Stable'
-                            ? 'success'
-                            : (pkg.badge === 'Beta'
-                              ? 'warning'
-                              : 'default')
-                        }
-                        className="text-xs shadow-soft-xs transition-all duration-300 group-hover:shadow-soft-md group-hover:scale-105"
-                      >
-                        {pkg.badge}
-                      </Badge>
-                    </div>
-                  </div>
-                  <CardTitle className="text-lg transition-colors duration-300 group-hover:text-foreground">
-                    {pkg.name}
-                  </CardTitle>
-                  <div className="text-sm font-mono text-muted-foreground bg-muted/50 px-2 py-1 rounded border border-border/30 shadow-soft-xs transition-all duration-300 group-hover:bg-muted/70">
-                    {pkg.package}
-                  </div>
-                  <CardDescription className="text-sm transition-colors duration-300 group-hover:text-muted-foreground/80">
-                    {pkg.description}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="flex-1 flex flex-col">
-                  <div className="space-y-2 mb-6 flex-1">
-                    {pkg.features.map((feature, featureIndex) => (
-                      <div
-                        key={featureIndex}
-                        className="flex items-center gap-2 text-sm transition-colors duration-300 group-hover:text-muted-foreground/90"
-                      >
-                        <CheckCircle className="h-4 w-4 text-primary flex-shrink-0 transition-all duration-300 group-hover:scale-110" />
-                        <span>{feature}</span>
-                      </div>
-                    ))}
-                  </div>
+            {toolkitPackages.map((pkg) => (
+              <div key={pkg.name} className="flex flex-col gap-4 bg-card p-6">
+                <div className="flex items-center justify-between font-mono text-[11px] uppercase tracking-wider">
+                  <span className="text-muted-foreground/60">{pkg.kind}</span>
+                  {pkg.badge === 'Stable' ? (
+                    <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                      {pkg.badge}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground/60">{pkg.badge}</span>
+                  )}
+                </div>
 
-                  <div className="space-y-2">
-                    <Button
-                      variant="outline"
-                      className="w-full group-button shadow-soft hover:shadow-soft-md transition-all duration-200 hover:scale-105"
-                      asChild
+                <div>
+                  <h3 className="text-base font-semibold text-foreground">{pkg.name}</h3>
+                  <p className="mt-1 font-mono text-xs text-muted-foreground/70">{pkg.package}</p>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    {pkg.description}
+                  </p>
+                </div>
+
+                <ul className="flex-1 space-y-1.5">
+                  {pkg.features.map((feature) => (
+                    <li
+                      key={feature}
+                      className="flex items-center gap-2 text-sm text-muted-foreground"
                     >
-                      <Link
-                        href={pkg.href}
-                        target={pkg.href.startsWith('http') ? '_blank' : undefined}
-                      >
-                        {pkg.href.startsWith('/') ? 'Try Now' : 'View Package'}
-                        <ExternalLink className="ml-2 h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
-                      </Link>
+                      <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="flex flex-col gap-1.5">
+                  <Button variant="outline" size="sm" asChild className="justify-between">
+                    <Link
+                      href={pkg.href}
+                      target={pkg.href.startsWith('http') ? '_blank' : undefined}
+                    >
+                      {pkg.href.startsWith('/') ? 'Try now' : 'View package'}
+                      <ArrowUpRight className="h-4 w-4" />
+                    </Link>
+                  </Button>
+                  {pkg.docsHref ? (
+                    <Button variant="ghost" size="sm" asChild className="text-xs">
+                      <Link href={pkg.docsHref}>Documentation</Link>
                     </Button>
-                    {pkg.docsHref && (
-                      <Button variant="ghost" size="sm" className="w-full text-xs" asChild>
-                        <Link href={pkg.docsHref}>Documentation</Link>
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+                  ) : null}
+                </div>
+              </div>
             ))}
           </RevealStagger>
 
-          <Reveal direction="up" delay={200} className="mt-12 text-center">
-            <Button
-              size="lg"
-              asChild
-              className="shadow-soft-md hover:shadow-soft-lg transition-all duration-300 hover:scale-105"
-            >
+          <Reveal direction="up" delay={150} className="mt-10">
+            <Button variant="outline" asChild>
               <Link href="https://github.com/agentcommunity" target="_blank">
-                <ExternalLink className="mr-2 h-5 w-5" />
-                View All on GitHub
+                View all on GitHub
+                <ArrowUpRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
           </Reveal>
