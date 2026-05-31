@@ -1,6 +1,0 @@
-"AID-Challenge": None
-"@method": GET
-"@target-uri": https://api.example.com/mcp
-"host": api.example.com
-"date": Mon, 01 Sep 2025 06:35:44 GMT
-"@signature-params": ("AID-Challenge" "@method" "@target-uri" "host" "date");created=1756708544;keyid="g1";alg="ed25519"

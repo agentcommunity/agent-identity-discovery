@@ -21,6 +21,7 @@ import inquirer from 'inquirer';
 import clipboardy from 'clipboardy';
 import { formatCheckResult } from './output';
 import { loadCache, saveCache } from './cache';
+import { applySecurityState } from './security-state';
 
 /**
  * CLI-specific function that generates Ed25519 keys and saves them to disk.
@@ -134,7 +135,7 @@ program
 
       try {
         const cache = options.checkDowngrade ? await loadCache() : null;
-        const previousCacheEntry = cache ? cache[domain] : undefined;
+        const previousCacheEntry = cache ? cache.entries[domain] : undefined;
 
         const report = await runCheck(domain, {
           protocol: options.protocol,
@@ -146,20 +147,20 @@ program
           pkaPolicy: options.pkaPolicy,
           downgradePolicy: options.downgradePolicy,
           wellKnownPolicy: options.wellKnownPolicy,
-          previousSecurity: previousCacheEntry
-            ? { pka: previousCacheEntry.pka, kid: previousCacheEntry.kid }
-            : undefined,
           showDetails: options.showDetails,
           probeProtoSubdomain: options.probeProtoSubdomain,
           probeProtoEvenIfBase: options.probeProtoEvenIfBase,
           dumpWellKnownPath:
             typeof options.dumpWellKnown === 'string' ? options.dumpWellKnown : null,
-          checkDowngrade: options.checkDowngrade,
-          previousCacheEntry,
+          checkDowngrade: false,
         } as CheckOptions);
 
-        if (cache && report.cacheEntry) {
-          cache[domain] = report.cacheEntry;
+        const securityState = cache
+          ? applySecurityState(report, previousCacheEntry, options.downgradePolicy)
+          : null;
+
+        if (cache && securityState?.shouldPersist && report.cacheEntry) {
+          cache.entries[domain] = report.cacheEntry;
           await saveCache(cache);
         }
 
@@ -222,7 +223,7 @@ program
     ) => {
       try {
         const cache = options.checkDowngrade ? await loadCache() : null;
-        const previousCacheEntry = cache ? cache[domain] : undefined;
+        const previousCacheEntry = cache ? cache.entries[domain] : undefined;
 
         const report = await runCheck(domain, {
           protocol: options.protocol,
@@ -234,20 +235,20 @@ program
           pkaPolicy: options.pkaPolicy,
           downgradePolicy: options.downgradePolicy,
           wellKnownPolicy: options.wellKnownPolicy,
-          previousSecurity: previousCacheEntry
-            ? { pka: previousCacheEntry.pka, kid: previousCacheEntry.kid }
-            : undefined,
           showDetails: options.showDetails || false,
           probeProtoSubdomain: false, // JSON command doesn't support proto probing for now
           probeProtoEvenIfBase: false,
           dumpWellKnownPath:
             typeof options.dumpWellKnown === 'string' ? options.dumpWellKnown : null,
-          checkDowngrade: options.checkDowngrade || false,
-          previousCacheEntry,
+          checkDowngrade: false,
         } as CheckOptions);
 
-        if (cache && report.cacheEntry) {
-          cache[domain] = report.cacheEntry;
+        const securityState = cache
+          ? applySecurityState(report, previousCacheEntry, options.downgradePolicy)
+          : null;
+
+        if (cache && securityState?.shouldPersist && report.cacheEntry) {
+          cache.entries[domain] = report.cacheEntry;
           await saveCache(cache);
         }
 
@@ -324,7 +325,7 @@ program
   .addCommand(
     new Command('generate')
       .description(
-        'Generate a new Ed25519 keypair and print the public key (z...); private key saved to ~/.aid/keys',
+        'Generate a new Ed25519 keypair and print the AID v2 public key (base64url JWK x); private key saved to ~/.aid/keys',
       )
       .option('--label <name>', 'Key label (filename prefix)')
       .option('--out <dir>', 'Output directory for private key')
@@ -340,8 +341,8 @@ program
   )
   .addCommand(
     new Command('verify')
-      .description('Verify a PKA public key string')
-      .requiredOption('--key <pka>', 'z-prefixed multibase Ed25519 public key')
+      .description('Verify an AID v2 PKA public key string')
+      .requiredOption('--key <pka>', 'base64url JWK x for a raw Ed25519 public key')
       .action((opts: { key: string }) => {
         const res = verifyPka(opts.key);
         if (res.valid) console.log('✅ valid');
@@ -439,21 +440,13 @@ program
       {
         type: 'input',
         name: 'pka',
-        message: 'PKA public key (z-prefixed multibase Ed25519):',
+        message: 'PKA public key (base64url JWK x for Ed25519, AID v2):',
         when: (a: { addPka?: boolean }) => Boolean(a.addPka),
         validate: (input: string) => {
           if (!input) return 'PKA key required when adding PKA';
           const r = verifyPka(input);
           return r.valid || r.reason || 'Invalid';
         },
-      },
-      {
-        type: 'input',
-        name: 'kid',
-        message: 'kid (1-6 chars [a-z0-9]):',
-        when: (a: { addPka?: boolean }) => Boolean(a.addPka),
-        validate: (input: string) =>
-          /^(?:[a-z0-9]{1,6})$/.test(input) || 'kid must match [a-z0-9]{1,6}',
       },
     ]);
 

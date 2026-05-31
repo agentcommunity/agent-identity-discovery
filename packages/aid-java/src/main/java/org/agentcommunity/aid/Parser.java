@@ -1,12 +1,16 @@
 package org.agentcommunity.aid;
 
 import java.net.URI;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 public final class Parser {
   private Parser() {}
+
+  private static final Pattern BASE64URL_UNPADDED = Pattern.compile("^[A-Za-z0-9_-]+$");
 
   public static AidRecord parse(String txtRecord) {
     Map<String, String> raw = parseRawRecord(txtRecord);
@@ -83,10 +87,10 @@ public final class Parser {
     }
 
     String version = raw.get("v");
-    if (!Constants.SPEC_VERSION.equals(version)) {
+    if (!isSupportedSpecVersion(version)) {
       throw new AidError(
           "ERR_INVALID_TXT",
-          "Unsupported version: " + version + ". Expected: " + Constants.SPEC_VERSION);
+          "Unsupported version: " + version + ". Expected one of: aid1, aid2");
     }
 
     String protoValue = hasProto ? raw.get("proto") : raw.get("p");
@@ -206,10 +210,48 @@ public final class Parser {
     }
     String pkaVal = raw.containsKey("pka") ? raw.get("pka") : (raw.containsKey("k") ? raw.get("k") : null);
     String kidVal = raw.containsKey("kid") ? raw.get("kid") : (raw.containsKey("i") ? raw.get("i") : null);
-    if (pkaVal != null && kidVal == null) {
+    if (Constants.SPEC_VERSION_V1.equals(version) && pkaVal != null && kidVal == null) {
       throw new AidError("ERR_INVALID_TXT", "kid is required when pka is present");
     }
-    return new AidRecord(Constants.SPEC_VERSION, uri, protoValue, auth, desc, docsVal, depVal, pkaVal, kidVal);
+    if (Constants.SPEC_VERSION_V2.equals(version)) {
+      if (kidVal != null) {
+        throw new AidError("ERR_INVALID_TXT", "kid/i is not allowed in aid2 records");
+      }
+      if (pkaVal != null) {
+        validateAid2Pka(pkaVal);
+      }
+    }
+    return new AidRecord(version, uri, protoValue, auth, desc, docsVal, depVal, pkaVal, kidVal);
+  }
+
+  private static boolean isSupportedSpecVersion(String version) {
+    for (String supported : Constants.SUPPORTED_SPEC_VERSIONS) {
+      if (supported.equals(version)) return true;
+    }
+    return false;
+  }
+
+  private static void validateAid2Pka(String value) {
+    byte[] decoded = decodeUnpaddedBase64Url(value);
+    if (decoded.length != 32) {
+      throw new AidError("ERR_INVALID_TXT", "aid2 pka must decode to exactly 32 bytes");
+    }
+  }
+
+  private static byte[] decodeUnpaddedBase64Url(String value) {
+    if (value == null || value.isEmpty() || value.contains("=") || !BASE64URL_UNPADDED.matcher(value).matches()) {
+      throw new AidError("ERR_INVALID_TXT", "aid2 pka must be unpadded base64url");
+    }
+    int remainder = value.length() % 4;
+    if (remainder == 1) {
+      throw new AidError("ERR_INVALID_TXT", "aid2 pka must be valid base64url");
+    }
+    String padded = value + "=".repeat((4 - remainder) % 4);
+    try {
+      return Base64.getUrlDecoder().decode(padded);
+    } catch (IllegalArgumentException e) {
+      throw new AidError("ERR_INVALID_TXT", "aid2 pka must be valid base64url");
+    }
   }
 
   public static boolean isValidProto(String token) {

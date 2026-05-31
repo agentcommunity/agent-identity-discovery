@@ -73,7 +73,7 @@ fn main() -> Result<(), aid_rs::AidError> {
 Notes
 
 - TTL from DNS is respected; successful `.well-known` fallback uses TTL=300.
-- PKA handshake (when `pka`/`kid` are present) requires enabling the `handshake` feature.
+- PKA handshake (when v2 `pka`/`k` is present) requires enabling the `handshake` feature. Legacy `aid1` records still use `pka`/`kid`.
 
 ---
 

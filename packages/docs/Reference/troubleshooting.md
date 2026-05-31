@@ -37,6 +37,16 @@ icon: material/tools
 
 ## PKA handshake failures (checklist)
 
+For v2 records:
+
+- Invalid key: `k`/`pka` is not unpadded base64url or does not decode to a 32-byte Ed25519 public key
+- `keyid` mismatch: header `keyid` does not equal the RFC 7638 JWK thumbprint derived from `k`
+- Nonce mismatch: response `nonce` does not exactly match the client challenge
+- Timestamp skew: `created`/`expires` is missing, expired, or too far from the client clock
+- Covered fields mismatch: ensure the response signature covers `"@method";req`, `"@target-uri";req`, `"@authority";req`, and `"@status"`
+
+For legacy v1 compatibility records:
+
 - Missing covered fields: ensure exactly `"AID-Challenge" "@method" "@target-uri" "host" "date"`
 - Algorithm mismatch: `alg` must be `ed25519`
 - Timestamp skew: `created` or HTTP `Date` outside ±300 seconds

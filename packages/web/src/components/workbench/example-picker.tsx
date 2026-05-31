@@ -81,7 +81,7 @@ export function ExamplePicker({ variant, onSelect, disabled }: ExamplePickerProp
               </div>
             </div>
             <div className="flex flex-col items-start gap-2 w-full sm:w-1/2">
-              <h3 className="text-sm font-semibold">Reference (v1.1)</h3>
+              <h3 className="text-sm font-semibold">Reference</h3>
               <div className="flex flex-wrap gap-2 w-full">
                 {REFERENCE_EXAMPLES.map((ex) => (
                   <ToggleGroupItem

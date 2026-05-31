@@ -1,14 +1,20 @@
 import {
   type AidRecord,
+  type AidRecordV1,
+  type AidRecordV2,
   type RawAidRecord,
   type ErrorCode,
-  SPEC_VERSION,
+  SPEC_VERSION_V1,
+  SPEC_VERSION_V2,
+  SUPPORTED_SPEC_VERSIONS,
   PROTOCOL_TOKENS,
   AUTH_TOKENS,
   ERROR_MESSAGES,
   ERROR_CODES,
   LOCAL_URI_SCHEMES,
 } from './constants.js';
+
+type SupportedSpecVersion = (typeof SUPPORTED_SPEC_VERSIONS)[number];
 
 /**
  * Custom error class for AID parsing and validation errors
@@ -24,6 +30,38 @@ export class AidError extends Error {
     this.code = ERROR_CODES[errorCode];
     this.errorCode = errorCode;
     this.details = details;
+  }
+}
+
+function isSupportedSpecVersion(version: string): version is SupportedSpecVersion {
+  return (SUPPORTED_SPEC_VERSIONS as readonly string[]).includes(version);
+}
+
+function decodeUnpaddedBase64Url(value: string): Uint8Array {
+  if (!/^[A-Za-z0-9_-]+$/.test(value) || value.includes('=')) {
+    throw new AidError('ERR_INVALID_TXT', 'aid2 pka must be unpadded base64url');
+  }
+
+  const remainder = value.length % 4;
+  if (remainder === 1) {
+    throw new AidError('ERR_INVALID_TXT', 'aid2 pka must be valid base64url');
+  }
+
+  const padded = value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - remainder) % 4);
+  try {
+    const binary = atob(padded);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  } catch {
+    throw new AidError('ERR_INVALID_TXT', 'aid2 pka must be valid base64url');
+  }
+}
+
+function validateAid2Pka(value: string): void {
+  const bytes = decodeUnpaddedBase64Url(value);
+  if (bytes.length !== 32) {
+    throw new AidError('ERR_INVALID_TXT', 'aid2 pka must decode to exactly 32 bytes');
   }
 }
 
@@ -222,12 +260,14 @@ export function validateRecord(rawRecord: RawAidRecord): AidRecord {
   }
 
   // Validate version
-  if (rawRecord.v !== SPEC_VERSION) {
+  if (!isSupportedSpecVersion(rawRecord.v)) {
     throw new AidError(
       'ERR_INVALID_TXT',
-      `Unsupported version: ${rawRecord.v}. Expected: ${SPEC_VERSION}`,
+      `Unsupported version: ${rawRecord.v}. Expected one of: ${SUPPORTED_SPEC_VERSIONS.join(', ')}`,
     );
   }
+
+  const version = rawRecord.v;
 
   // Get protocol value (prefer 'proto' over 'p')
   const protoValue = rawRecord.proto;
@@ -272,9 +312,17 @@ export function validateRecord(rawRecord: RawAidRecord): AidRecord {
     }
   }
 
-  // If PKA is present, kid is required for rotation
-  if (rawRecord.pka && !rawRecord.kid) {
+  if (version === SPEC_VERSION_V1 && rawRecord.pka && !rawRecord.kid) {
     throw new AidError('ERR_INVALID_TXT', 'kid is required when pka is present');
+  }
+
+  if (version === SPEC_VERSION_V2) {
+    if (rawRecord.kid) {
+      throw new AidError('ERR_INVALID_TXT', 'kid/i is not allowed in aid2 records');
+    }
+    if (rawRecord.pka) {
+      validateAid2Pka(rawRecord.pka);
+    }
   }
 
   // URI validation based on protocol type
@@ -320,9 +368,7 @@ export function validateRecord(rawRecord: RawAidRecord): AidRecord {
     }
   }
 
-  // Return validated record
-  return {
-    v: rawRecord.v as 'aid1',
+  const commonFields = {
     uri: rawRecord.uri,
     proto: protoValue as keyof typeof PROTOCOL_TOKENS,
     ...(rawRecord.auth && { auth: rawRecord.auth as keyof typeof AUTH_TOKENS }),
@@ -330,8 +376,20 @@ export function validateRecord(rawRecord: RawAidRecord): AidRecord {
     ...(rawRecord.docs && { docs: rawRecord.docs }),
     ...(rawRecord.dep && { dep: rawRecord.dep }),
     ...(rawRecord.pka && { pka: rawRecord.pka }),
-    ...(rawRecord.kid && { kid: rawRecord.kid }),
   };
+
+  if (version === SPEC_VERSION_V1) {
+    return {
+      v: SPEC_VERSION_V1,
+      ...commonFields,
+      ...(rawRecord.kid && { kid: rawRecord.kid }),
+    } satisfies AidRecordV1;
+  }
+
+  return {
+    v: SPEC_VERSION_V2,
+    ...commonFields,
+  } satisfies AidRecordV2;
 }
 
 /**

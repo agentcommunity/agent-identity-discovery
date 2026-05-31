@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { buildTxtRecord, validateTxt, type AidGeneratorData } from '@/lib/aid-generator';
 
 describe('AID generator', () => {
-  it('builds alias record including v1.1 fields', () => {
+  it('builds alias record including v2 fields', () => {
     const data: AidGeneratorData = {
       uri: 'https://api.example.com/mcp',
       proto: 'mcp',
@@ -11,23 +11,22 @@ describe('AID generator', () => {
       domain: 'example.com',
       docs: 'https://docs.example.com/agent',
       dep: '2026-01-01T00:00:00Z',
-      pka: 'z1234',
-      kid: 'g1',
+      pka: 'ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ',
     };
     const txt = buildTxtRecord(data);
-    expect(txt).toContain('v=aid1');
+    expect(txt).toContain('v=aid2');
     expect(txt).toContain('u=https://api.example.com/mcp');
     expect(txt).toContain('p=mcp');
     expect(txt).toContain('a=pat');
     expect(txt).toContain('s=Example');
     expect(txt).toContain('d=https://docs.example.com/agent');
     expect(txt).toContain('e=2026-01-01T00:00:00Z');
-    expect(txt).toContain('k=z1234');
-    expect(txt).toContain('i=g1');
+    expect(txt).toContain('k=ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ');
+    expect(txt).not.toContain('i=');
   });
 
   it('validates required fields and version', () => {
-    const ok = validateTxt('v=aid1;u=https://api.example.com;p=mcp') as {
+    const ok = validateTxt('v=aid2;u=https://api.example.com;p=mcp') as {
       isValid: boolean;
       error?: string;
     };

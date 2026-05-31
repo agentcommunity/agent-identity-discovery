@@ -14,7 +14,7 @@ from typing import Tuple
 import dns.exception
 import dns.resolver
 
-from .constants import DNS_SUBDOMAIN, DNS_TTL_MIN
+from .constants import DNS_SUBDOMAIN, DNS_TTL_MIN, SPEC_VERSION_V1, SPEC_VERSION_V2
 from .parser import AidError, parse
 from . import parser as _parser
 
@@ -24,6 +24,34 @@ except Exception:  # pragma: no cover - import-time optional
     perform_pka_handshake = None  # type: ignore
 
 __all__ = ["discover"]
+
+
+def _select_preferred_record(valid_records: list[dict], query_name: str) -> dict:
+    selected_version = (
+        SPEC_VERSION_V2
+        if any(record.get("v") == SPEC_VERSION_V2 for record in valid_records)
+        else SPEC_VERSION_V1
+    )
+    selected_records = [
+        record for record in valid_records if record.get("v") == selected_version
+    ]
+    if len(selected_records) == 1:
+        return selected_records[0]
+    raise AidError(
+        "ERR_INVALID_TXT",
+        f"Multiple valid AID records found for {query_name}; publish exactly one valid record per queried DNS name",
+    )
+
+
+def _perform_pka_for_record(record: dict, timeout: float) -> None:
+    if not record.get("pka"):
+        return
+    if perform_pka_handshake is None:
+        raise AidError("ERR_SECURITY", "PKA handshake not supported in this environment")
+    if record.get("v") == SPEC_VERSION_V1:
+        perform_pka_handshake(record["uri"], record["pka"], record.get("kid") or "", timeout=timeout)
+        return
+    perform_pka_handshake(record["uri"], record["pka"], timeout=timeout)
 
 
 def _query_txt_record(fqdn: str, timeout: float) -> Tuple[list[str], int]:
@@ -118,13 +146,10 @@ def discover(
                 last_error = exc
                 continue
 
-        if len(valid_records) == 1:
-            return valid_records[0], ttl
-        if len(valid_records) > 1:
-            raise AidError(
-                "ERR_INVALID_TXT",
-                f"Multiple valid AID records found for {query_name}; publish exactly one valid record per queried DNS name",
-            )
+        if valid_records:
+            record = _select_preferred_record(valid_records, query_name)
+            _perform_pka_for_record(record, timeout)
+            return record, ttl
 
         # If we got here, either no records or all invalid
         if last_error is not None:
@@ -193,55 +218,31 @@ def discover(
         return _parser.validate_record(raw)
 
     # --- Discovery Logic ---
-    # 1. Start with the base domain query
     base_fqdn = f"{DNS_SUBDOMAIN}.{domain_alabel}".rstrip(".")
-    try:
-        record, ttl = _query_and_parse(base_fqdn, filter_by_protocol=True)
-        # If no specific protocol is requested, or if the found record matches, we're done.
-        if not protocol or record.get("proto") == protocol:
-            return record, ttl
-    except AidError as e:
-        # If the base lookup fails with anything other than no record, we might still fallback.
-        # But if it's a critical error, we shouldn't continue to protocol-specific lookups.
-        if e.error_code not in ("ERR_NO_RECORD", "ERR_UNSUPPORTED_PROTO"):
-            # Re-raise unless we can fallback later
-            if not (well_known_fallback and e.error_code == "ERR_DNS_LOOKUP_FAILED"):
-                 raise
-
-    # 2. If a specific protocol was requested and the base record didn't match (or was missing),
-    # try the protocol-specific subdomains.
+    query_plan: list[tuple[str, bool]]
     if protocol:
-        # a) underscore form: _agent._<proto>.<domain>
-        proto_underscore = f"{DNS_SUBDOMAIN}._{protocol}.{domain_alabel}".rstrip(".")
-        try:
-            return _query_and_parse(proto_underscore, filter_by_protocol=True)
-        except AidError as e:
-            if getattr(e, "error_code", None) != "ERR_NO_RECORD":
-                 raise
+        query_plan = [
+            (f"{DNS_SUBDOMAIN}._{protocol}.{domain_alabel}".rstrip("."), True),
+            (f"{DNS_SUBDOMAIN}.{protocol}.{domain_alabel}".rstrip("."), True),
+            (base_fqdn, False),
+        ]
+    else:
+        query_plan = [(base_fqdn, False)]
 
-        # b) non-underscore form (as a fallback for older specs or misconfigurations)
-        proto_plain = f"{DNS_SUBDOMAIN}.{protocol}.{domain_alabel}".rstrip(".")
+    last_error: AidError | None = None
+    for query_name, filter_by_protocol in query_plan:
         try:
-            return _query_and_parse(proto_plain, filter_by_protocol=True)
-        except AidError as e:
-            if getattr(e, "error_code", None) != "ERR_NO_RECORD":
-                 raise
+            return _query_and_parse(query_name, filter_by_protocol=filter_by_protocol)
+        except AidError as exc:
+            last_error = exc
+            if exc.error_code != "ERR_NO_RECORD":
+                raise
 
-    # 3. If all DNS lookups fail, handle the final fallback or error state.
-    try:
-        # This will re-query the base and fail with a clear error if nothing is found.
-        # Or, it will trigger the .well-known fallback if applicable.
-        # Per spec: when falling back to base record, do NOT filter by protocol to maintain compatibility
-        return _query_and_parse(base_fqdn, filter_by_protocol=False)
-    except AidError as exc:
-        if well_known_fallback and exc.error_code in ("ERR_NO_RECORD", "ERR_DNS_LOOKUP_FAILED"):
-            # Attempt .well-known fallback
-            doc = _fetch_well_known_json(domain_alabel, well_known_timeout)
-            record = _canonicalize_well_known(doc)
-            # Perform PKA handshake if present
-            if record.get("pka"):
-                if perform_pka_handshake is None:
-                    raise AidError("ERR_SECURITY", "PKA handshake not supported in this environment")
-                perform_pka_handshake(record["uri"], record["pka"], record.get("kid") or "", timeout=well_known_timeout)
-            return record, DNS_TTL_MIN
-        raise
+    if well_known_fallback and last_error and last_error.error_code in ("ERR_NO_RECORD", "ERR_DNS_LOOKUP_FAILED"):
+        # Attempt .well-known fallback
+        doc = _fetch_well_known_json(domain_alabel, well_known_timeout)
+        record = _canonicalize_well_known(doc)
+        # Perform PKA handshake if present
+        _perform_pka_for_record(record, well_known_timeout)
+        return record, DNS_TTL_MIN
+    raise last_error or AidError("ERR_NO_RECORD", f"No valid _agent TXT record found for {base_fqdn}")

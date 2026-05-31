@@ -9,9 +9,9 @@ import { SectionHeader } from './section-header';
 
 const RECORD_NAME = '_agent.example.com';
 const RECORD_VALUE =
-  'v=aid1;u=https://api.example.com/mcp;p=mcp;k=z7rW8rTq8o4mM6vVf7w1k3m4uQn9p2YxCAbcDeFgHiJ;i=g1';
+  'v=aid2;u=https://api.example.com/mcp;p=mcp;k=ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ';
 const RECORD_VALUE_DISPLAY =
-  'v=aid1;u=https://api.example.com/mcp;p=mcp;k=z7rW8rTq8o4mM6vVf7w…;i=g1';
+  'v=aid2;u=https://api.example.com/mcp;p=mcp;k=ebVWLo_mVPlAeLES6K…';
 const RECORD_FULL = `${RECORD_NAME}. 300 IN TXT "${RECORD_VALUE}"`;
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -24,7 +24,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     </div>
   );
 }
-
 export function Identity() {
   return (
     <section className="section-padding border-t border-border">
@@ -59,24 +58,24 @@ export function Identity() {
                     <li className="flex gap-3">
                       <span className="font-mono text-xs text-muted-foreground/50">1</span>
                       <span>
-                        Publish <code>k</code> (public key) and <code>i</code> (key id) in your TXT
-                        record
+                        Publish <code>k</code> as the base64url Ed25519 JWK <code>x</code> value
                       </span>
                     </li>
                     <li className="flex gap-3">
                       <span className="font-mono text-xs text-muted-foreground/50">2</span>
                       <span>
-                        Client sends an <code>AID-Challenge</code> to your <code>uri</code>
+                        Client requests a nonce-bound RFC 9421 response signature
                       </span>
                     </li>
                     <li className="flex gap-3">
                       <span className="font-mono text-xs text-muted-foreground/50">3</span>
-                      <span>Server returns an HTTP signature (Ed25519) covering the request</span>
+                      <span>Server signs the request target and response status with Ed25519</span>
                     </li>
                     <li className="flex gap-3">
                       <span className="font-mono text-xs text-muted-foreground/50">4</span>
                       <span>
-                        Client verifies the signature using <code>k</code>
+                        Client derives <code>keyid</code> from <code>k</code> and verifies the
+                        signature
                       </span>
                     </li>
                   </ol>

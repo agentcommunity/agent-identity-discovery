@@ -6,14 +6,14 @@ import { discover, AidError, type AidRecord } from '@agentcommunity/aid/browser'
 import type { Result } from '@/lib/types/result';
 
 /** Shape of the successful TXT payload parsed and formatted by the hook for the UI. */
-export interface DiscoveryData extends AidRecord {
+export type DiscoveryData = AidRecord & {
   host: string;
   port: number;
   /** The connection protocol (e.g., mcp, custom). */
   protocol?: string;
   /** Optional extra fields that may be present in TXT record (e.g., protocol). */
   [key: string]: unknown;
-}
+};
 
 /**
  * Represents additional metadata we want to expose alongside a successful discovery.
@@ -75,7 +75,13 @@ export function useDiscovery() {
             recordType: 'TXT',
             source: 'DNS-over-HTTPS',
             txtRecord: reconstructedTxt,
-            pka: parsed.pka || parsed.kid ? { present: Boolean(parsed.pka), verified: null, kid: parsed.kid ?? null } : undefined,
+            pka: parsed.pka
+              ? {
+                  present: true,
+                  verified: null,
+                  kid: parsed.v === 'aid1' ? (parsed.kid ?? null) : null,
+                }
+              : undefined,
           },
         },
       };

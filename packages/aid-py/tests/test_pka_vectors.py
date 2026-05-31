@@ -1,7 +1,7 @@
 # MIT License
 # Shared PKA vectors parity tests (Python)
 
-import sys, pathlib, json, base64, time
+import sys, pathlib, json, base64, time, re
 import pytest
 
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
@@ -17,6 +17,17 @@ def _load_vectors():
     root = pathlib.Path(__file__).resolve().parents[3]
     data = json.loads((root / "protocol" / "pka_vectors.json").read_text())
     return data["vectors"]
+
+
+def _load_v1_vectors():
+    return [vector for vector in _load_vectors() if vector["record"]["v"] == "aid1"]
+
+
+def _vector_by_id(vector_id: str):
+    for vector in _load_vectors():
+        if vector["id"] == vector_id:
+            return vector
+    raise AssertionError(f"missing vector: {vector_id}")
 
 
 ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
@@ -53,7 +64,7 @@ class _Resp:
         return self._b
 
 
-@pytest.mark.parametrize("vector", _load_vectors(), ids=lambda v: v["id"])  # type: ignore
+@pytest.mark.parametrize("vector", _load_v1_vectors(), ids=lambda v: v["id"])  # type: ignore
 def test_pka_vectors(monkeypatch, vector):
     import dns.resolver
 
@@ -149,3 +160,346 @@ def test_pka_vectors(monkeypatch, vector):
     else:
         with pytest.raises(AidError):
             discover("example.com", well_known_fallback=True)
+
+
+def _header(req, name: str):
+    try:
+        value = req.headers.get(name) if hasattr(req, "headers") else None
+    except Exception:
+        value = None
+    if not value and hasattr(req, "get_header"):
+        try:
+            value = req.get_header(name)
+        except Exception:
+            value = None
+    if not value and hasattr(req, "headers") and isinstance(req.headers, dict):
+        for key, candidate in req.headers.items():
+            if key.lower() == name.lower():
+                value = candidate
+                break
+    return value
+
+
+def _b64url_decode(value: str) -> bytes:
+    return base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
+
+
+def test_v2_pka_accepts_canonical_rfc9421_signed_401(monkeypatch):
+    import dns.resolver
+    import urllib.request
+    import aid_py.pka as pka_module
+
+    vector = _vector_by_id("v2-rfc9421-response-signature")
+
+    def _no_record(name, rdtype, lifetime=5.0):
+        raise dns.resolver.NXDOMAIN()
+
+    monkeypatch.setattr(dns.resolver, "resolve", _no_record)
+    monkeypatch.setattr(pka_module.os, "urandom", lambda n: _b64url_decode(vector["nonce"]))
+    monkeypatch.setattr(pka_module.time, "time", lambda: vector["created"] + 30)
+
+    def _fake_open(req, timeout=2.0):
+        url = req.full_url if hasattr(req, "full_url") else req
+        if url.endswith("/.well-known/agent"):
+            return _Resp(200, {"Content-Type": "application/json"}, json.dumps(vector["record"]))
+        assert url == vector["request"]["target_uri"]
+        assert _header(req, "Accept-Signature") == vector["request"]["accept_signature"]
+        assert _header(req, "Cache-Control") == vector["request"]["cache_control"]
+        return _Resp(
+            401,
+            {
+                "Cache-Control": vector["response"]["cache_control"],
+                "Signature-Input": vector["response"]["signature_input"],
+                "Signature": vector["response"]["signature"],
+            },
+            "",
+        )
+
+    class _FakeOpener:
+        def open(self, req, timeout=2.0):
+            return _fake_open(req, timeout)
+
+    monkeypatch.setattr(urllib.request, "build_opener", lambda *args, **kwargs: _FakeOpener())
+
+    rec, _ = discover("example.com", well_known_fallback=True)
+    assert rec["v"] == "aid2"
+    assert rec["pka"] == vector["record"]["k"]
+
+
+def test_v2_pka_canonicalizes_uppercase_host_default_port_and_fragment(monkeypatch):
+    import dns.resolver
+    import urllib.request
+    import aid_py.pka as pka_module
+
+    vector = _vector_by_id("v2-uppercase-host-default-port-canonical-target")
+
+    def _no_record(name, rdtype, lifetime=5.0):
+        raise dns.resolver.NXDOMAIN()
+
+    monkeypatch.setattr(dns.resolver, "resolve", _no_record)
+    monkeypatch.setattr(pka_module.os, "urandom", lambda n: _b64url_decode(vector["nonce"]))
+    monkeypatch.setattr(pka_module.time, "time", lambda: vector["created"] + 30)
+
+    def _fake_open(req, timeout=2.0):
+        url = req.full_url if hasattr(req, "full_url") else req
+        if url.endswith("/.well-known/agent"):
+            return _Resp(200, {"Content-Type": "application/json"}, json.dumps(vector["record"]))
+        assert url == vector["request"]["target_uri"]
+        assert _header(req, "Accept-Signature") == vector["request"]["accept_signature"]
+        return _Resp(
+            401,
+            {
+                "Cache-Control": vector["response"]["cache_control"],
+                "Signature-Input": vector["response"]["signature_input"],
+                "Signature": vector["response"]["signature"],
+            },
+            "",
+        )
+
+    class _FakeOpener:
+        def open(self, req, timeout=2.0):
+            return _fake_open(req, timeout)
+
+    monkeypatch.setattr(urllib.request, "build_opener", lambda *args, **kwargs: _FakeOpener())
+
+    rec, _ = discover("example.com", well_known_fallback=True)
+    assert rec["v"] == "aid2"
+    assert rec["pka"] == vector["record"]["k"]
+
+
+def test_v2_pka_rejects_modified_response_signature(monkeypatch):
+    import dns.resolver
+    import urllib.request
+    import aid_py.pka as pka_module
+
+    vector = _vector_by_id("v2-rfc9421-response-signature")
+
+    def _no_record(name, rdtype, lifetime=5.0):
+        raise dns.resolver.NXDOMAIN()
+
+    monkeypatch.setattr(dns.resolver, "resolve", _no_record)
+    monkeypatch.setattr(pka_module.os, "urandom", lambda n: _b64url_decode(vector["nonce"]))
+    monkeypatch.setattr(pka_module.time, "time", lambda: vector["created"] + 30)
+
+    bad_signature = vector["response"]["signature"].replace("Tymq", "Aymq", 1)
+
+    def _fake_open(req, timeout=2.0):
+        url = req.full_url if hasattr(req, "full_url") else req
+        if url.endswith("/.well-known/agent"):
+            return _Resp(200, {"Content-Type": "application/json"}, json.dumps(vector["record"]))
+        return _Resp(
+            401,
+            {
+                "Cache-Control": vector["response"]["cache_control"],
+                "Signature-Input": vector["response"]["signature_input"],
+                "Signature": bad_signature,
+            },
+            "",
+        )
+
+    class _FakeOpener:
+        def open(self, req, timeout=2.0):
+            return _fake_open(req, timeout)
+
+    monkeypatch.setattr(urllib.request, "build_opener", lambda *args, **kwargs: _FakeOpener())
+
+    with pytest.raises(AidError) as exc_info:
+        discover("example.com", well_known_fallback=True)
+    assert exc_info.value.error_code == "ERR_SECURITY"
+
+
+def test_v2_pka_rejects_redirect_response(monkeypatch):
+    import dns.resolver
+    import urllib.request
+    import aid_py.pka as pka_module
+
+    vector = _vector_by_id("v2-rfc9421-response-signature")
+
+    def _no_record(name, rdtype, lifetime=5.0):
+        raise dns.resolver.NXDOMAIN()
+
+    monkeypatch.setattr(dns.resolver, "resolve", _no_record)
+    monkeypatch.setattr(pka_module.os, "urandom", lambda n: _b64url_decode(vector["nonce"]))
+    monkeypatch.setattr(pka_module.time, "time", lambda: vector["created"] + 30)
+
+    def _fake_open(req, timeout=2.0):
+        url = req.full_url if hasattr(req, "full_url") else req
+        if url.endswith("/.well-known/agent"):
+            return _Resp(200, {"Content-Type": "application/json"}, json.dumps(vector["record"]))
+        return _Resp(302, {"Location": "https://elsewhere.example.com/"}, "")
+
+    class _FakeOpener:
+        def open(self, req, timeout=2.0):
+            return _fake_open(req, timeout)
+
+    monkeypatch.setattr(urllib.request, "build_opener", lambda *args, **kwargs: _FakeOpener())
+
+    with pytest.raises(AidError) as exc_info:
+        discover("example.com", well_known_fallback=True)
+    assert exc_info.value.error_code == "ERR_SECURITY"
+
+
+def test_v2_request_authority_preserves_ipv6_brackets_and_port():
+    import aid_py.pka as pka_module
+
+    assert pka_module._request_authority("https://[2001:db8::1]:8443/mcp") == "[2001:db8::1]:8443"
+    assert pka_module._request_authority("https://[2001:db8::1]/mcp") == "[2001:db8::1]"
+
+
+@pytest.mark.parametrize("param", ["nonce", "keyid", "alg", "created", "expires", "tag"])
+def test_v2_signature_input_rejects_duplicate_critical_params(param):
+    import aid_py.pka as pka_module
+
+    vector = _vector_by_id("v2-rfc9421-response-signature")
+    keyid = re.search(r'keyid="([^"]+)"', vector["response"]["signature_input"])
+    assert keyid is not None
+    duplicate_value = {
+        "nonce": f'"{vector["nonce"]}"',
+        "keyid": f'"{keyid.group(1)}"',
+        "alg": '"ed25519"',
+        "created": str(vector["created"]),
+        "expires": str(vector["expires"]),
+        "tag": '"aid-pka-v2"',
+    }[param]
+    headers = {
+        "Signature-Input": f'{vector["response"]["signature_input"]};{param}={duplicate_value}',
+        "Signature": vector["response"]["signature"],
+    }
+
+    with pytest.raises(AidError) as exc_info:
+        pka_module._parse_v2_signature_headers(headers)
+    assert exc_info.value.error_code == "ERR_SECURITY"
+
+
+def test_v2_signature_input_rejects_trailing_bytes_after_quoted_param():
+    import aid_py.pka as pka_module
+
+    vector = _vector_by_id("v2-rfc9421-response-signature")
+    headers = {
+        "Signature-Input": vector["response"]["signature_input"].replace(
+            f'nonce="{vector["nonce"]}"',
+            'nonce="n"junk',
+        ),
+        "Signature": vector["response"]["signature"],
+    }
+
+    with pytest.raises(AidError) as exc_info:
+        pka_module._parse_v2_signature_headers(headers)
+    assert exc_info.value.error_code == "ERR_SECURITY"
+
+
+@pytest.mark.parametrize(
+    ("case_id", "mutate"),
+    [
+        ("duplicate_req", lambda value: value.replace('"@method";req', '"@method";req;req', 1)),
+        ("uppercase_req", lambda value: value.replace('"@method";req', '"@method";REQ', 1)),
+        ("mixed_case_req", lambda value: value.replace('"@method";req', '"@method";ReQ', 1)),
+        ("unknown_param", lambda value: value.replace('"@method";req', '"@method";req;foo', 1)),
+        ("duplicate_name", lambda value: value.replace('"@target-uri";req', '"@method";req', 1)),
+        ("missing_required", lambda value: value.replace(' "@authority";req', "", 1)),
+        ("extra_date", lambda value: value.replace('"@status"', '"date" "@status"', 1)),
+    ],
+    ids=lambda case: case if isinstance(case, str) else None,
+)
+def test_v2_signature_input_rejects_invalid_covered_items(case_id, mutate):
+    import aid_py.pka as pka_module
+
+    vector = _vector_by_id("v2-rfc9421-response-signature")
+    headers = {
+        "Signature-Input": mutate(vector["response"]["signature_input"]),
+        "Signature": vector["response"]["signature"],
+    }
+
+    with pytest.raises(AidError) as exc_info:
+        pka_module._parse_v2_signature_headers(headers)
+    assert exc_info.value.error_code == "ERR_SECURITY"
+
+
+@pytest.mark.parametrize("header_name", ["Signature-Input", "Signature"])
+def test_v2_headers_reject_duplicate_aid_pka_dictionary_member(header_name):
+    import aid_py.pka as pka_module
+
+    vector = _vector_by_id("v2-rfc9421-response-signature")
+    headers = {
+        "Signature-Input": vector["response"]["signature_input"],
+        "Signature": vector["response"]["signature"],
+    }
+    source = "signature_input" if header_name == "Signature-Input" else "signature"
+    headers[header_name] = f'{vector["response"][source]}, {vector["response"][source]}'
+
+    with pytest.raises(AidError) as exc_info:
+        pka_module._parse_v2_signature_headers(headers)
+    assert exc_info.value.error_code == "ERR_SECURITY"
+
+
+@pytest.mark.parametrize("header_name", ["Signature-Input", "Signature"])
+def test_v2_headers_reject_duplicate_aid_pka_member_across_repeated_header_values(header_name):
+    import aid_py.pka as pka_module
+
+    class _RepeatedHeaders(dict):
+        def get_all(self, name):
+            value = self.get(name)
+            if value is None:
+                return None
+            if name.lower() == header_name.lower():
+                return [value, value]
+            return [value]
+
+    vector = _vector_by_id("v2-rfc9421-response-signature")
+    headers = _RepeatedHeaders(
+        {
+            "Signature-Input": vector["response"]["signature_input"],
+            "Signature": vector["response"]["signature"],
+        }
+    )
+
+    with pytest.raises(AidError) as exc_info:
+        pka_module._parse_v2_signature_headers(headers)
+    assert exc_info.value.error_code == "ERR_SECURITY"
+
+
+def test_v2_signature_input_rejects_unknown_top_level_param():
+    import aid_py.pka as pka_module
+
+    vector = _vector_by_id("v2-rfc9421-response-signature")
+    headers = {
+        "Signature-Input": f'{vector["response"]["signature_input"]};foo="bar"',
+        "Signature": vector["response"]["signature"],
+    }
+
+    with pytest.raises(AidError) as exc_info:
+        pka_module._parse_v2_signature_headers(headers)
+    assert exc_info.value.error_code == "ERR_SECURITY"
+
+
+@pytest.mark.parametrize("param", ["created", "expires"])
+def test_v2_signature_input_rejects_quoted_integer_params(param):
+    import aid_py.pka as pka_module
+
+    vector = _vector_by_id("v2-rfc9421-response-signature")
+    value = str(vector[param])
+    headers = {
+        "Signature-Input": vector["response"]["signature_input"].replace(
+            f"{param}={value}",
+            f'{param}="{value}"',
+        ),
+        "Signature": vector["response"]["signature"],
+    }
+
+    with pytest.raises(AidError) as exc_info:
+        pka_module._parse_v2_signature_headers(headers)
+    assert exc_info.value.error_code == "ERR_SECURITY"
+
+
+def test_debug_write_does_not_create_package_debug_dir_by_default(tmp_path, monkeypatch):
+    import aid_py.pka as pka_module
+
+    fake_module = tmp_path / "site-packages" / "aid_py" / "pka.py"
+    fake_module.parent.mkdir(parents=True)
+    fake_module.write_text("")
+    monkeypatch.setattr(pka_module, "__file__", str(fake_module))
+    monkeypatch.delenv("AID_DEBUG_PKA_DIR", raising=False)
+
+    pka_module._debug_write("probe.txt", "debug")
+
+    assert not (fake_module.parent / "_debug" / "probe.txt").exists()

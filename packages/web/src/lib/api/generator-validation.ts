@@ -2,7 +2,6 @@ import { buildTxtRecordVariant } from '@agentcommunity/aid-engine';
 import type { AuthToken } from '@agentcommunity/aid';
 
 const ISO_8601_UTC_Z = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
-const KID_PATTERN = /^[a-z0-9]{1,6}$/;
 
 const PROTOCOL_SCHEMES = {
   mcp: ['https://'],
@@ -48,7 +47,7 @@ interface Issue {
 }
 
 interface GeneratorJsonPreview {
-  v: 'aid1';
+  v: 'aid2';
   u?: string;
   p?: string;
   a?: string;
@@ -56,7 +55,6 @@ interface GeneratorJsonPreview {
   d?: string;
   e?: string;
   k?: string;
-  i?: string;
 }
 
 export interface GeneratorValidationResponse {
@@ -99,7 +97,7 @@ const isValidDomain = (domain: string): boolean => {
 };
 
 const buildJsonPreview = (data: GeneratorBody): GeneratorJsonPreview => ({
-  v: 'aid1',
+  v: 'aid2',
   u: data.uri || undefined,
   p: data.proto || undefined,
   a: data.auth || undefined,
@@ -107,10 +105,20 @@ const buildJsonPreview = (data: GeneratorBody): GeneratorJsonPreview => ({
   d: data.docs || undefined,
   e: data.dep || undefined,
   k: data.pka || undefined,
-  i: data.kid || undefined,
 });
 
 const safeByteLength = (value: string): number => new TextEncoder().encode(value).length;
+
+const isValidV2Pka = (value: string): boolean => {
+  if (!/^[A-Za-z0-9_-]+$/.test(value) || value.includes('=') || value.length % 4 === 1) {
+    return false;
+  }
+  try {
+    return Buffer.from(value, 'base64url').length === 32;
+  } catch {
+    return false;
+  }
+};
 
 export const validateGeneratorPayload = (payload: unknown): GeneratorValidationResponse => {
   const data = normalize(payload);
@@ -139,14 +147,11 @@ export const validateGeneratorPayload = (payload: unknown): GeneratorValidationR
   if (data.dep && !ISO_8601_UTC_Z.test(data.dep)) {
     errors.push({ code: 'ERR_DEP_ISO', message: 'Dep must be ISO 8601 UTC Z' });
   }
-  if (data.pka && !data.kid) {
-    errors.push({
-      code: 'ERR_KID_REQUIRED',
-      message: 'Key ID (rotation) is required when PKA is present',
-    });
+  if (data.kid) {
+    errors.push({ code: 'ERR_KID_NOT_ALLOWED', message: 'Key ID is not used in AID v2' });
   }
-  if (data.kid && !KID_PATTERN.test(data.kid)) {
-    errors.push({ code: 'ERR_KID_FORMAT', message: 'Key ID must be 1-6 chars [a-z0-9]' });
+  if (data.pka && !isValidV2Pka(data.pka)) {
+    errors.push({ code: 'ERR_PKA_FORMAT', message: 'PKA must be unpadded base64url Ed25519' });
   }
 
   if (data.uri && isGeneratorProtocol(data.proto)) {

@@ -54,18 +54,21 @@ const verifyVersionAlignment = async (repoRoot) => {
   const mismatches = [];
 
   const specPath = path.join(repoRoot, 'packages', 'docs', 'specification.md');
+  const v2PreviewPath = path.join(repoRoot, 'packages', 'docs', 'specification_v2_explained.md');
   const constantsPath = path.join(repoRoot, 'protocol', 'constants.yml');
   const rootReadmePath = path.join(repoRoot, 'README.md');
   const aidReadmePath = path.join(repoRoot, 'packages', 'aid', 'README.md');
   const agentsPath = path.join(repoRoot, 'AGENTS.md');
 
-  const [specContent, constantsContent, rootReadme, aidReadme, agentsContent] = await Promise.all([
-    readUtf8(specPath),
-    readUtf8(constantsPath),
-    readUtf8(rootReadmePath),
-    readUtf8(aidReadmePath),
-    readUtf8(agentsPath),
-  ]);
+  const [specContent, v2PreviewContent, constantsContent, rootReadme, aidReadme, agentsContent] =
+    await Promise.all([
+      readUtf8(specPath),
+      readUtf8(v2PreviewPath),
+      readUtf8(constantsPath),
+      readUtf8(rootReadmePath),
+      readUtf8(aidReadmePath),
+      readUtf8(agentsPath),
+    ]);
 
   const specVersion = extractVersion(
     specContent,
@@ -84,7 +87,16 @@ const verifyVersionAlignment = async (repoRoot) => {
     path.join(repoRoot, 'packages', 'aid-conformance', 'package.json'),
   );
 
-  if (constantsVersion !== specVersion) {
+  const constantsMajor = constantsVersion.split('.')[0];
+  const specMajor = specVersion.split('.')[0];
+  const hasV2DraftPreview =
+    constantsMajor === '2' &&
+    specMajor === '1' &&
+    /^# Agent Identity & Discovery \(AID\) v2 - Explained Draft$/m.test(v2PreviewContent) &&
+    /^\s*-\s*v2\s*$/m.test(v2PreviewContent) &&
+    v2PreviewContent.includes('`aid2`');
+
+  if (constantsVersion !== specVersion && !hasV2DraftPreview) {
     mismatches.push(
       `Version mismatch: protocol/constants.yml schemaVersion=${constantsVersion} but specification.md=${specVersion}`,
     );

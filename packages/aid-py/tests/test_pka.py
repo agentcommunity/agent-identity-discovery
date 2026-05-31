@@ -131,11 +131,6 @@ def test_pka_accepts_quoted_keyid(monkeypatch):
         host = pathlib.PurePosixPath(url).name if "://" not in url else __import__("urllib.parse").parse.urlparse(url).netloc
         base, params_str = _build_base(order, challenge=challenge, method=method, target=target, host=host, date=date, created=now, kid=kid)
         sig = private_key.sign(base)
-        if __import__("os").environ.get("AID_DEBUG_PKA") == "1":
-            from pathlib import Path
-            p = Path(__file__).resolve().parents[1] / "aid_py" / "_debug"
-            p.mkdir(parents=True, exist_ok=True)
-            (p / "base_test.txt").write_text(base.decode())
         quoted = ' '.join([f'"{c}"' for c in order])
         headers = {
             "Signature-Input": f"sig=({quoted});created={now};keyid=\"{kid}\";alg=\"ed25519\"",

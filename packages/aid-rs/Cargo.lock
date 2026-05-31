@@ -34,12 +34,14 @@ dependencies = [
  "bs58",
  "ed25519-dalek",
  "futures",
+ "getrandom 0.2.16",
  "hickory-resolver",
  "httpdate",
  "httpmock",
  "idna 0.5.0",
  "reqwest",
  "serde_json",
+ "sha2",
  "tokio",
 ]
 

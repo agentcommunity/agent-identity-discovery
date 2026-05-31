@@ -3,6 +3,7 @@
 use crate::errors::AidError;
 use crate::parser::parse;
 use crate::record::AidRecord;
+use crate::constants_gen::SPEC_VERSION_V1;
 use reqwest::redirect::Policy;
 use reqwest::Client;
 use std::time::Duration;
@@ -78,9 +79,12 @@ pub async fn fetch_well_known(domain: &str, timeout: Duration) -> Result<AidReco
     let txt = canonicalize_to_txt(obj);
     let rec = parse(&txt)?;
     // Perform PKA handshake when present
-    if let (Some(pka), Some(kid)) = (rec.pka.clone(), rec.kid.clone()) {
-        // ignore result variable usage; propagate error if any
-        crate::pka::perform_pka_handshake(&rec.uri, &pka, &kid, timeout).await?;
+    if let Some(pka) = rec.pka.clone() {
+        if rec.v == SPEC_VERSION_V1 {
+            crate::pka::perform_pka_handshake(&rec.uri, &pka, rec.kid.as_deref().unwrap_or(""), timeout).await?;
+        } else {
+            crate::pka::perform_pka_handshake(&rec.uri, &pka, "", timeout).await?;
+        }
     }
     Ok(rec)
 }

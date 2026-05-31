@@ -8,11 +8,25 @@ import type { HandshakeSuccessData } from '@/hooks/use-connection';
 import type { AidRecordV1, HandshakeV1 } from '@/generated/spec';
 
 function isDiscoveryData(x: unknown): x is DiscoveryData {
-  return typeof x === 'object' && x !== null && 'uri' in x && 'proto' in x;
+  return (
+    typeof x === 'object' &&
+    x !== null &&
+    'uri' in x &&
+    'proto' in x &&
+    typeof (x as { uri?: unknown }).uri === 'string' &&
+    typeof (x as { proto?: unknown }).proto === 'string'
+  );
 }
 
 function isAidRecordV1Raw(x: unknown): x is AidRecordV1 {
-  return typeof x === 'object' && x !== null && 'uri' in x && 'proto' in x;
+  return (
+    typeof x === 'object' &&
+    x !== null &&
+    'uri' in x &&
+    'proto' in x &&
+    typeof (x as { uri?: unknown }).uri === 'string' &&
+    typeof (x as { proto?: unknown }).proto === 'string'
+  );
 }
 
 const normalizeRecord = (raw: unknown): CanonicalRecord | null => {

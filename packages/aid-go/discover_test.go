@@ -107,3 +107,93 @@ func TestDiscoverFailsOnMultipleValidTXTAnswers(t *testing.T) {
 		t.Fatalf("expected ERR_INVALID_TXT, got %s", aidErr.Symbol)
 	}
 }
+
+func TestDiscoverPrefersValidAid2OverAid1(t *testing.T) {
+	oldLookup := lookupTXT
+	defer func() { lookupTXT = oldLookup }()
+	lookupTXT = func(_ context.Context, _ string) ([]string, error) {
+		return []string{
+			"v=aid1;u=https://v1.example.com/mcp;p=mcp",
+			"v=aid2;u=https://v2.example.com/mcp;p=mcp",
+		}, nil
+	}
+
+	rec, _, err := DiscoverWithOptions("example.com", 2*time.Second, DiscoveryOptions{
+		WellKnownFallback: false,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.V != "aid2" || rec.URI != "https://v2.example.com/mcp" {
+		t.Fatalf("expected aid2 record, got %+v", rec)
+	}
+}
+
+func TestDiscoverFailsOnMultipleValidAid2Records(t *testing.T) {
+	oldLookup := lookupTXT
+	defer func() { lookupTXT = oldLookup }()
+	lookupTXT = func(_ context.Context, _ string) ([]string, error) {
+		return []string{
+			"v=aid1;u=https://v1.example.com/mcp;p=mcp",
+			"v=aid2;u=https://one.example.com/mcp;p=mcp",
+			"v=aid2;u=https://two.example.com/mcp;p=mcp",
+		}, nil
+	}
+
+	_, _, err := DiscoverWithOptions("example.com", 2*time.Second, DiscoveryOptions{
+		WellKnownFallback: false,
+	})
+	if err == nil {
+		t.Fatalf("expected ambiguity error")
+	}
+	aidErr, ok := err.(*AidError)
+	if !ok {
+		t.Fatalf("expected AidError, got %T", err)
+	}
+	if aidErr.Symbol != "ERR_INVALID_TXT" {
+		t.Fatalf("expected ERR_INVALID_TXT, got %s", aidErr.Symbol)
+	}
+}
+
+func TestDiscoverSelectsValidAid2WhenAnotherAid2IsMalformed(t *testing.T) {
+	oldLookup := lookupTXT
+	defer func() { lookupTXT = oldLookup }()
+	lookupTXT = func(_ context.Context, _ string) ([]string, error) {
+		return []string{
+			"v=aid2;u=http://bad.example.com/mcp;p=mcp",
+			"v=aid2;u=https://good.example.com/mcp;p=mcp",
+		}, nil
+	}
+
+	rec, _, err := DiscoverWithOptions("example.com", 2*time.Second, DiscoveryOptions{
+		WellKnownFallback: false,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.V != "aid2" || rec.URI != "https://good.example.com/mcp" {
+		t.Fatalf("expected valid aid2 record, got %+v", rec)
+	}
+}
+
+func TestDiscoverRejectsOnlyMalformedAidLikeTxt(t *testing.T) {
+	oldLookup := lookupTXT
+	defer func() { lookupTXT = oldLookup }()
+	lookupTXT = func(_ context.Context, _ string) ([]string, error) {
+		return []string{"v=aid3;u=https://future.example.com/mcp;p=mcp"}, nil
+	}
+
+	_, _, err := DiscoverWithOptions("example.com", 2*time.Second, DiscoveryOptions{
+		WellKnownFallback: true,
+	})
+	if err == nil {
+		t.Fatalf("expected invalid TXT error")
+	}
+	aidErr, ok := err.(*AidError)
+	if !ok {
+		t.Fatalf("expected AidError, got %T", err)
+	}
+	if aidErr.Symbol != "ERR_INVALID_TXT" {
+		t.Fatalf("expected ERR_INVALID_TXT, got %s", aidErr.Symbol)
+	}
+}

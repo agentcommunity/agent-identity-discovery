@@ -4,8 +4,8 @@ Version: 1.2.0
 Summary: Python library for Agent Identity & Discovery (AID) - v1.2.0 release
 Author-email: Agent Community <maintainers@agentcommunity.org>
 License: MIT
-Project-URL: Homepage, https://github.com/agentcommunity/agent-interface-discovery
-Project-URL: Repository, https://github.com/agentcommunity/agent-interface-discovery
+Project-URL: Homepage, https://github.com/agentcommunity/agent-identity-discovery
+Project-URL: Repository, https://github.com/agentcommunity/agent-identity-discovery
 Requires-Python: >=3.8
 Description-Content-Type: text/markdown
 Requires-Dist: dnspython>=2.6.0
@@ -17,7 +17,7 @@ Requires-Dist: cryptography>=42; extra == "pka"
 
 # aid-discovery (Python)
 
-> Official Python implementation of the [Agent Identity & Discovery (AID)](https://github.com/agentcommunity/agent-interface-discovery) specification.
+> Official Python implementation of the [Agent Identity & Discovery (AID)](https://github.com/agentcommunity/agent-identity-discovery) specification.
 
 [![PyPI version](https://img.shields.io/pypi/v/aid-discovery.svg?color=blue)](https://pypi.org/project/aid-discovery/)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
@@ -52,12 +52,12 @@ except AidError as e:
 
 ### `discover(domain: str, *, protocol: str | None = None, timeout: float = 5.0, well_known_fallback: bool = True, well_known_timeout: float = 2.0) -> (dict, int)`
 
-Discovers an agent by looking up the `_agent` TXT record for the given domain.
+Discovers an agent by looking up the `_agent` TXT record for the exact host you pass in. The resolver does not implicitly retry parent hosts.
 
 **Parameters:**
 
 - `domain` (str): The domain name to discover
-- `protocol` (str, optional): Try protocol-specific subdomain first (e.g., `mcp`)
+- `protocol` (str, optional): Try protocol-specific subdomain names for the same exact host first (e.g., `mcp`)
 - `timeout` (float): DNS timeout in seconds (default 5.0)
 - `well_known_fallback` (bool): If true, falls back to `https://<domain>/.well-known/agent` on `ERR_NO_RECORD` or `ERR_DNS_LOOKUP_FAILED` (default True)
 - `well_known_timeout` (float): Timeout for the `.well-known` HTTP fetch (default 2.0)
@@ -175,7 +175,7 @@ See the documentation “Quick Start → PKA handshake expectations” for heade
 
 ## Development
 
-This package is part of the [AID monorepo](https://github.com/agentcommunity/agent-interface-discovery). To run tests:
+This package is part of the [AID monorepo](https://github.com/agentcommunity/agent-identity-discovery). To run tests:
 
 ```bash
 # From the monorepo root
@@ -188,4 +188,4 @@ python -m pytest tests/
 
 ## License
 
-MIT - see [LICENSE](https://github.com/agentcommunity/agent-interface-discovery/blob/main/LICENSE) for details.
+MIT - see [LICENSE](https://github.com/agentcommunity/agent-identity-discovery/blob/main/LICENSE) for details.

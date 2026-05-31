@@ -58,12 +58,11 @@ const record = buildTxtRecordVariant({
   proto: 'mcp',
   auth: 'pat',
   desc: 'Example Agent',
-  pka: 'zBase58PublicKey',
-  kid: 'g1',
-}); // Canonical v1.x output uses short keys
+  pka: 'JrQLj5P_89iXES9-vFgrIy29clF9CC_oPPsw3c5D0bs',
+}); // Canonical v2 output uses short keys
 
 console.log(record);
-// "v=aid1;u=https://api.example.com/agent;p=mcp;a=pat;s=Example Agent;k=zBase58PublicKey;i=g1"
+// "v=aid2;u=https://api.example.com/agent;p=mcp;a=pat;s=Example Agent;k=JrQLj5P_89iXES9-vFgrIy29clF9CC_oPPsw3c5D0bs"
 ```
 
 ### Validation
@@ -71,7 +70,7 @@ console.log(record);
 ```typescript
 import { validateTxtRecord } from '@agentcommunity/aid-engine';
 
-const validation = validateTxtRecord('v=aid1;u=https://api.example.com/agent;p=mcp');
+const validation = validateTxtRecord('v=aid2;u=https://api.example.com/agent;p=mcp');
 console.log(validation.isValid); // true
 console.log(validation.errors); // []
 ```
@@ -81,7 +80,7 @@ console.log(validation.errors); // []
 ```typescript
 import { verifyPka } from '@agentcommunity/aid-engine';
 
-const result = verifyPka('zBase58PublicKey');
+const result = verifyPka('JrQLj5P_89iXES9-vFgrIy29clF9CC_oPPsw3c5D0bs');
 console.log(result.valid); // true/false
 console.log(result.reason); // error message if invalid
 ```

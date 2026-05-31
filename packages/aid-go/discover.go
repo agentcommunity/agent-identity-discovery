@@ -47,30 +47,40 @@ func DiscoverWithOptions(domain string, timeout time.Duration, opts DiscoveryOpt
 			return AidRecord{}, 0, newAidError("ERR_DNS_LOOKUP_FAILED", err.Error())
 		}
 		var lastErr error
-		var valid AidRecord
-		validCount := 0
+		validByVersion := map[string][]AidRecord{
+			SpecVersionV1: {},
+			SpecVersionV2: {},
+		}
 		for _, txt := range txts {
 			rec, perr := Parse(txt)
 			if perr == nil {
-				valid = rec
-				validCount++
+				validByVersion[rec.V] = append(validByVersion[rec.V], rec)
 				continue
 			}
 			lastErr = perr
 		}
-		if validCount == 1 {
+
+		selectedVersion := ""
+		if len(validByVersion[SpecVersionV2]) > 0 {
+			selectedVersion = SpecVersionV2
+		} else if len(validByVersion[SpecVersionV1]) > 0 {
+			selectedVersion = SpecVersionV1
+		}
+		if selectedVersion != "" {
+			selected := validByVersion[selectedVersion]
+			if len(selected) > 1 {
+				return AidRecord{}, 0, newAidError(
+					"ERR_INVALID_TXT",
+					fmt.Sprintf("Multiple valid %s AID records found for %s; publish exactly one valid record per queried DNS name", selectedVersion, fqdn),
+				)
+			}
+			valid := selected[0]
 			if valid.Pka != "" {
 				if err := performPKAHandshake(valid.URI, valid.Pka, valid.Kid, timeout); err != nil {
 					return AidRecord{}, 0, err
 				}
 			}
 			return valid, 0, nil
-		}
-		if validCount > 1 {
-			return AidRecord{}, 0, newAidError(
-				"ERR_INVALID_TXT",
-				fmt.Sprintf("Multiple valid AID records found for %s; publish exactly one valid record per queried DNS name", fqdn),
-			)
 		}
 		if lastErr != nil {
 			return AidRecord{}, 0, lastErr

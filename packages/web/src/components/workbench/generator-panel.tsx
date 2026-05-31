@@ -38,7 +38,6 @@ export function GeneratorPanel() {
 
               <SecurityFields
                 pka={form.formData.pka}
-                kid={form.formData.kid}
                 onChange={(patch: FormPatch) => form.updateForm(patch)}
               />
             </CardContent>

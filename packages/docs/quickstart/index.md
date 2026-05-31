@@ -55,12 +55,12 @@ aid-doctor generate \
 This outputs the exact TXT record content you need:
 
 ```
-v=aid1;u=https://api.my-cool-saas.com/agent/v1;p=mcp;s=My Cool SaaS AI
+v=aid2;u=https://api.my-cool-saas.com/agent/v1;p=mcp;s=My Cool SaaS AI
 ```
 
 **Plus validation:** The CLI automatically validates your record format, URI scheme, and protocol tokens before generating.
 
-> **Key reference:** AID records use short wire keys for compactness. `v`=version, `u`=uri, `p`=protocol, `a`=auth, `s`=description, `d`=docs url, `e`=deprecation, `k`=public key, `i`=key id. You do not need to memorize these because the CLI and [Live Generator](https://aid.agentcommunity.org/workbench) handle them for you. See the [Specification](../specification.md) for the complete key table.
+> **Key reference:** AID records use short wire keys for compactness. `v`=version, `u`=uri, `p`=protocol, `a`=auth, `s`=description, `d`=docs url, `e`=deprecation, and `k`=public key. In v2, `k` is the unpadded base64url Ed25519 JWK `x` value and the HTTP signature `keyid` is derived from it as an RFC 7638 JWK thumbprint. The legacy v1 compatibility format uses `k=z...` base58btc and `i`/`kid`. You do not need to memorize these because the CLI and [Live Generator](https://aid.agentcommunity.org/workbench) handle them for you. See the [Specification](../specification.md) for the v1.2 normative key table and [v2 explainer](../specification_v2_explained.md) for the v2 migration model.
 
 ### Option B: Manual Generation
 
@@ -80,7 +80,7 @@ You need two things:
 The AID record is a single string of `key=value` pairs.
 
 ```
-v=aid1;u=https://api.my-cool-saas.com/agent/v1;p=mcp;s=My Cool SaaS AI
+v=aid2;u=https://api.my-cool-saas.com/agent/v1;p=mcp;s=My Cool SaaS AI
 ```
 
 > **Tip:** Use our [**Live Generator**](https://aid.agentcommunity.org/workbench) to create this string and avoid typos!
@@ -171,9 +171,17 @@ const { record } = await discover('supabase.agentcommunity.org');
 console.log(`Found ${record.proto} agent at ${record.uri}`);
 ```
 
-#### PKA handshake expectations (v1.1)
+#### PKA handshake expectations
 
-Clients perform an Ed25519 HTTP Message Signatures handshake when a record includes `pka`/`kid`. Implementations enforce:
+For v2 records, clients perform an Ed25519 HTTP Message Signatures handshake when a record includes `k`/`pka`. Implementations enforce:
+
+- `k` is unpadded base64url and decodes to a 32-byte Ed25519 public key.
+- The signature `keyid` equals the RFC 7638 JWK thumbprint derived from `k`.
+- The client challenge is carried as the RFC 9421 `nonce`.
+- `created` and `expires` are present and short-lived.
+- HTTP `Date` is not part of the v2 signature base.
+
+For v1 compatibility records, clients perform the legacy handshake when a record includes `pka`/`kid`. Implementations enforce:
 
 - Covered fields set: `"AID-Challenge" "@method" "@target-uri" "host" "date"`
 - `alg="ed25519"`

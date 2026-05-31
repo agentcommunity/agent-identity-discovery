@@ -47,7 +47,7 @@ Console.WriteLine($"proto={rec.Proto}, uri={rec.Uri}");
 
 Notes
 
-- PKA handshake runs automatically when `pka`/`kid` are present.
+- PKA handshake runs automatically when v2 `pka`/`k` is present. Legacy `aid1` records still use `pka`/`kid`.
 - Errors: `AidError : Exception` exposes `.ErrorCode` (symbol) and `.Code` (number).
 
 ---

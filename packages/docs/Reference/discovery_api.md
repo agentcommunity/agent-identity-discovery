@@ -4,7 +4,7 @@ description: 'Cross-language discover() options and behaviors'
 icon: material/magnify-scan
 ---
 
-# Discovery API (v1.2)
+# Discovery API
 
 Cross-language parity for AID `discover()` wrappers with consistent security and fallback behavior.
 
@@ -13,9 +13,10 @@ Cross-language parity for AID `discover()` wrappers with consistent security and
 - IDNA: Normalize domains to A-label (Punycode) before DNS.
 - Exact-host only: build DNS and `.well-known` lookups from the exact host the caller supplied after IDNA normalization. Do not implicitly walk to parent hosts.
 - DNS-first: Query `_agent.<domain>`. When `protocol` is specified, try protocol-specific names for that same exact host before base.
-- TXT parsing: Enforce v1.2 record rules (aliases, schemes, metadata constraints).
+- TXT parsing: Enforce versioned record rules (aliases, schemes, metadata constraints).
 - Multiple TXT answers: exactly one valid AID record at a queried DNS name succeeds; `2+` valid records fail as ambiguity instead of using resolver order.
-- PKA: When `pka`/`kid` present, perform Ed25519 HTTP Message Signatures handshake with exact covered fields set.
+- PKA: For v2, when `pka`/`k` is present, perform the nonce-bound Ed25519 HTTP Message Signatures handshake and compare `keyid` to the RFC 7638 JWK thumbprint derived from `k`.
+- PKA compatibility: For `aid1`, when `pka`/`kid` is present, perform the legacy v1.1 handshake.
 - Well-known fallback: Only on `ERR_NO_RECORD` or `ERR_DNS_LOOKUP_FAILED`. HTTPS JSON, ≤64KB, ~2s timeout, no redirects. Successful fallback uses `TTL=300`.
 - Redirect policy: Do not auto-follow redirects for handshake or well-known.
 - Delegation: if operators want inheritance, they should delegate the exact `_agent.<child-host>` label in DNS, for example with `CNAME`.

@@ -62,9 +62,9 @@ public static class Aid
         {
             throw new AidError(nameof(Constants.ERR_INVALID_TXT), "Missing required field: v");
         }
-        if (!string.Equals(v, Constants.SpecVersion, StringComparison.Ordinal))
+        if (!Constants.SupportedSpecVersions.Contains(v, StringComparer.Ordinal))
         {
-            throw new AidError(nameof(Constants.ERR_INVALID_TXT), $"Unsupported version: {v}. Expected: {Constants.SpecVersion}");
+            throw new AidError(nameof(Constants.ERR_INVALID_TXT), $"Unsupported version: {v}");
         }
 
         // Alias duplication checks
@@ -176,12 +176,7 @@ public static class Aid
         {
             if (!uri.StartsWith("https://", StringComparison.Ordinal))
             {
-                // Allow HTTP for localhost/127.0.0.1 during testing
-                if (!uri.StartsWith("http://", StringComparison.Ordinal) ||
-                    (!uri.Contains("localhost") && !uri.Contains("127.0.0.1")))
-                {
-                    throw new AidError(nameof(Constants.ERR_INVALID_TXT), $"Invalid URI scheme for remote protocol '{proto}'. MUST be 'https:'");
-                }
+                throw new AidError(nameof(Constants.ERR_INVALID_TXT), $"Invalid URI scheme for remote protocol '{proto}'. MUST be 'https:'");
             }
             if (uri.StartsWith("https://", StringComparison.Ordinal) && !IsValidHttpsUri(uri))
             {
@@ -191,13 +186,24 @@ public static class Aid
 
         var pka = raw.TryGetValue("pka", out var kfull) ? kfull : (raw.TryGetValue("k", out var kalias) ? kalias : null);
         var kid = raw.TryGetValue("kid", out var ifull) ? ifull : (raw.TryGetValue("i", out var ialias) ? ialias : null);
-        if (pka is not null && kid is null)
+        if (v == Constants.SpecVersionV1 && pka is not null && kid is null)
         {
             throw new AidError(nameof(Constants.ERR_INVALID_TXT), "kid is required when pka is present");
         }
+        if (v == Constants.SpecVersionV2)
+        {
+            if (kid is not null)
+            {
+                throw new AidError(nameof(Constants.ERR_INVALID_TXT), "kid/i is not allowed in aid2 records");
+            }
+            if (pka is not null)
+            {
+                ValidateAid2Pka(pka);
+            }
+        }
 
         return new AidRecord(
-            v: Constants.SpecVersion,
+            v: v,
             uri: uri,
             proto: proto,
             auth: auth,
@@ -223,5 +229,48 @@ public static class Aid
         if (!string.Equals(u.Scheme, Uri.UriSchemeHttps, StringComparison.Ordinal)) return false;
         if (string.IsNullOrEmpty(u.Host)) return false;
         return true;
+    }
+
+    private static void ValidateAid2Pka(string value)
+    {
+        var decoded = DecodeUnpaddedBase64Url(value, nameof(Constants.ERR_INVALID_TXT));
+        if (decoded.Length != 32)
+        {
+            throw new AidError(nameof(Constants.ERR_INVALID_TXT), "aid2 pka must decode to exactly 32 bytes");
+        }
+    }
+
+    internal static byte[] DecodeUnpaddedBase64Url(string value, string errorCode)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            throw new AidError(errorCode, "Invalid base64url value");
+        }
+        foreach (var c in value)
+        {
+            var valid = (c >= 'A' && c <= 'Z') ||
+                        (c >= 'a' && c <= 'z') ||
+                        (c >= '0' && c <= '9') ||
+                        c == '-' ||
+                        c == '_';
+            if (!valid)
+            {
+                throw new AidError(errorCode, "Invalid base64url value");
+            }
+        }
+        if (value.Length % 4 == 1)
+        {
+            throw new AidError(errorCode, "Invalid base64url value");
+        }
+        var padded = value.Replace('-', '+').Replace('_', '/');
+        padded = padded.PadRight(padded.Length + (4 - padded.Length % 4) % 4, '=');
+        try
+        {
+            return Convert.FromBase64String(padded);
+        }
+        catch (FormatException)
+        {
+            throw new AidError(errorCode, "Invalid base64url value");
+        }
     }
 }

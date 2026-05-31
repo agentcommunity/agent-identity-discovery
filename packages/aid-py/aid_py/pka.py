@@ -6,16 +6,18 @@ the TXT record includes a Public Key for Agent (pka) and key id (kid).
 from __future__ import annotations
 
 import base64
+import hashlib
 import os
 import re
 import time
 import hmac # Added for constant-time comparisons
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse
 import urllib.request
 import urllib.error
 
 from .parser import AidError
 import pathlib
+import tempfile
 import logging # Added for logging in empty except block
 
 def _ascii_lower_ct(s: str) -> str:
@@ -29,15 +31,111 @@ def _ascii_lower_ct(s: str) -> str:
     return "".join(res)
 
 def _debug_write(name: str, data: str) -> None:
+    """Write development-only PKA diagnostics outside the package by default."""
     try:
-        d = pathlib.Path(__file__).resolve().parent / "_debug"
-        d.mkdir(exist_ok=True)
-        (d / name).write_text(data)
+        configured_dir = os.environ.get("AID_DEBUG_PKA_DIR")
+        d = pathlib.Path(configured_dir) if configured_dir else pathlib.Path(tempfile.gettempdir()) / "aid-py-pka-debug"
+        d.mkdir(parents=True, exist_ok=True)
+        (d / pathlib.Path(name).name).write_text(data)
     except Exception as e:
         # Intentionally swallowing error here for debug writing,
         # as failure to write debug data should not stop the main flow.
         # Log for visibility in debug builds.
         logging.debug(f"Failed to write debug data: {e}")
+
+
+def _get_header(headers, name: str) -> str | None:
+    for accessor_name in ("get_all", "getall"):
+        accessor = getattr(headers, accessor_name, None)
+        if not callable(accessor):
+            continue
+        values = None
+        for candidate_name in (name, name.lower()):
+            try:
+                values = accessor(candidate_name)
+            except Exception:
+                values = None
+            if values:
+                break
+        if values:
+            return ", ".join(str(value) for value in values if value is not None)
+
+    try:
+        value = headers.get(name)
+    except Exception:
+        value = None
+    if value is not None:
+        return value
+    lower = name.lower()
+    try:
+        items = headers.items()
+    except Exception:
+        return None
+    for key, candidate in items:
+        if str(key).lower() == lower:
+            return candidate
+    return None
+
+
+def _response_status(resp) -> int:
+    return int(getattr(resp, "status", getattr(resp, "code", 0)))
+
+
+def _close_response(resp) -> None:
+    close = getattr(resp, "close", None)
+    if callable(close):
+        close()
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):  # type: ignore[attr-defined]
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # pragma: no cover
+        return None
+
+
+def _open_no_redirect(req, timeout: float):
+    opener = urllib.request.build_opener(_NoRedirect())
+    try:
+        return opener.open(req, timeout=timeout)  # nosec B310
+    except urllib.error.HTTPError as exc:
+        return exc
+
+
+def _b64url_encode(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).decode("ascii").rstrip("=")
+
+
+def _b64url_decode(value: str) -> bytes:
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", value) or "=" in value:
+        raise AidError("ERR_SECURITY", "Invalid aid2 PKA encoding")
+    if len(value) % 4 == 1:
+        raise AidError("ERR_SECURITY", "Invalid aid2 PKA encoding")
+    try:
+        return base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
+    except Exception:
+        raise AidError("ERR_SECURITY", "Invalid aid2 PKA encoding") from None
+
+
+def _verify_ed25519(public_key: bytes, signature: bytes, data: bytes) -> None:
+    try:
+        try:
+            from nacl.signing import VerifyKey  # type: ignore
+
+            VerifyKey(public_key).verify(data, signature)
+            return
+        except ImportError as e:
+            logging.debug(f"PyNaCl not available, falling back to cryptography: {e}")
+            from cryptography.hazmat.primitives.asymmetric import ed25519  # type: ignore
+            from cryptography.exceptions import InvalidSignature  # type: ignore
+
+            vk = ed25519.Ed25519PublicKey.from_public_bytes(public_key)
+            try:
+                vk.verify(signature, data)
+            except InvalidSignature:
+                raise AidError("ERR_SECURITY", "PKA signature verification failed") from None
+    except AidError:
+        raise
+    except Exception as exc:  # pragma: no cover - missing libs
+        raise AidError("ERR_SECURITY", f"PKA verification unavailable: {exc}") from None
 
 
 def _b58_decode(s: str) -> bytes:
@@ -77,9 +175,9 @@ def _multibase_decode(s: str) -> bytes:
     raise AidError("ERR_SECURITY", "Unsupported multibase prefix")
 
 
-def _parse_signature_headers(headers: dict[str, str]) -> tuple[list[str], int, str, str, str, bytes, str | None]:
-    sig_input = headers.get("Signature-Input") or headers.get("signature-input")
-    sig = headers.get("Signature") or headers.get("signature")
+def _parse_signature_headers(headers) -> tuple[list[str], int, str, str, str, bytes, str | None]:
+    sig_input = _get_header(headers, "Signature-Input")
+    sig = _get_header(headers, "Signature")
     if not sig_input or not sig:
         raise AidError("ERR_SECURITY", "Missing signature headers")
 
@@ -124,7 +222,7 @@ def _parse_signature_headers(headers: dict[str, str]) -> tuple[list[str], int, s
     if not sm:
         raise AidError("ERR_SECURITY", "Invalid Signature header")
     signature = base64.b64decode(sm.group(1))
-    date_header = headers.get("Date") or headers.get("date")
+    date_header = _get_header(headers, "Date")
     return covered, created, keyid, keyid_raw, alg, signature, date_header
 
 
@@ -173,7 +271,327 @@ def _build_signature_base(
     return "\n".join(lines).encode("utf-8")
 
 
-def perform_pka_handshake(uri: str, pka: str, kid: str, *, timeout: float = 2.0) -> None:
+def _split_dictionary_members(value: str) -> list[str]:
+    parts: list[str] = []
+    start = 0
+    depth = 0
+    in_quote = False
+    in_bytes = False
+    escaped = False
+    for index, char in enumerate(value):
+        if escaped:
+            escaped = False
+            continue
+        if in_quote:
+            if char == "\\":
+                escaped = True
+            elif char == '"':
+                in_quote = False
+            continue
+        if char == '"':
+            in_quote = True
+            continue
+        if char == ":":
+            in_bytes = not in_bytes
+            continue
+        if in_bytes:
+            continue
+        if char == "(":
+            depth += 1
+            continue
+        if char == ")" and depth > 0:
+            depth -= 1
+            continue
+        if char == "," and depth == 0:
+            parts.append(value[start:index].strip())
+            start = index + 1
+    parts.append(value[start:].strip())
+    return [part for part in parts if part]
+
+
+def _extract_dictionary_member(value: str, member: str) -> str:
+    prefix = f"{member}="
+    found: str | None = None
+    for part in _split_dictionary_members(value):
+        if part.startswith(prefix):
+            if found is not None:
+                raise AidError("ERR_SECURITY", f"Duplicate {member} signature member")
+            found = part[len(prefix):].strip()
+    if found is not None:
+        return found
+    raise AidError("ERR_SECURITY", f"Missing {member} signature member")
+
+
+def _split_inner_list_items(value: str) -> list[str]:
+    items: list[str] = []
+    index = 0
+    while index < len(value):
+        while index < len(value) and value[index].isspace():
+            index += 1
+        if index >= len(value):
+            break
+        match = re.match(r'"[^"]+"(?:;[A-Za-z0-9_*.-]+)*', value[index:])
+        if not match:
+            raise AidError("ERR_SECURITY", "Invalid Signature-Input covered item")
+        items.append(match.group(0))
+        index += len(match.group(0))
+        if index < len(value) and not value[index].isspace():
+            raise AidError("ERR_SECURITY", "Invalid Signature-Input covered item")
+    return items
+
+
+def _parse_signature_params(
+    value: str,
+    critical: set[str] | None = None,
+    allowed: set[str] | None = None,
+    bare_required: set[str] | None = None,
+) -> dict[str, str]:
+    critical = critical or set()
+    bare_required = bare_required or set()
+    params: dict[str, str] = {}
+    index = 0
+    while index < len(value):
+        while index < len(value) and value[index].isspace():
+            index += 1
+        if index >= len(value):
+            break
+        if value[index] != ";":
+            raise AidError("ERR_SECURITY", "Invalid Signature-Input parameters")
+        index += 1
+        while index < len(value) and value[index].isspace():
+            index += 1
+
+        name_start = index
+        while index < len(value) and re.match(r"[A-Za-z0-9_*.-]", value[index]):
+            index += 1
+        key = value[name_start:index].lower()
+        if not key:
+            raise AidError("ERR_SECURITY", "Invalid Signature-Input parameter")
+        if allowed is not None and key not in allowed:
+            raise AidError("ERR_SECURITY", "Unsupported Signature-Input parameter")
+        if key in critical and key in params:
+            raise AidError("ERR_SECURITY", "Duplicate Signature-Input parameter")
+
+        while index < len(value) and value[index].isspace():
+            index += 1
+        if index >= len(value) or value[index] != "=":
+            params[key] = ""
+            continue
+
+        index += 1
+        while index < len(value) and value[index].isspace():
+            index += 1
+        value_start = index
+        if index < len(value) and value[index] == '"':
+            index += 1
+            escaped = False
+            while index < len(value):
+                char = value[index]
+                if escaped:
+                    escaped = False
+                elif char == "\\":
+                    escaped = True
+                elif char == '"':
+                    index += 1
+                    break
+                index += 1
+            else:
+                raise AidError("ERR_SECURITY", "Invalid Signature-Input parameter")
+            raw = value[value_start:index].strip()
+            while index < len(value) and value[index].isspace():
+                index += 1
+            if index < len(value) and value[index] != ";":
+                raise AidError("ERR_SECURITY", "Invalid Signature-Input parameters")
+        else:
+            while index < len(value) and value[index] != ";":
+                index += 1
+            raw = value[value_start:index].strip()
+
+        if key in bare_required and raw.startswith('"'):
+            raise AidError("ERR_SECURITY", "Invalid Signature-Input parameter")
+        if raw.startswith('"') and raw.endswith('"'):
+            unquoted: list[str] = []
+            escaped = False
+            for char in raw[1:-1]:
+                if escaped:
+                    unquoted.append(char)
+                    escaped = False
+                elif char == "\\":
+                    escaped = True
+                else:
+                    unquoted.append(char)
+            raw = "".join(unquoted)
+        params[key] = raw
+    return params
+
+
+def _parse_v2_covered_item(raw: str) -> dict[str, object]:
+    match = re.fullmatch(r'"([^"]+)"((?:;[A-Za-z0-9_*.-]+)*)', raw)
+    if not match:
+        raise AidError("ERR_SECURITY", "Invalid Signature-Input covered item")
+    name = match.group(1)
+    params = [part for part in match.group(2).split(";") if part]
+    if name not in ("@method", "@target-uri", "@authority", "@status"):
+        raise AidError("ERR_SECURITY", f"Unsupported covered field: {name}")
+    seen_params: set[str] = set()
+    for param in params:
+        if param in seen_params:
+            raise AidError("ERR_SECURITY", "Duplicate Signature-Input covered item parameter")
+        if param != "req":
+            raise AidError("ERR_SECURITY", "Unsupported Signature-Input covered item parameter")
+        seen_params.add(param)
+    req = "req" in seen_params
+    return {"raw": raw, "name": name, "req": req}
+
+
+def _validate_v2_covered_set(covered: list[dict[str, object]]) -> None:
+    expected = {
+        "@method": True,
+        "@target-uri": True,
+        "@authority": True,
+        "@status": False,
+    }
+    if len(covered) != len(expected):
+        raise AidError("ERR_SECURITY", "Signature-Input must cover required fields")
+    seen: set[str] = set()
+    for item in covered:
+        name = item["name"]
+        req = item["req"]
+        if not isinstance(name, str) or name in seen or expected.get(name) != req:
+            raise AidError("ERR_SECURITY", "Signature-Input must cover required fields")
+        seen.add(name)
+    if seen != set(expected):
+        raise AidError("ERR_SECURITY", "Signature-Input must cover required fields")
+
+
+def _parse_v2_signature_headers(headers) -> dict[str, object]:
+    sig_input = _get_header(headers, "Signature-Input")
+    sig = _get_header(headers, "Signature")
+    if not sig_input or not sig:
+        raise AidError("ERR_SECURITY", "Missing signature headers")
+
+    signature_params_raw = _extract_dictionary_member(sig_input, "aid-pka")
+    if not signature_params_raw.startswith("("):
+        raise AidError("ERR_SECURITY", "Invalid Signature-Input")
+    close_index = signature_params_raw.find(")")
+    if close_index < 0:
+        raise AidError("ERR_SECURITY", "Invalid Signature-Input")
+
+    covered_raw = signature_params_raw[1:close_index].strip()
+    params_raw = signature_params_raw[close_index + 1:]
+    covered = [_parse_v2_covered_item(item) for item in _split_inner_list_items(covered_raw)]
+    _validate_v2_covered_set(covered)
+
+    required = ("created", "expires", "keyid", "alg", "nonce", "tag")
+    required_set = set(required)
+    params = _parse_signature_params(
+        params_raw,
+        required_set,
+        allowed=required_set,
+        bare_required={"created", "expires"},
+    )
+    if any(param not in params for param in required):
+        raise AidError("ERR_SECURITY", "Invalid Signature-Input")
+    if not re.fullmatch(r"\d+", params["created"]) or not re.fullmatch(r"\d+", params["expires"]):
+        raise AidError("ERR_SECURITY", "Invalid Signature-Input timestamp")
+
+    signature_raw = _extract_dictionary_member(sig, "aid-pka")
+    sig_match = re.fullmatch(r":\s*([^:]+?)\s*:", signature_raw)
+    if not sig_match:
+        raise AidError("ERR_SECURITY", "Invalid Signature header")
+    try:
+        signature = base64.b64decode(sig_match.group(1), validate=True)
+    except Exception:
+        raise AidError("ERR_SECURITY", "Invalid Signature header") from None
+
+    return {
+        "covered": covered,
+        "signature_params_raw": signature_params_raw,
+        "created": int(params["created"]),
+        "expires": int(params["expires"]),
+        "keyid": params["keyid"],
+        "alg": params["alg"],
+        "nonce": params["nonce"],
+        "tag": params["tag"],
+        "signature": signature,
+    }
+
+
+def _has_no_store_directive(cache_control: str | None) -> bool:
+    if not cache_control:
+        return False
+    return any(
+        part.strip().split(";", 1)[0].strip().lower() == "no-store"
+        for part in cache_control.split(",")
+    )
+
+
+def _normalize_request_uri(uri: str) -> str:
+    parsed = urlparse(uri)
+    authority = _request_authority(uri)
+    return urlunparse(parsed._replace(scheme=parsed.scheme.lower(), netloc=authority, fragment=""))
+
+
+def _request_authority(uri: str) -> str:
+    parsed = urlparse(uri)
+    hostname = (parsed.hostname or "").lower()
+    if not hostname:
+        raise AidError("ERR_SECURITY", "Invalid URI for handshake")
+    host = f"[{hostname}]" if ":" in hostname and not hostname.startswith("[") else hostname
+    try:
+        port = parsed.port
+    except ValueError:
+        raise AidError("ERR_SECURITY", "Invalid URI for handshake") from None
+    if port and not (
+        (parsed.scheme == "https" and port == 443)
+        or (parsed.scheme == "http" and port == 80)
+    ):
+        return f"{host}:{port}"
+    return host
+
+
+def _build_v2_signature_base(
+    covered: list[dict[str, object]],
+    signature_params_raw: str,
+    *,
+    method: str,
+    target_uri: str,
+    authority: str,
+    status: int,
+) -> bytes:
+    lines: list[str] = []
+    for item in covered:
+        name = item["name"]
+        req = bool(item["req"])
+        suffix = ";req" if req else ""
+        if name == "@method":
+            lines.append(f'"@method"{suffix}: {method}')
+        elif name == "@target-uri":
+            lines.append(f'"@target-uri"{suffix}: {target_uri}')
+        elif name == "@authority":
+            lines.append(f'"@authority"{suffix}: {authority}')
+        elif name == "@status":
+            lines.append(f'"@status"{suffix}: {status}')
+        else:
+            raise AidError("ERR_SECURITY", f"Unsupported covered field: {name}")
+    lines.append(f'"@signature-params": {signature_params_raw}')
+    return "\n".join(lines).encode("utf-8")
+
+
+def _derive_aid2_key_material(pka: str) -> tuple[bytes, str]:
+    public_key = _b64url_decode(pka)
+    if len(public_key) != 32:
+        raise AidError("ERR_SECURITY", "Invalid PKA length")
+    thumbprint_input = f'{{"crv":"Ed25519","kty":"OKP","x":"{pka}"}}'.encode("utf-8")
+    keyid = _b64url_encode(hashlib.sha256(thumbprint_input).digest())
+    return public_key, keyid
+
+
+def _build_accept_signature_v2(keyid: str, nonce: str) -> str:
+    return f'aid-pka=("@method";req "@target-uri";req "@authority";req "@status");created;expires;keyid="{keyid}";alg="ed25519";nonce="{nonce}";tag="aid-pka-v2"'
+
+
+def _perform_v1_pka_handshake(uri: str, pka: str, kid: str, *, timeout: float = 2.0) -> None:
     if not kid:
         raise AidError("ERR_SECURITY", "Missing kid for PKA")
     parsed = urlparse(uri)
@@ -187,11 +605,14 @@ def perform_pka_handshake(uri: str, pka: str, kid: str, *, timeout: float = 2.0)
     req = urllib.request.Request(uri, headers={"AID-Challenge": challenge, "Date": date_hdr})
 
     try:
-        opener = urllib.request.build_opener()
-        with opener.open(req, timeout=timeout) as resp:  # nosec B310
-            if resp.status != 200:
-                raise AidError("ERR_SECURITY", f"Handshake HTTP {resp.status}")
-            headers = {k: v for k, v in resp.headers.items()}
+        resp = _open_no_redirect(req, timeout)
+        try:
+            status = _response_status(resp)
+            if status != 200:
+                raise AidError("ERR_SECURITY", f"Handshake HTTP {status}")
+            headers = resp.headers
+        finally:
+            _close_response(resp)
     except AidError:
         raise
     except Exception as exc:  # pragma: no cover - network errors
@@ -236,26 +657,83 @@ def perform_pka_handshake(uri: str, pka: str, kid: str, *, timeout: float = 2.0)
     if len(pub) != 32:
         raise AidError("ERR_SECURITY", "Invalid PKA length")
 
+    _verify_ed25519(pub, signature, base)
+
+
+def _perform_v2_pka_handshake(uri: str, pka: str, *, timeout: float = 2.0) -> None:
+    public_key, expected_keyid = _derive_aid2_key_material(pka)
+    nonce = _b64url_encode(os.urandom(32))
+    request_uri = _normalize_request_uri(uri)
+    authority = _request_authority(request_uri)
+    req = urllib.request.Request(
+        request_uri,
+        headers={
+            "Accept-Signature": _build_accept_signature_v2(expected_keyid, nonce),
+            "Cache-Control": "no-store",
+        },
+        method="GET",
+    )
+
     try:
-        # Prefer PyNaCl if available
+        resp = _open_no_redirect(req, timeout)
         try:
-            from nacl.signing import VerifyKey  # type: ignore
-
-            vk = VerifyKey(pub)
-            vk.verify(base, signature)  # raises on failure
-            return
-        except ImportError as e:
-            logging.debug(f"PyNaCl not available, falling back to cryptography: {e}")
-            # Fallback to cryptography if available
-            from cryptography.hazmat.primitives.asymmetric import ed25519  # type: ignore
-            from cryptography.exceptions import InvalidSignature  # type: ignore
-
-            vk = ed25519.Ed25519PublicKey.from_public_bytes(pub)
-            try:
-                vk.verify(signature, base)
-            except InvalidSignature:
-                raise AidError("ERR_SECURITY", "PKA signature verification failed") from None
+            status = _response_status(resp)
+            if 300 <= status < 400:
+                raise AidError("ERR_SECURITY", "PKA redirects are not allowed")
+            headers = resp.headers
+            if not _has_no_store_directive(_get_header(headers, "Cache-Control")):
+                raise AidError("ERR_SECURITY", "PKA response must include Cache-Control: no-store")
+            parsed = _parse_v2_signature_headers(headers)
+        finally:
+            _close_response(resp)
     except AidError:
         raise
-    except Exception as exc:  # pragma: no cover - missing libs
-        raise AidError("ERR_SECURITY", f"PKA verification unavailable: {exc}") from None
+    except Exception as exc:  # pragma: no cover - network errors
+        raise AidError("ERR_SECURITY", str(exc)) from None
+
+    created = parsed["created"]
+    expires = parsed["expires"]
+    if not isinstance(created, int) or not isinstance(expires, int):
+        raise AidError("ERR_SECURITY", "Invalid Signature-Input timestamp")
+    now = int(time.time())
+    skew_seconds = 30
+    if expires <= created or expires - created > 300:
+        raise AidError("ERR_SECURITY", "Invalid signature freshness window")
+    if created - now > skew_seconds or now - expires > skew_seconds:
+        raise AidError("ERR_SECURITY", "Signature timestamp outside acceptance window")
+
+    keyid = parsed["keyid"]
+    alg = parsed["alg"]
+    response_nonce = parsed["nonce"]
+    tag = parsed["tag"]
+    if not isinstance(keyid, str) or not hmac.compare_digest(keyid.encode("utf-8"), expected_keyid.encode("utf-8")):
+        raise AidError("ERR_SECURITY", "Signature keyid mismatch")
+    if not isinstance(alg, str) or not hmac.compare_digest(_ascii_lower_ct(alg).encode("utf-8"), b"ed25519"):
+        raise AidError("ERR_SECURITY", "Unsupported signature algorithm")
+    if not isinstance(response_nonce, str) or not hmac.compare_digest(response_nonce.encode("utf-8"), nonce.encode("utf-8")):
+        raise AidError("ERR_SECURITY", "Signature nonce mismatch")
+    if not isinstance(tag, str) or not hmac.compare_digest(tag.encode("utf-8"), b"aid-pka-v2"):
+        raise AidError("ERR_SECURITY", "Invalid signature tag")
+
+    covered = parsed["covered"]
+    signature_params_raw = parsed["signature_params_raw"]
+    signature = parsed["signature"]
+    if not isinstance(covered, list) or not isinstance(signature_params_raw, str) or not isinstance(signature, bytes):
+        raise AidError("ERR_SECURITY", "Invalid Signature-Input")
+
+    base = _build_v2_signature_base(
+        covered,
+        signature_params_raw,
+        method="GET",
+        target_uri=request_uri,
+        authority=authority,
+        status=status,
+    )
+    _verify_ed25519(public_key, signature, base)
+
+
+def perform_pka_handshake(uri: str, pka: str, kid: str | None = None, *, timeout: float = 2.0) -> None:
+    if kid is not None:
+        _perform_v1_pka_handshake(uri, pka, kid, timeout=timeout)
+        return
+    _perform_v2_pka_handshake(uri, pka, timeout=timeout)

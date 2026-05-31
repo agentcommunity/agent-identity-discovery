@@ -52,13 +52,13 @@ var result = await Discovery.DiscoverAsync(
 Console.WriteLine($"{result.Record.Proto} at {result.Record.Uri}");`,
 };
 
-const DNS_SNIPPET = `_agent.example.com. 300 IN TXT "v=aid1;u=https://api.example.com/mcp;p=mcp"`;
-const DNS_PKA_SNIPPET = `_agent.example.com. 300 IN TXT "v=aid1;u=https://api.example.com/mcp;p=mcp;k=z7rW8rTq8o4mM6vVf7w1k3m4uQn9p2YxCAbcDeFgHiJ;i=g1"`;
+const DNS_SNIPPET = `_agent.example.com. 300 IN TXT "v=aid2;u=https://api.example.com/mcp;p=mcp"`;
+const DNS_PKA_SNIPPET = `_agent.example.com. 300 IN TXT "v=aid2;u=https://api.example.com/mcp;p=mcp;k=ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ"`;
 const TERRAFORM_SNIPPET = `resource "cloudflare_record" "aid" {
   zone_id = var.zone_id
   name    = "_agent"
   type    = "TXT"
-  value   = "v=aid1;u=https://api.example.com/openapi.json;p=openapi"
+  value   = "v=aid2;u=https://api.example.com/openapi.json;p=openapi"
 }`;
 
 const VALIDATE_SNIPPET = `# Validate your record from the CLI

@@ -37,6 +37,7 @@ interface DnsConfig {
 interface ProtocolConstants {
   schemaVersion: string;
   specVersion: string;
+  supportedSpecVersions?: string[];
   protocolTokens: Record<string, string>;
   authTokens: Record<string, string>;
   errorCodes: Record<string, ErrorCode>;
@@ -52,10 +53,58 @@ const GENERATED_WARNING = `/**
  * To make changes, edit the YAML file and run: pnpm gen
  */`;
 
+function getRecordContractMetadata(constants: ProtocolConstants) {
+  const req = constants.aidRecord.required;
+  const opt = constants.aidRecord.optional;
+  const aliasMap = constants.aidRecord.aliases || {};
+  const v2CanonicalFields = [...new Set([...req, ...opt])];
+  const v2AliasFields = [...Object.keys(aliasMap)];
+  const v1CanonicalFields = v2CanonicalFields.includes('kid')
+    ? v2CanonicalFields
+    : [...v2CanonicalFields, 'kid'];
+  const v1AliasFields = v2AliasFields.includes('i') ? v2AliasFields : [...v2AliasFields, 'i'];
+
+  return {
+    v1CanonicalFields,
+    v1AliasFields,
+    v2CanonicalFields,
+    v2AliasFields,
+  };
+}
+
+function tsReadonlyArray(values: string[]): string {
+  return `[\n${values.map((value) => `  '${value}',`).join('\n')}\n] as const`;
+}
+
+function pyList(values: string[]): string {
+  return `[\n${values.map((value) => `    "${value}",`).join('\n')}\n]`;
+}
+
+function goStringSlice(values: string[]): string {
+  return `[]string{\n${values.map((value) => `\t"${value}",`).join('\n')}\n}`;
+}
+
+function rustStrSlice(values: string[]): string {
+  return `&[${values.map((value) => `"${value}"`).join(', ')}]`;
+}
+
+function csStringArray(values: string[]): string {
+  return `new string[] { ${values.map((value) => `"${value}"`).join(', ')} }`;
+}
+
+function javaStringArray(values: string[]): string {
+  return `new String[] {${values.map((value) => `"${value}"`).join(', ')} }`;
+}
+
 function generateTypeScriptConstants(constants: ProtocolConstants): string {
   const sortedProtocolTokens = Object.keys(constants.protocolTokens).sort();
   const sortedAuthTokens = Object.keys(constants.authTokens).sort();
   const sortedErrorCodes = Object.keys(constants.errorCodes).sort();
+  const supportedSpecVersions =
+    constants.supportedSpecVersions && constants.supportedSpecVersions.length > 0
+      ? constants.supportedSpecVersions
+      : [constants.specVersion];
+  const recordContract = getRecordContractMetadata(constants);
 
   // Build dynamic AidRecord and RawAidRecord shapes from YAML
   const req = constants.aidRecord.required;
@@ -63,7 +112,7 @@ function generateTypeScriptConstants(constants: ProtocolConstants): string {
   const aliasMap = constants.aidRecord.aliases || {};
 
   const allCanonKeys = [...new Set([...req, ...opt])];
-  const allAliasKeys = Object.keys(aliasMap);
+  const allAliasKeys = [...new Set([...Object.keys(aliasMap), 'i'])];
 
   const tsTypeForField = (field: string): string => {
     if (field === 'v') return `"${constants.specVersion}"`;
@@ -72,22 +121,53 @@ function generateTypeScriptConstants(constants: ProtocolConstants): string {
     return 'string';
   };
 
+  const commonOptional = opt.filter((field) => field !== 'pka' && field !== 'kid');
   const aidRecordInterface = `// AID Record structure
-export interface AidRecord {
-${req.map((f) => `  /** ${f} */\n  ${f === 'v' ? 'v' : f}: ${tsTypeForField(f)};`).join('\n')}
-${opt.map((f) => `  /** ${f} (optional) */\n  ${f}?: ${tsTypeForField(f)};`).join('\n')}
-}`;
+interface AidRecordCommon {
+  /** uri */
+  uri: string;
+  /** proto */
+  proto: ProtocolToken;
+${commonOptional.map((f) => `  /** ${f} (optional) */\n  ${f}?: ${tsTypeForField(f)};`).join('\n')}
+}
+
+export interface AidRecordV1 extends AidRecordCommon {
+  /** v */
+  v: 'aid1';
+  /** pka (optional) */
+  pka?: string;
+  /** kid (optional, required when pka is present) */
+  kid?: string;
+}
+
+export interface AidRecordV2 extends AidRecordCommon {
+  /** v */
+  v: 'aid2';
+  /** pka (optional) */
+  pka?: string;
+  /** kid is not allowed in aid2 records */
+  kid?: never;
+}
+
+export type AidRecord = AidRecordV1 | AidRecordV2;`;
 
   const rawAidRecordInterface = `// Raw parsed record (before validation)
 export interface RawAidRecord {
 ${allCanonKeys.map((f) => `  ${f}?: string;`).join('\n')}
+  kid?: string;
 ${allAliasKeys.map((f) => `  ${f}?: string;`).join('\n')}
 }`;
 
   return `${GENERATED_WARNING}
 
-// Specification version
+// Specification versions
+export const SPEC_VERSION_V1 = 'aid1' as const;
+export const SPEC_VERSION_V2 = 'aid2' as const;
 export const SPEC_VERSION = '${constants.specVersion}' as const;
+export const SUPPORTED_SPEC_VERSIONS = [
+${supportedSpecVersions.map((version) => `  '${version}',`).join('\n')}
+] as const;
+export type AidSpecVersion = typeof SUPPORTED_SPEC_VERSIONS[number];
 
 // Protocol tokens
 ${sortedProtocolTokens
@@ -141,6 +221,13 @@ ${aidRecordInterface}
 
 ${rawAidRecordInterface}
 
+// Version-specific raw record metadata. AidRecord remains compatibility-facing,
+// while AidRecordV2 deliberately excludes legacy DNS kid/i.
+export const AID_RECORD_V1_CANONICAL_FIELDS = ${tsReadonlyArray(recordContract.v1CanonicalFields)};
+export const AID_RECORD_V1_ALIAS_FIELDS = ${tsReadonlyArray(recordContract.v1AliasFields)};
+export const AID_RECORD_V2_CANONICAL_FIELDS = ${tsReadonlyArray(recordContract.v2CanonicalFields)};
+export const AID_RECORD_V2_ALIAS_FIELDS = ${tsReadonlyArray(recordContract.v2AliasFields)};
+
 // DNS configuration
 export const DNS_SUBDOMAIN = '${constants.dns.subdomain}' as const;
 export const DNS_TTL_MIN = ${constants.dns.ttlRecommendation.min} as const;
@@ -166,11 +253,16 @@ function generateWebSpecModule(constants: ProtocolConstants): string {
   const sortedProtocolTokens = Object.keys(constants.protocolTokens).sort();
   const sortedAuthTokens = Object.keys(constants.authTokens).sort();
   const sortedErrorCodes = Object.keys(constants.errorCodes).sort();
+  const supportedSpecVersions =
+    constants.supportedSpecVersions && constants.supportedSpecVersions.length > 0
+      ? constants.supportedSpecVersions
+      : [constants.specVersion];
   const req = constants.aidRecord.required;
   const opt = constants.aidRecord.optional;
   const aliasMap = constants.aidRecord.aliases || {};
   const allCanonKeys = [...new Set([...req, ...opt])];
-  const allAliasKeys = Object.keys(aliasMap);
+  const allAliasKeys = [...new Set([...Object.keys(aliasMap), 'i'])];
+  const recordContract = getRecordContractMetadata(constants);
   const tsTypeForField = (field: string): string => {
     if (field === 'v') return `"${constants.specVersion}"`;
     if (field === 'proto') return 'ProtocolToken';
@@ -185,7 +277,11 @@ function generateWebSpecModule(constants: ProtocolConstants): string {
   return (
     header +
     `\n// ---- Version ----\n` +
+    `export const SPEC_VERSION_V1 = 'aid1' as const;\n` +
+    `export const SPEC_VERSION_V2 = 'aid2' as const;\n` +
     `export const SPEC_VERSION = '${constants.specVersion}' as const;\n` +
+    `export const SUPPORTED_SPEC_VERSIONS = [${supportedSpecVersions.map((version) => `'${version}'`).join(', ')}] as const;\n` +
+    `export type AidSpecVersion = (typeof SUPPORTED_SPEC_VERSIONS)[number];\n` +
     `\n// ---- Tokens ----\n` +
     sortedProtocolTokens
       .map((t) => `export const PROTO_${t.toUpperCase()} = '${t}' as const;`)
@@ -225,14 +321,34 @@ function generateWebSpecModule(constants: ProtocolConstants): string {
     `export type LocalUriScheme = (typeof LOCAL_URI_SCHEMES)[number];\n` +
     `\n// ---- Record types ----\n` +
     `${aidRecordDoc}\n` +
-    `export interface AidRecordV1 {\n` +
-    req.map((f) => `  ${f}: ${tsTypeForField(f)};`).join('\n') +
-    '\n' +
-    opt.map((f) => `  ${f}?: ${tsTypeForField(f)};`).join('\n') +
+    `interface AidRecordCommon {\n` +
+    `  uri: string;\n` +
+    `  proto: ProtocolToken;\n` +
+    opt
+      .filter((f) => f !== 'pka' && f !== 'kid')
+      .map((f) => `  ${f}?: ${tsTypeForField(f)};`)
+      .join('\n') +
     `\n}\n` +
+    `\nexport interface AidRecordV1 extends AidRecordCommon {\n` +
+    `  v: 'aid1';\n` +
+    `  pka?: string;\n` +
+    `  kid?: string;\n` +
+    `}\n` +
+    `\nexport interface AidRecordV2 extends AidRecordCommon {\n` +
+    `  v: 'aid2';\n` +
+    `  pka?: string;\n` +
+    `  kid?: never;\n` +
+    `}\n` +
+    `\nexport type AidRecord = AidRecordV1 | AidRecordV2;\n` +
+    `\n// Version-specific raw record metadata. AidRecordV2 excludes legacy DNS kid/i.\n` +
+    `export const AID_RECORD_V1_CANONICAL_FIELDS = ${tsReadonlyArray(recordContract.v1CanonicalFields)};\n` +
+    `export const AID_RECORD_V1_ALIAS_FIELDS = ${tsReadonlyArray(recordContract.v1AliasFields)};\n` +
+    `export const AID_RECORD_V2_CANONICAL_FIELDS = ${tsReadonlyArray(recordContract.v2CanonicalFields)};\n` +
+    `export const AID_RECORD_V2_ALIAS_FIELDS = ${tsReadonlyArray(recordContract.v2AliasFields)};\n` +
     `\n/** Raw, partially parsed record shape (before validation) */\n` +
     `export interface RawAidRecord {\n` +
     allCanonKeys.map((f) => `  ${f}?: string;`).join(' ') +
+    ' kid?: string;' +
     ' ' +
     allAliasKeys.map((f) => `  ${f}?: string;`).join(' ') +
     `\n}\n` +
@@ -249,6 +365,11 @@ function generatePythonConstants(constants: ProtocolConstants): string {
   const sortedProtocolTokens = Object.keys(constants.protocolTokens).sort();
   const sortedAuthTokens = Object.keys(constants.authTokens).sort();
   const sortedErrorCodes = Object.keys(constants.errorCodes).sort();
+  const supportedSpecVersions =
+    constants.supportedSpecVersions && constants.supportedSpecVersions.length > 0
+      ? constants.supportedSpecVersions
+      : [constants.specVersion];
+  const recordContract = getRecordContractMetadata(constants);
 
   const pythonWarning = `"""
 GENERATED FILE - DO NOT EDIT
@@ -269,7 +390,18 @@ from typing import Final, Dict, List
 # Version
 # ---------------------------------------------------------------------------
 
+SPEC_VERSION_V1: Final[str] = "aid1"
+SPEC_VERSION_V2: Final[str] = "aid2"
 SPEC_VERSION: Final[str] = "${constants.specVersion}"
+SUPPORTED_SPEC_VERSIONS: Final[List[str]] = [
+${supportedSpecVersions.map((version) => `    "${version}",`).join('\n')}
+]
+
+# Version-specific raw record metadata. AidRecordV2 excludes legacy DNS kid/i.
+AID_RECORD_V1_CANONICAL_FIELDS: Final[List[str]] = ${pyList(recordContract.v1CanonicalFields)}
+AID_RECORD_V1_ALIAS_FIELDS: Final[List[str]] = ${pyList(recordContract.v1AliasFields)}
+AID_RECORD_V2_CANONICAL_FIELDS: Final[List[str]] = ${pyList(recordContract.v2CanonicalFields)}
+AID_RECORD_V2_ALIAS_FIELDS: Final[List[str]] = ${pyList(recordContract.v2AliasFields)}
 
 # ---------------------------------------------------------------------------
 # Protocol tokens
@@ -338,6 +470,11 @@ function generateGoConstants(constants: ProtocolConstants): string {
   const sortedProtocolTokens = Object.keys(constants.protocolTokens).sort();
   const sortedAuthTokens = Object.keys(constants.authTokens).sort();
   const sortedErrorCodes = Object.keys(constants.errorCodes).sort();
+  const supportedSpecVersions =
+    constants.supportedSpecVersions && constants.supportedSpecVersions.length > 0
+      ? constants.supportedSpecVersions
+      : [constants.specVersion];
+  const recordContract = getRecordContractMetadata(constants);
 
   const goWarning = `// Code generated by scripts/generate-constants.ts; DO NOT EDIT.`;
 
@@ -355,7 +492,19 @@ package aid
 // Version
 // ---------------------------------------------------------------------------
 
+const SpecVersionV1 = "aid1"
+const SpecVersionV2 = "aid2"
 const SpecVersion = "${constants.specVersion}"
+
+var SupportedSpecVersions = []string{
+${supportedSpecVersions.map((version) => `\t"${version}",`).join('\n')}
+}
+
+// Version-specific raw record metadata. AidRecordV2 excludes legacy DNS kid/i.
+var AidRecordV1CanonicalFields = ${goStringSlice(recordContract.v1CanonicalFields)}
+var AidRecordV1AliasFields = ${goStringSlice(recordContract.v1AliasFields)}
+var AidRecordV2CanonicalFields = ${goStringSlice(recordContract.v2CanonicalFields)}
+var AidRecordV2AliasFields = ${goStringSlice(recordContract.v2AliasFields)}
 
 // ---------------------------------------------------------------------------
 // Protocol tokens
@@ -426,12 +575,27 @@ function generateRustConstants(constants: ProtocolConstants): string {
   const sortedProtocolTokens = Object.keys(constants.protocolTokens).sort();
   const sortedAuthTokens = Object.keys(constants.authTokens).sort();
   const sortedErrorCodes = Object.keys(constants.errorCodes).sort();
+  const supportedSpecVersions =
+    constants.supportedSpecVersions && constants.supportedSpecVersions.length > 0
+      ? constants.supportedSpecVersions
+      : [constants.specVersion];
+  const recordContract = getRecordContractMetadata(constants);
 
   return (
     `// GENERATED FILE - DO NOT EDIT\n\n` +
     `// Auto-generated from protocol/constants.yml by scripts/generate-constants.ts\n` +
     `// Run 'pnpm gen' to regenerate.\n\n` +
-    `pub const SPEC_VERSION: &str = "${constants.specVersion}";\n\n` +
+    `pub const SPEC_VERSION_V1: &str = "aid1";\n` +
+    `pub const SPEC_VERSION_V2: &str = "aid2";\n` +
+    `pub const SPEC_VERSION: &str = "${constants.specVersion}";\n` +
+    `pub const SUPPORTED_SPEC_VERSIONS: &[&str] = &[${supportedSpecVersions
+      .map((version) => `"${version}"`)
+      .join(', ')}];\n\n` +
+    `// Version-specific raw record metadata. AidRecordV2 excludes legacy DNS kid/i.\n` +
+    `pub const AID_RECORD_V1_CANONICAL_FIELDS: &[&str] = ${rustStrSlice(recordContract.v1CanonicalFields)};\n` +
+    `pub const AID_RECORD_V1_ALIAS_FIELDS: &[&str] = ${rustStrSlice(recordContract.v1AliasFields)};\n` +
+    `pub const AID_RECORD_V2_CANONICAL_FIELDS: &[&str] = ${rustStrSlice(recordContract.v2CanonicalFields)};\n` +
+    `pub const AID_RECORD_V2_ALIAS_FIELDS: &[&str] = ${rustStrSlice(recordContract.v2AliasFields)};\n\n` +
     `// Protocol tokens\n` +
     sortedProtocolTokens
       .map((t) => `pub const PROTO_${t.toUpperCase()}: &str = "${t}";`)
@@ -461,12 +625,27 @@ function generateDotnetConstants(constants: ProtocolConstants): string {
   const sortedProtocolTokens = Object.keys(constants.protocolTokens).sort();
   const sortedAuthTokens = Object.keys(constants.authTokens).sort();
   const sortedErrorCodes = Object.keys(constants.errorCodes).sort();
+  const supportedSpecVersions =
+    constants.supportedSpecVersions && constants.supportedSpecVersions.length > 0
+      ? constants.supportedSpecVersions
+      : [constants.specVersion];
+  const recordContract = getRecordContractMetadata(constants);
 
   return (
     `// <auto-generated>\n// GENERATED FILE - DO NOT EDIT\n// </auto-generated>\n\n` +
     `namespace AidDiscovery {\n` +
     `  public static class Constants {\n` +
+    `    public const string SpecVersionV1 = "aid1";\n` +
+    `    public const string SpecVersionV2 = "aid2";\n` +
     `    public const string SpecVersion = "${constants.specVersion}";\n` +
+    `    public static readonly string[] SupportedSpecVersions = new string[] { ${supportedSpecVersions
+      .map((version) => `"${version}"`)
+      .join(', ')} };\n` +
+    `    // Version-specific raw record metadata. AidRecordV2 excludes legacy DNS kid/i.\n` +
+    `    public static readonly string[] AidRecordV1CanonicalFields = ${csStringArray(recordContract.v1CanonicalFields)};\n` +
+    `    public static readonly string[] AidRecordV1AliasFields = ${csStringArray(recordContract.v1AliasFields)};\n` +
+    `    public static readonly string[] AidRecordV2CanonicalFields = ${csStringArray(recordContract.v2CanonicalFields)};\n` +
+    `    public static readonly string[] AidRecordV2AliasFields = ${csStringArray(recordContract.v2AliasFields)};\n` +
     sortedProtocolTokens
       .map((t) => `    public const string PROTO_${t.toUpperCase()} = "${t}";`)
       .join('\n') +
@@ -496,13 +675,28 @@ function generateJavaConstants(constants: ProtocolConstants): string {
   const sortedProtocolTokens = Object.keys(constants.protocolTokens).sort();
   const sortedAuthTokens = Object.keys(constants.authTokens).sort();
   const sortedErrorCodes = Object.keys(constants.errorCodes).sort();
+  const supportedSpecVersions =
+    constants.supportedSpecVersions && constants.supportedSpecVersions.length > 0
+      ? constants.supportedSpecVersions
+      : [constants.specVersion];
+  const recordContract = getRecordContractMetadata(constants);
 
   return (
     `// GENERATED FILE - DO NOT EDIT\n` +
     `package org.agentcommunity.aid;\n\n` +
     `public final class Constants {\n` +
     `  private Constants() {}\n` +
+    `  public static final String SPEC_VERSION_V1 = "aid1";\n` +
+    `  public static final String SPEC_VERSION_V2 = "aid2";\n` +
     `  public static final String SPEC_VERSION = "${constants.specVersion}";\n` +
+    `  public static final String[] SUPPORTED_SPEC_VERSIONS = new String[] {${supportedSpecVersions
+      .map((version) => `"${version}"`)
+      .join(', ')} };\n` +
+    `  // Version-specific raw record metadata. AidRecordV2 excludes legacy DNS kid/i.\n` +
+    `  public static final String[] AID_RECORD_V1_CANONICAL_FIELDS = ${javaStringArray(recordContract.v1CanonicalFields)};\n` +
+    `  public static final String[] AID_RECORD_V1_ALIAS_FIELDS = ${javaStringArray(recordContract.v1AliasFields)};\n` +
+    `  public static final String[] AID_RECORD_V2_CANONICAL_FIELDS = ${javaStringArray(recordContract.v2CanonicalFields)};\n` +
+    `  public static final String[] AID_RECORD_V2_ALIAS_FIELDS = ${javaStringArray(recordContract.v2AliasFields)};\n` +
     sortedProtocolTokens
       .map((t) => `  public static final String PROTO_${t.toUpperCase()} = "${t}";`)
       .join('\n') +

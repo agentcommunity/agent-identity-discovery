@@ -4,7 +4,11 @@
 // Run 'pnpm gen' after updating the YAML.
 
 // ---- Version ----
-export const SPEC_VERSION = 'aid1' as const;
+export const SPEC_VERSION_V1 = 'aid1' as const;
+export const SPEC_VERSION_V2 = 'aid2' as const;
+export const SPEC_VERSION = 'aid2' as const;
+export const SUPPORTED_SPEC_VERSIONS = ['aid1', 'aid2'] as const;
+export type AidSpecVersion = (typeof SUPPORTED_SPEC_VERSIONS)[number];
 
 // ---- Tokens ----
 export const PROTO_A2A = 'a2a' as const;
@@ -99,17 +103,53 @@ export type LocalUriScheme = (typeof LOCAL_URI_SCHEMES)[number];
  * AID TXT record as specified by the current spec version.
  * This is the raw, spec-shaped record (before any UI normalization).
  */
-export interface AidRecordV1 {
-  v: 'aid1';
+interface AidRecordCommon {
   uri: string;
   proto: ProtocolToken;
   auth?: AuthToken;
   desc?: string;
   docs?: string;
   dep?: string;
+}
+
+export interface AidRecordV1 extends AidRecordCommon {
+  v: 'aid1';
   pka?: string;
   kid?: string;
 }
+
+export interface AidRecordV2 extends AidRecordCommon {
+  v: 'aid2';
+  pka?: string;
+  kid?: never;
+}
+
+export type AidRecord = AidRecordV1 | AidRecordV2;
+
+// Version-specific raw record metadata. AidRecordV2 excludes legacy DNS kid/i.
+export const AID_RECORD_V1_CANONICAL_FIELDS = [
+  'v',
+  'uri',
+  'proto',
+  'auth',
+  'desc',
+  'docs',
+  'dep',
+  'pka',
+  'kid',
+] as const;
+export const AID_RECORD_V1_ALIAS_FIELDS = ['p', 'u', 'a', 's', 'd', 'e', 'k', 'i'] as const;
+export const AID_RECORD_V2_CANONICAL_FIELDS = [
+  'v',
+  'uri',
+  'proto',
+  'auth',
+  'desc',
+  'docs',
+  'dep',
+  'pka',
+] as const;
+export const AID_RECORD_V2_ALIAS_FIELDS = ['p', 'u', 'a', 's', 'd', 'e', 'k'] as const;
 
 /** Raw, partially parsed record shape (before validation) */
 export interface RawAidRecord {

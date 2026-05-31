@@ -90,11 +90,11 @@ AID_ALLOW_INSECURE_WELL_KNOWN=1 aid-doctor check localhost:19081 --show-details 
 
 ### PKA handshake expectations
 
-- Required covered fields: `"AID-Challenge" "@method" "@target-uri" "host" "date"`
+- AID v2 `k`/`pka` is the unpadded base64url JWK `x` value for the raw 32-byte Ed25519 public key
+- v2 reports derive the HTTP Message Signature `keyid` as the RFC 7638 JWK SHA-256 thumbprint
 - `alg` must be `ed25519`
-- `created` and HTTP `Date` must both be within ±300s of the current time
-- `keyid` must match the record `kid` (quotes allowed in header, compare normalized)
-- Public key is multibase base58btc (`z...`) for the raw 32‑byte Ed25519 key
+- v2 PKA uses a nonce-bound HTTP Message Signature response and requires `Cache-Control: no-store`
+- Legacy `aid1` records can still be checked during the compatibility window, including their legacy `kid`
 
 ### Loopback HTTP (dev‑only)
 

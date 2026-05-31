@@ -195,14 +195,17 @@ export async function runCheck(domain: string, opts: CheckOptions): Promise<Doct
       // ignore
     }
 
-    // PKA presence (handshake can be enabled in future if exported by SDK)
-    if (record.pka && record.kid) {
+    if (record.pka) {
       report.pka.present = true;
-      report.pka.kid = record.kid;
-      report.pka.alg = 'ed25519'; // Per spec v1.1
+      report.pka.kid = record.v === 'aid1' ? (record.kid ?? null) : null;
+      report.pka.alg = 'ed25519';
       report.pka.attempted = true;
       try {
-        await performPKAHandshake(record.uri, record.pka, record.kid);
+        if (record.v === 'aid1') {
+          await performPKAHandshake(record.uri, record.pka, record.kid ?? '');
+        } else {
+          await performPKAHandshake(record.uri, record.pka);
+        }
         report.pka.verified = true;
       } catch (e) {
         const err = e as AidError;
@@ -223,7 +226,7 @@ export async function runCheck(domain: string, opts: CheckOptions): Promise<Doct
         const prev = opts.previousCacheEntry;
         report.downgrade.previous = { pka: prev.pka, kid: prev.kid };
         const nowPka = record.pka ?? null;
-        const nowKid = record.kid ?? null;
+        const nowKid = record.v === 'aid1' ? (record.kid ?? null) : null;
         if (prev.pka && !nowPka) {
           report.downgrade.status = 'downgrade';
           report.record.warnings.push({

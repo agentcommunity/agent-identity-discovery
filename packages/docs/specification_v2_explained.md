@@ -438,7 +438,7 @@ The SHA-256 digest is encoded as unpadded base64url. Implementations MUST NOT ha
 
 ### B.3 Request And Response Shape
 
-Current preferred shape, pending exact Structured Fields validation for `Accept-Signature`:
+Validated RFC 9421 Structured Fields shape:
 
 ```http
 Accept-Signature: aid-pka=("@method";req "@target-uri";req "@authority";req "@status");created;expires;keyid="<jwk-thumbprint>";alg="ed25519";nonce="<client-challenge>";tag="aid-pka-v2"
@@ -584,16 +584,17 @@ Reviewer-facing language should say "DNS-current endpoint/key" and should not im
 
 These are the remaining checks before turning this preview into the actual replacement spec text:
 
-1. Validate exact RFC 9421 `Accept-Signature` Structured Fields syntax for requesting a response signature with `nonce`, `created`, `expires`, `keyid`, `alg`, and `tag`.
-2. Create one canonical v2 PKA vector and verify it with at least one independent RFC 9421 / Structured Fields implementation before SDK implementation.
-3. Tighten the final non-normative auth.md wording without specifying ID-JAG audience, provider trust lists, registration payloads, or auth.md metadata registry details.
+1. Preserve the committed canonical v2 PKA vector as the conformance anchor for `Accept-Signature`, `Signature-Input`, the signature base, and Ed25519 verification.
+2. Record final cross-language verification evidence from the SDK implementation work before the normative v2 spec PR.
+3. Review the RFC 9421 / Structured Fields text against that evidence so the replacement spec does not depend on preview-only validation notes.
+4. Tighten the final non-normative auth.md wording without specifying ID-JAG audience, provider trust lists, registration payloads, or auth.md metadata registry details.
 
 ---
 
 ## Reviewer Questions
 
-1. Is the no-date RFC 9421 `aid-pka` response signature shape correct and implementable?
-2. Is the `Accept-Signature` serialization valid with existing Structured Fields libraries?
+1. Does the committed canonical vector give enough evidence to freeze the no-date RFC 9421 `aid-pka` response signature shape?
+2. Do the SDK implementation results show compatible Structured Fields parsing and signature-base reconstruction across languages?
 3. Are the covered components sufficient to bind request target, response status, and nonce challenge?
 4. Are the nonce, expiry, clock-skew, redirect, cache, and authority rules practical for real deployments?
 5. Is signed non-`200` response support, especially signed `401`, the right way to support OAuth/auth.md handoff?

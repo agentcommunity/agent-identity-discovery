@@ -22,7 +22,7 @@ export interface AidGeneratorData {
 
 // The core logic function
 export function buildTxtRecord(formData: AidGeneratorData): string {
-  const parts: string[] = ['v=aid1'];
+  const parts: string[] = ['v=aid2'];
   if (formData.uri) parts.push(`u=${formData.uri}`);
   if (formData.proto) parts.push(`p=${formData.proto}`);
   if (formData.auth) parts.push(`a=${formData.auth}`);
@@ -30,7 +30,6 @@ export function buildTxtRecord(formData: AidGeneratorData): string {
   if (formData.docs) parts.push(`d=${formData.docs}`);
   if (formData.dep) parts.push(`e=${formData.dep}`);
   if (formData.pka) parts.push(`k=${formData.pka}`);
-  if (formData.kid) parts.push(`i=${formData.kid}`);
   return parts.join(';');
 }
 
@@ -44,10 +43,13 @@ export function validateTxt(record: string): { isValid: boolean; error?: string 
     const v = map.get('v') ?? map.get('version');
     const uri = map.get('u') ?? map.get('uri');
     const proto = map.get('p') ?? map.get('proto');
-    if (v !== 'aid1') throw new Error('Missing or invalid version (v=aid1)');
+    if (v !== 'aid1' && v !== 'aid2') throw new Error('Missing or invalid version');
     if (!uri) throw new Error('Missing uri/u');
     if (!proto) throw new Error('Missing proto/p');
-    if (map.get('i') && !map.get('k') && !map.get('pka')) throw new Error('kid requires pka');
+    if (v === 'aid2' && (map.get('i') || map.get('kid')))
+      throw new Error('kid is not valid in aid2');
+    if (v === 'aid1' && (map.get('k') || map.get('pka')) && !map.get('i') && !map.get('kid'))
+      throw new Error('kid requires pka');
     return { isValid: true };
   } catch (error) {
     return { isValid: false, error: error instanceof Error ? error.message : 'Invalid' };

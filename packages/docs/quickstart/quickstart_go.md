@@ -51,7 +51,7 @@ rec, ttl, err := aid.DiscoverWithOptions(
 Notes
 
 - TTL uses DNS value when available; for `.well-known` fallback, TTL is treated as 300.
-- PKA handshake runs automatically when `pka`/`kid` are present.
+- PKA handshake runs automatically when v2 `pka`/`k` is present. Legacy `aid1` records still use `pka`/`kid`.
 
 ## Parse Raw TXT
 

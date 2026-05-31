@@ -8,7 +8,7 @@ export function computeBytes(txt: string, desc: string): { txtBytes: number; des
 }
 
 export function buildTxtRecord(data: AidGeneratorFormData): string {
-  const parts: string[] = ['v=aid1'];
+  const parts: string[] = ['v=aid2'];
   if (data.uri) parts.push(`u=${data.uri}`);
   if (data.proto) parts.push(`p=${data.proto}`);
   if (data.auth) parts.push(`a=${data.auth}`);
@@ -16,12 +16,11 @@ export function buildTxtRecord(data: AidGeneratorFormData): string {
   if (data.docs) parts.push(`d=${data.docs}`);
   if (data.dep) parts.push(`e=${data.dep}`);
   if (data.pka) parts.push(`k=${data.pka}`);
-  if (data.kid) parts.push(`i=${data.kid}`);
   return parts.join(';');
 }
 
 export function buildWellKnownJson(data: AidGeneratorFormData): Record<string, string> {
-  const o: Record<string, string> = { v: 'aid1' };
+  const o: Record<string, string> = { v: 'aid2' };
   const put = (alias: string, val?: string) => {
     if (!val) return;
     o[alias] = val;
@@ -33,7 +32,6 @@ export function buildWellKnownJson(data: AidGeneratorFormData): Record<string, s
   put('d', data.docs);
   put('e', data.dep);
   put('k', data.pka);
-  put('i', data.kid);
   return o;
 }
 
@@ -83,15 +81,8 @@ export function validate(data: AidGeneratorFormData): ValidationResult {
       errors.push({ code: 'ERR_DEP_ISO', message: 'Dep must be ISO 8601 UTC Z' });
   }
 
-  // PKA rules
-  if (data.pka && !data.kid) {
-    errors.push({
-      code: 'ERR_KID_REQUIRED',
-      message: 'Key ID (rotation) is required when PKA is present',
-    });
-  }
-  if (data.pka && !isValidZBase58(data.pka)) {
-    errors.push({ code: 'ERR_PKA_FORMAT', message: 'PKA must be z-base58 multibase' });
+  if (data.pka && !isValidBase64UrlEd25519(data.pka)) {
+    errors.push({ code: 'ERR_PKA_FORMAT', message: 'PKA must be unpadded base64url Ed25519' });
   }
 
   // Byte length for TXT
@@ -137,13 +128,16 @@ export function parseRecordString(str: string): Partial<AidGeneratorFormData> {
   return out;
 }
 
-function isValidZBase58(s: string): boolean {
-  if (!s || s[0] !== 'z') return false;
-  const body = s.slice(1);
-  const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-  for (const c of body) if (!ALPHABET.includes(c)) return false;
-  const approx = Math.floor((body.length * Math.log(58)) / Math.log(256));
-  return approx === 32 || approx === 33;
+function isValidBase64UrlEd25519(s: string): boolean {
+  if (!/^[A-Za-z0-9_-]+$/.test(s) || s.includes('=') || s.length % 4 === 1) return false;
+  try {
+    const padded =
+      s.replaceAll('-', '+').replaceAll('_', '/') + '='.repeat((4 - (s.length % 4)) % 4);
+    const bytes = Uint8Array.from(atob(padded), (char) => char.codePointAt(0) ?? 0);
+    return bytes.length === 32;
+  } catch {
+    return false;
+  }
 }
 
 function byteLen(s: string): number {

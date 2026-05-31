@@ -49,9 +49,38 @@
         "uri": "https://shop.example.com/ucp",
         "proto": "ucp"
       }
+    },
+    {
+      "name": "v2-simple",
+      "raw": "v=aid2;u=https://api.example.com/mcp;p=mcp;a=oauth2_code",
+      "expected": {
+        "v": "aid2",
+        "uri": "https://api.example.com/mcp",
+        "proto": "mcp",
+        "auth": "oauth2_code"
+      }
+    },
+    {
+      "name": "v2-with-pka",
+      "raw": "v=aid2;u=https://api.example.com/mcp;p=mcp;k=ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ",
+      "expected": {
+        "v": "aid2",
+        "uri": "https://api.example.com/mcp",
+        "proto": "mcp",
+        "pka": "ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ"
+      }
+    },
+    {
+      "name": "v2-ipv6-authority",
+      "raw": "v=aid2;u=https://[2001:db8::1]:8443/mcp;p=mcp;k=ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ",
+      "expected": {
+        "v": "aid2",
+        "uri": "https://[2001:db8::1]:8443/mcp",
+        "proto": "mcp",
+        "pka": "ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ"
+      }
     }
-  ]
-  ,
+  ],
   "invalid": [
     {
       "name": "pka-missing-kid",
@@ -72,6 +101,124 @@
       "name": "remote-non-https",
       "raw": "v=aid1;uri=http://api.example.com/mcp;proto=mcp",
       "errorCode": "ERR_INVALID_TXT"
+    },
+    {
+      "name": "v2-stale-kid",
+      "raw": "v=aid2;uri=https://api.example.com/mcp;proto=mcp;k=ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ;i=g1",
+      "errorCode": "ERR_INVALID_TXT"
+    },
+    {
+      "name": "v2-legacy-multibase-pka",
+      "raw": "v=aid2;uri=https://api.example.com/mcp;proto=mcp;k=z1111111111111111111111111111111111111111111",
+      "errorCode": "ERR_INVALID_TXT"
+    },
+    {
+      "name": "v2-padded-pka",
+      "raw": "v=aid2;uri=https://api.example.com/mcp;proto=mcp;k=ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=",
+      "errorCode": "ERR_INVALID_TXT"
+    },
+    {
+      "name": "v2-invalid-base64url-character",
+      "raw": "v=aid2;uri=https://api.example.com/mcp;proto=mcp;k=ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60Elm+",
+      "errorCode": "ERR_INVALID_TXT"
+    },
+    {
+      "name": "v2-pka-decodes-to-31-bytes",
+      "raw": "v=aid2;uri=https://api.example.com/mcp;proto=mcp;k=AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHw",
+      "errorCode": "ERR_INVALID_TXT"
+    },
+    {
+      "name": "v2-pka-decodes-to-33-bytes",
+      "raw": "v=aid2;uri=https://api.example.com/mcp;proto=mcp;k=AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAh",
+      "errorCode": "ERR_INVALID_TXT"
+    },
+    {
+      "name": "v2-duplicate-pka-alias",
+      "raw": "v=aid2;uri=https://api.example.com/mcp;proto=mcp;k=ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ;pka=ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ",
+      "errorCode": "ERR_INVALID_TXT"
+    },
+    {
+      "name": "unknown-future-version",
+      "raw": "v=aid3;uri=https://api.example.com/mcp;proto=mcp",
+      "errorCode": "ERR_INVALID_TXT"
+    }
+  ],
+  "recordSets": [
+    {
+      "name": "aid1-aid2-coexistence-prefers-aid2",
+      "records": [
+        "v=aid1;u=https://v1.example.com/mcp;p=mcp",
+        "v=aid2;u=https://v2.example.com/mcp;p=mcp"
+      ],
+      "expectedSelected": {
+        "v": "aid2",
+        "uri": "https://v2.example.com/mcp",
+        "proto": "mcp"
+      },
+      "metadata": {
+        "selectionRule": "When exactly one valid aid2 record coexists with aid1 records at the same owner name, version-aware clients prefer aid2."
+      }
+    },
+    {
+      "name": "unknown-future-version-ignored-when-aid2-present",
+      "records": [
+        "v=aid3;u=https://future.example.com/mcp;p=mcp",
+        "v=aid2;u=https://v2.example.com/mcp;p=mcp"
+      ],
+      "expectedSelected": {
+        "v": "aid2",
+        "uri": "https://v2.example.com/mcp",
+        "proto": "mcp"
+      },
+      "metadata": {
+        "selectionRule": "Unknown future versions are not selected over a supported aid2 record."
+      }
+    },
+    {
+      "name": "unknown-future-version-only",
+      "records": ["v=aid3;u=https://future.example.com/mcp;p=mcp"],
+      "expectedErrorCode": "ERR_INVALID_TXT",
+      "metadata": {
+        "selectionRule": "Unknown future versions must not be treated as aid2-compatible records."
+      }
+    },
+    {
+      "name": "valid-aid2-with-malformed-aid2-selects-valid-aid2",
+      "records": [
+        "v=aid2;u=http://bad.example.com/mcp;p=mcp",
+        "v=aid2;u=https://v2.example.com/mcp;p=mcp"
+      ],
+      "expectedSelected": {
+        "v": "aid2",
+        "uri": "https://v2.example.com/mcp",
+        "proto": "mcp"
+      },
+      "metadata": {
+        "selectionRule": "When exactly one valid aid2 record exists, malformed aid2 records at the same owner name do not block selection."
+      }
+    },
+    {
+      "name": "malformed-aid2-with-valid-aid1-selects-aid1",
+      "records": [
+        "v=aid2;u=http://bad.example.com/mcp;p=mcp",
+        "v=aid1;u=https://v1.example.com/mcp;p=mcp"
+      ],
+      "expectedSelected": {
+        "v": "aid1",
+        "uri": "https://v1.example.com/mcp",
+        "proto": "mcp"
+      },
+      "metadata": {
+        "selectionRule": "Malformed aid2 records do not block fallback to a single valid aid1 record."
+      }
+    },
+    {
+      "name": "only-malformed-aid-like-txt-no-well-known-fallback",
+      "records": ["v=aid3;u=https://future.example.com/mcp;p=mcp"],
+      "expectedErrorCode": "ERR_INVALID_TXT",
+      "metadata": {
+        "selectionRule": "When DNS contains only malformed AID-like TXT, clients return ERR_INVALID_TXT and do not use well-known fallback."
+      }
     }
   ]
 }

@@ -45,7 +45,7 @@ public class Main {
 
 Notes
 
-- PKA handshake runs automatically when `pka`/`kid` are present.
+- PKA handshake runs automatically when v2 `pka`/`k` is present. Legacy `aid1` records still use `pka`/`kid`.
 - Errors: `AidError` exposes `.errorCode` (symbol) and `.code` (number).
 
 ---

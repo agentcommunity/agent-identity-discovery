@@ -94,8 +94,8 @@ export function PreviewPanel({
             <Lightbulb className="h-4 w-4" />
             <AlertTitle>Ready to publish!</AlertTitle>
             <AlertDescription>
-              Add the DNS record above to your DNS provider. AID v1.x publishes short keys as the
-              canonical wire format.
+              Add the DNS record above to your DNS provider. The generator emits the compact
+              short-key TXT form for the selected record version.
             </AlertDescription>
           </Alert>
         )}

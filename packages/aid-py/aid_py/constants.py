@@ -12,7 +12,55 @@ from typing import Final, Dict, List
 # Version
 # ---------------------------------------------------------------------------
 
-SPEC_VERSION: Final[str] = "aid1"
+SPEC_VERSION_V1: Final[str] = "aid1"
+SPEC_VERSION_V2: Final[str] = "aid2"
+SPEC_VERSION: Final[str] = "aid2"
+SUPPORTED_SPEC_VERSIONS: Final[List[str]] = [
+    "aid1",
+    "aid2",
+]
+
+# Version-specific raw record metadata. AidRecordV2 excludes legacy DNS kid/i.
+AID_RECORD_V1_CANONICAL_FIELDS: Final[List[str]] = [
+    "v",
+    "uri",
+    "proto",
+    "auth",
+    "desc",
+    "docs",
+    "dep",
+    "pka",
+    "kid",
+]
+AID_RECORD_V1_ALIAS_FIELDS: Final[List[str]] = [
+    "p",
+    "u",
+    "a",
+    "s",
+    "d",
+    "e",
+    "k",
+    "i",
+]
+AID_RECORD_V2_CANONICAL_FIELDS: Final[List[str]] = [
+    "v",
+    "uri",
+    "proto",
+    "auth",
+    "desc",
+    "docs",
+    "dep",
+    "pka",
+]
+AID_RECORD_V2_ALIAS_FIELDS: Final[List[str]] = [
+    "p",
+    "u",
+    "a",
+    "s",
+    "d",
+    "e",
+    "k",
+]
 
 # ---------------------------------------------------------------------------
 # Protocol tokens

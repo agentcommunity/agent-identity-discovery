@@ -78,6 +78,8 @@ A successful standard is defined as much by the problems it _doesn't_ solve as b
 
 ### **6. Discovery vs Identity (and PKA in v1.1)**
 
+This section documents the v1.1 design rationale. For new v2 records, PKA keeps the same endpoint-proof role but uses `k` as unpadded base64url JWK `x`, derives `keyid` with RFC 7638, and no longer publishes `kid` in DNS.
+
 Discovery answers “where and how do I connect?” Identity answers “am I really talking to who DNS pointed me to?” AID v1 keeps these responsibilities separate by design, then offers PKA as an optional, cryptographic proof to harden discovery without changing DNS.
 
 - **Discovery (AID):** DNS TXT at `_agent.<domain>`, with protocol token and `uri`.

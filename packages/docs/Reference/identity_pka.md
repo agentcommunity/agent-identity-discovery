@@ -1,10 +1,10 @@
 ---
 title: 'Identity & PKA'
-description: 'Optional endpoint proof and rotation for AID v1.1'
+description: 'Optional endpoint proof for AID v2 and v1 compatibility'
 icon: material/shield-lock-outline
 ---
 
-[View spec appendix](../specification.md#appendix-d-pka-handshake-normative)
+[View v2 explainer](../specification_v2_explained.md#appendix-b-pka-handshake) or the [v1.2 spec appendix](../specification.md#appendix-d-pka-handshake-normative).
 
 ## Identity & PKA (ELI5)
 
@@ -17,7 +17,9 @@ icon: material/shield-lock-outline
 PKA stands for **P**ublic **K**ey for **A**gent.
 
 - **PKA:** A public key (`pka`/`k`) advertised in the `_agent.<domain>` record.
-- **kid:** A Key ID (`kid`/`i`) used to label and rotate keys.
+- **v2 key:** `k` is the unpadded base64url Ed25519 JWK `x` value.
+- **v2 keyid:** The HTTP signature `keyid` is the RFC 7638 JWK thumbprint derived from `k`.
+- **v1 compatibility:** Legacy `aid1` PKA uses `k=z...` base58btc and an explicit `i`/`kid`.
 
 ## Relationship to Pkarr
 
@@ -31,26 +33,38 @@ In short, PKA applies the powerful identity philosophy of Pkarr with the pragmat
 
 ## How it works (high level)
 
-1. The TXT record includes `k` (or `pka`) with a multibase Ed25519 public key and an `i` (or `kid`) label.
-2. The client makes the first request with an `AID-Challenge` header and a `Date`.
-3. The server responds with HTTP Message Signatures (RFC 9421) headers that cover the challenge, method, target URI, host, and date.
-4. The client verifies the signature with the published public key. If it matches and the timestamp is fresh (≈5 minutes), trust is established.
+1. The TXT record includes `k` (or `pka`) with the current Ed25519 public key.
+2. The client derives the RFC 7638 JWK thumbprint keyid from `k`.
+3. The client sends an RFC 9421 response-signature challenge with a fresh `nonce`.
+4. The server responds with HTTP Message Signatures (RFC 9421) headers that cover the request context and response status.
+5. The client verifies the signature with the published public key. If it matches, the nonce is echoed, and the response is fresh, endpoint proof succeeds.
 
 ## Example TXT
+
+```text
+_agent.example.com. 300 IN TXT "v=aid2;p=mcp;u=https://api.example.com/mcp;k=JrQLj5P_89iXES9-vFgrIy29clF9CC_oPPsw3c5D0bs"
+```
+
+## Technical details (concise)
+
+- Key: Ed25519, unpadded base64url JWK `x` encoded in `k`/`pka`.
+- Key identity: RFC 7638 JWK thumbprint over `{"crv":"Ed25519","kty":"OKP","x":"<k>"}`.
+- Proof: HTTP Message Signatures (RFC 9421). Client requests a nonce-bound response signature; server returns `Signature-Input` and `Signature`.
+- Covered fields: `"@method";req`, `"@target-uri";req`, `"@authority";req`, and `"@status"`.
+- Freshness: `created` and `expires` are mandatory and short-lived. HTTP `Date` is not signed in v2.
+- Rotation: AID v2 core publishes the current key. It does not define DNS-level rotation labels. Returning clients can detect a changed key by comparing derived thumbprints.
+- Downgrade warnings: If `k`/`pka` disappears after being present, clients should warn.
+- Together with TLS (required) and DNSSEC (recommended), PKA creates defense in depth.
+
+## v1 compatibility
+
+Legacy `aid1` records remain valid during the compatibility window:
 
 ```text
 _agent.example.com. 300 IN TXT "v=aid1;p=mcp;u=https://api.example.com/mcp;k=z7rW8r...;i=g1"
 ```
 
-## Technical details (concise)
-
-- Key: Ed25519, multibase (z/base58btc) encoded in `k`/`pka`.
-- Proof: HTTP Message Signatures (RFC 9421). Client sends `AID-Challenge`; server returns `Signature-Input` and `Signature`.
-- Covered fields: `AID-Challenge`, `@method`, `@target-uri`, `host`, `date`.
-- Freshness: Reject if the `created` timestamp is too old or too far in the future (±300s typical).
-- Rotation: Change keys by publishing a new `k` with a new `i` (kid). Keep old key available until clients have seen the new one.
-- Downgrade warnings: If `k`/`pka` disappears after being present, clients should warn.
-- Together with TLS (required) and DNSSEC (recommended), PKA creates defense‑in‑depth.
+For `aid1`, `k` is multibase `z...` base58btc, `i`/`kid` is required with `k`, the client sends `AID-Challenge` and `Date`, and the signature `keyid` must match DNS `kid`.
 
 ## When to require PKA
 
@@ -60,8 +74,10 @@ _agent.example.com. 300 IN TXT "v=aid1;p=mcp;u=https://api.example.com/mcp;k=z7r
 
 ## Operations checklist
 
-- Publish `k` and `i` in the TXT record.
-- Store the private key securely; plan rotation via `kid`.
+- Publish `k` in the TXT record. For new v2 records, do not publish `i`/`kid`.
+- Store the private key securely.
+- Track the derived RFC 7638 thumbprint in deployment notes so planned key replacement is distinguishable from an unexpected change.
+- For legacy v1 compatibility records, keep publishing `i`/`kid` with `k`.
 - Monitor for downgrade: if you remove `k`, expect client warnings.
 - Document your contact/docs URL via `d` (docs) and deprecation timeline via `e` (dep) as needed.
 - Use the [aid-doctor CLI](../Tooling/aid_doctor.md) `pka` commands to generate and verify PKA keys.
@@ -82,6 +98,7 @@ In short, PKA provides the most critical value of a DID—a verifiable, decentra
 
 ## See also
 
-- Spec appendix: [PKA Handshake](../specification.md#appendix-d-pka-handshake-normative)
+- v2 explainer: [PKA Handshake](../specification_v2_explained.md#appendix-b-pka-handshake)
+- v1.2 spec appendix: [PKA Handshake](../specification.md#appendix-d-pka-handshake-normative)
 - [Security Best Practices](security.md)
 - [Rationale](../Understand/rationale.md)

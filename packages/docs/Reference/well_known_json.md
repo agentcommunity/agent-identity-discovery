@@ -1,10 +1,10 @@
 ---
 title: '.well-known JSON'
-description: 'Canonical JSON payload, client guardrails, and TTL policy'
+description: 'Fallback JSON payload, client guardrails, and TTL policy'
 icon: material/file-code
 ---
 
-# .well-known JSON (v1.1)
+# .well-known JSON
 
 Clients may fall back to a JSON document at `/.well-known/agent` only when DNS discovery fails with `ERR_NO_RECORD` or `ERR_DNS_LOOKUP_FAILED`.
 
@@ -19,17 +19,18 @@ Clients may fall back to a JSON document at `/.well-known/agent` only when DNS d
 
 ```json
 {
-  "v": "aid1",
+  "v": "aid2",
   "u": "https://api.example.com/mcp",
   "p": "mcp",
   "s": "Example Agent",
   "d": "https://docs.example.com/agent",
-  "k": "zBase58PublicKey",
-  "i": "g1"
+  "k": "JrQLj5P_89iXES9-vFgrIy29clF9CC_oPPsw3c5D0bs"
 }
 ```
 
-The document mirrors TXT keys and supports single-letter aliases (`v,u,p,s,a,d,e,k,i`). Clients canonicalize aliases to their full names and parse using the same validation rules as TXT.
+The document mirrors TXT keys and supports single-letter aliases (`v,u,p,s,a,d,e,k`). Clients canonicalize aliases to their full names and parse using the same validation rules as TXT.
+
+Legacy `aid1` fallback JSON remains valid during the compatibility window. For `aid1` PKA, include `k=z...` and `i`/`kid`.
 
 ## Client guardrails
 
@@ -46,7 +47,7 @@ The document mirrors TXT keys and supports single-letter aliases (`v,u,p,s,a,d,e
 ## Errors
 
 - Use `ERR_FALLBACK_FAILED` for fetch/validation failures.
-- PKA rules still apply if `k`/`i` are present (see PKA handshake expectations).
+- PKA rules still apply if `k` is present. In v2, the HTTP signature `keyid` is derived from `k`; in legacy v1, `i`/`kid` is required with `k`.
 - Test your `.well-known` implementation using the [aid-doctor CLI](../Tooling/aid_doctor.md) with the `--dump-well-known` flag.
 
 ## See also

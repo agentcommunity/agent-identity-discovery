@@ -5,8 +5,12 @@
  * To make changes, edit the YAML file and run: pnpm gen
  */
 
-// Specification version
-export const SPEC_VERSION = 'aid1' as const;
+// Specification versions
+export const SPEC_VERSION_V1 = 'aid1' as const;
+export const SPEC_VERSION_V2 = 'aid2' as const;
+export const SPEC_VERSION = 'aid2' as const;
+export const SUPPORTED_SPEC_VERSIONS = ['aid1', 'aid2'] as const;
+export type AidSpecVersion = (typeof SUPPORTED_SPEC_VERSIONS)[number];
 
 // Protocol tokens
 export const PROTO_A2A = 'a2a' as const;
@@ -87,9 +91,7 @@ export const ERROR_MESSAGES = {
 export type ErrorCode = keyof typeof ERROR_CODES;
 
 // AID Record structure
-export interface AidRecord {
-  /** v */
-  v: 'aid1';
+interface AidRecordCommon {
   /** uri */
   uri: string;
   /** proto */
@@ -102,11 +104,27 @@ export interface AidRecord {
   docs?: string;
   /** dep (optional) */
   dep?: string;
+}
+
+export interface AidRecordV1 extends AidRecordCommon {
+  /** v */
+  v: 'aid1';
   /** pka (optional) */
   pka?: string;
-  /** kid (optional) */
+  /** kid (optional, required when pka is present) */
   kid?: string;
 }
+
+export interface AidRecordV2 extends AidRecordCommon {
+  /** v */
+  v: 'aid2';
+  /** pka (optional) */
+  pka?: string;
+  /** kid is not allowed in aid2 records */
+  kid?: never;
+}
+
+export type AidRecord = AidRecordV1 | AidRecordV2;
 
 // Raw parsed record (before validation)
 export interface RawAidRecord {
@@ -128,6 +146,32 @@ export interface RawAidRecord {
   k?: string;
   i?: string;
 }
+
+// Version-specific raw record metadata. AidRecord remains compatibility-facing,
+// while AidRecordV2 deliberately excludes legacy DNS kid/i.
+export const AID_RECORD_V1_CANONICAL_FIELDS = [
+  'v',
+  'uri',
+  'proto',
+  'auth',
+  'desc',
+  'docs',
+  'dep',
+  'pka',
+  'kid',
+] as const;
+export const AID_RECORD_V1_ALIAS_FIELDS = ['p', 'u', 'a', 's', 'd', 'e', 'k', 'i'] as const;
+export const AID_RECORD_V2_CANONICAL_FIELDS = [
+  'v',
+  'uri',
+  'proto',
+  'auth',
+  'desc',
+  'docs',
+  'dep',
+  'pka',
+] as const;
+export const AID_RECORD_V2_ALIAS_FIELDS = ['p', 'u', 'a', 's', 'd', 'e', 'k'] as const;
 
 // DNS configuration
 export const DNS_SUBDOMAIN = '_agent' as const;

@@ -6,11 +6,11 @@ const discoveryOk: DiscoveryResult = {
   ok: true,
   value: {
     record: {
-      v: 'aid1',
-      uri: 'ws://simple.agentcommunity.org:8080/mcp',
-      proto: 'mcp',
+      v: 'aid2',
+      uri: 'wss://simple.agentcommunity.org/mcp',
+      proto: 'websocket',
       host: 'simple.agentcommunity.org',
-      port: 8080,
+      port: 443,
       desc: 'Simple demo agent',
     } as unknown as DiscoveryData,
     metadata: {
@@ -18,7 +18,7 @@ const discoveryOk: DiscoveryResult = {
       lookupTime: 89,
       recordType: 'TXT',
       source: 'DNS',
-      txtRecord: 'v=aid1;u=ws://simple.agentcommunity.org:8080/mcp;p=mcp;s=Simple demo agent',
+      txtRecord: 'v=aid2;u=wss://simple.agentcommunity.org/mcp;p=websocket;s=Simple demo agent',
     },
   },
 };
