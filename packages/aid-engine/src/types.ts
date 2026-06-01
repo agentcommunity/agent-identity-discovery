@@ -99,6 +99,8 @@ export interface DowngradeBlock {
   } | null;
   status:
     | 'no_change'
+    // Legacy aliases retained for public API compatibility with older reports.
+    // Current runCheck output uses pka_removed/key_replaced or more specific statuses.
     | 'downgrade'
     | 'key_rotation'
     | 'first_seen'

@@ -314,7 +314,14 @@ fn extract_dict_member(input: &str, label: &str) -> Result<String, AidError> {
     let mut found: Option<String> = None;
     for part in split_dict_members(input) {
         if let Some(eq) = part.find('=') {
-            if ascii_to_lowercase(part[..eq].trim()) == label {
+            let member_label = part[..eq].trim();
+            if ascii_to_lowercase(member_label) == label {
+                if member_label != label {
+                    return Err(AidError::new(
+                        "ERR_SECURITY",
+                        format!("Invalid {} signature member label", label),
+                    ));
+                }
                 if found.is_some() {
                     return Err(AidError::new(
                         "ERR_SECURITY",
@@ -360,7 +367,7 @@ fn param_value_raw(params: &str, name: &str) -> Result<Option<String>, AidError>
             Some(eq) => (trimmed[..eq].trim(), Some(trimmed[eq + 1..].trim())),
             None => (trimmed, None),
         };
-        if ascii_to_lowercase(param_name) == name {
+        if param_name == name {
             if found.is_some() {
                 return Err(AidError::new(
                     "ERR_SECURITY",
@@ -385,8 +392,7 @@ fn validate_v2_signature_input_params(params: &str) -> Result<(), AidError> {
             Some(eq) => trimmed[..eq].trim(),
             None => trimmed,
         };
-        let lower = ascii_to_lowercase(param_name);
-        if !allowed.iter().any(|allowed_name| *allowed_name == lower) {
+        if !allowed.iter().any(|allowed_name| *allowed_name == param_name) {
             return Err(AidError::new(
                 "ERR_SECURITY",
                 format!("Unsupported Signature-Input parameter: {}", param_name),
@@ -930,11 +936,71 @@ mod tests {
     }
 
     #[test]
+    fn rejects_mixed_case_aid_pka_signature_input_member_label() {
+        for label in ["AID-PKA", "Aid-Pka"] {
+            let signature_input = v2_signature_input_with_extra("").replacen("aid-pka=", &format!("{}=", label), 1);
+            let headers = v2_parse_headers(&signature_input);
+            let err = parse_v2_signature_headers(&headers).expect_err("mixed-case Signature-Input member label must fail");
+            assert_eq!(err.error_code, "ERR_SECURITY");
+            assert!(err.message.contains("Invalid aid-pka signature member label"));
+        }
+    }
+
+    #[test]
+    fn rejects_exact_plus_mixed_case_aid_pka_signature_input_member_label() {
+        let exact = v2_signature_input_with_extra("");
+        for label in ["AID-PKA", "Aid-Pka"] {
+            let headers = v2_parse_headers(&format!("{}, {}=()", exact, label));
+            let err =
+                parse_v2_signature_headers(&headers).expect_err("case-confused Signature-Input member must fail");
+            assert_eq!(err.error_code, "ERR_SECURITY");
+            assert!(err.message.contains("aid-pka signature member"));
+        }
+    }
+
+    #[test]
+    fn rejects_mixed_case_aid_pka_signature_member_label() {
+        for label in ["AID-PKA", "Aid-Pka"] {
+            let mut headers = HeaderMap::new();
+            headers.insert("Signature-Input", v2_signature_input_with_extra("").parse().unwrap());
+            headers.insert("Signature", format!("{}=:AA==:", label).parse().unwrap());
+
+            let err = parse_v2_signature_headers(&headers).expect_err("mixed-case Signature member label must fail");
+            assert_eq!(err.error_code, "ERR_SECURITY");
+            assert!(err.message.contains("Invalid aid-pka signature member label"));
+        }
+    }
+
+    #[test]
+    fn rejects_exact_plus_mixed_case_aid_pka_signature_member_label() {
+        for label in ["AID-PKA", "Aid-Pka"] {
+            let mut headers = HeaderMap::new();
+            headers.insert("Signature-Input", v2_signature_input_with_extra("").parse().unwrap());
+            headers.insert("Signature", format!("aid-pka=:AA==:, {}=:AQ==:", label).parse().unwrap());
+
+            let err = parse_v2_signature_headers(&headers).expect_err("case-confused Signature member must fail");
+            assert_eq!(err.error_code, "ERR_SECURITY");
+            assert!(err.message.contains("aid-pka signature member"));
+        }
+    }
+
+    #[test]
     fn rejects_unknown_v2_signature_input_top_level_parameter() {
         let headers = v2_parse_headers(&v2_signature_input_with_extra(";foo=\"bar\""));
         let err = parse_v2_signature_headers(&headers).expect_err("unknown top-level parameter must fail");
         assert_eq!(err.error_code, "ERR_SECURITY");
         assert!(err.message.contains("Unsupported Signature-Input parameter"));
+    }
+
+    #[test]
+    fn rejects_mixed_case_v2_signature_input_top_level_parameters() {
+        for (param, replacement) in [("created=", "Created="), ("keyid=", "KeyID=")] {
+            let signature_input = v2_signature_input_with_extra("").replacen(param, replacement, 1);
+            let headers = v2_parse_headers(&signature_input);
+            let err = parse_v2_signature_headers(&headers).expect_err("mixed-case top-level parameter must fail");
+            assert_eq!(err.error_code, "ERR_SECURITY");
+            assert!(err.message.contains("Unsupported Signature-Input parameter"));
+        }
     }
 
     #[test]
@@ -1015,6 +1081,19 @@ mod tests {
                 covered_name
             )));
             let err = parse_v2_signature_headers(&headers).expect_err("unsupported covered field must fail");
+            assert_eq!(err.error_code, "ERR_SECURITY");
+            assert!(err.message.contains("Unsupported covered field"));
+        }
+    }
+
+    #[test]
+    fn rejects_mixed_case_v2_derived_covered_fields() {
+        for covered_name in ["@Method", "@METHOD"] {
+            let headers = v2_parse_headers(&v2_signature_input_with_covered(&format!(
+                "\"{}\";req \"@target-uri\";req \"@authority\";req \"@status\"",
+                covered_name
+            )));
+            let err = parse_v2_signature_headers(&headers).expect_err("mixed-case derived covered field must fail");
             assert_eq!(err.error_code, "ERR_SECURITY");
             assert!(err.message.contains("Unsupported covered field"));
         }

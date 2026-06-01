@@ -367,12 +367,80 @@ func TestPKAV2RejectsDuplicateAidPkaSignatureDictionaryMembers(t *testing.T) {
 	}
 }
 
+func TestPKAV2RejectsNonExactAidPkaDictionaryMemberLabels(t *testing.T) {
+	cases := map[string]struct {
+		headerName string
+		label      string
+	}{
+		"Signature-Input uppercase":  {headerName: "Signature-Input", label: "AID-PKA"},
+		"Signature-Input mixed-case": {headerName: "Signature-Input", label: "Aid-Pka"},
+		"Signature uppercase":        {headerName: "Signature", label: "AID-PKA"},
+		"Signature mixed-case":       {headerName: "Signature", label: "Aid-Pka"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			headers := validPKAV2SignatureHeaders()
+			value := strings.Replace(headers.Get(tc.headerName), "aid-pka=", tc.label+"=", 1)
+			headers.Set(tc.headerName, value)
+
+			if _, err := parseV2SignatureHeaders(headers); err == nil {
+				t.Fatalf("expected non-exact %s member label %q to be rejected", tc.headerName, tc.label)
+			}
+		})
+	}
+}
+
+func TestPKAV2RejectsAdditionalNonExactAidPkaDictionaryMemberLabels(t *testing.T) {
+	cases := map[string]struct {
+		headerName string
+		label      string
+	}{
+		"Signature-Input uppercase":  {headerName: "Signature-Input", label: "AID-PKA"},
+		"Signature-Input mixed-case": {headerName: "Signature-Input", label: "Aid-Pka"},
+		"Signature uppercase":        {headerName: "Signature", label: "AID-PKA"},
+		"Signature mixed-case":       {headerName: "Signature", label: "Aid-Pka"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			headers := validPKAV2SignatureHeaders()
+			confusedMember := strings.Replace(headers.Get(tc.headerName), "aid-pka=", tc.label+"=", 1)
+			headers.Set(tc.headerName, headers.Get(tc.headerName)+", "+confusedMember)
+
+			if _, err := parseV2SignatureHeaders(headers); err == nil {
+				t.Fatalf("expected additional non-exact %s member label %q to be rejected", tc.headerName, tc.label)
+			}
+		})
+	}
+}
+
 func TestPKAV2RejectsUnknownTopLevelSignatureInputParams(t *testing.T) {
 	headers := validPKAV2SignatureHeaders()
 	headers.Set("Signature-Input", headers.Get("Signature-Input")+`;foo="bar"`)
 
 	if _, err := parseV2SignatureHeaders(headers); err == nil {
 		t.Fatalf("expected unknown top-level Signature-Input parameter to be rejected")
+	}
+}
+
+func TestPKAV2RejectsNonExactTopLevelSignatureInputParamNames(t *testing.T) {
+	cases := map[string]struct {
+		original    string
+		replacement string
+	}{
+		"mixed-case created": {original: `;created=1`, replacement: `;Created=1`},
+		"mixed-case keyid":   {original: `;keyid="key"`, replacement: `;KeyID="key"`},
+		"uppercase alg":      {original: `;alg="ed25519"`, replacement: `;ALG="ed25519"`},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			headers := validPKAV2SignatureHeaders()
+			sigInput := strings.Replace(headers.Get("Signature-Input"), tc.original, tc.replacement, 1)
+			headers.Set("Signature-Input", sigInput)
+
+			if _, err := parseV2SignatureHeaders(headers); err == nil {
+				t.Fatalf("expected non-exact %s to be rejected", name)
+			}
+		})
 	}
 }
 

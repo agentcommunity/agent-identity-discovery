@@ -20,7 +20,7 @@ System.out.println(result.record.proto + " at " + result.record.uri + " ttl=" + 
 
 ```java
 var opts = new DiscoveryOptions();
-opts.protocol = "mcp";                        // Try _agent._mcp., then _agent.mcp., then base
+opts.protocol = "mcp";                        // Validate mcp after base lookup; proto probe is diagnostic
 opts.timeout = java.time.Duration.ofSeconds(5);
 opts.wellKnownFallback = true;                 // Only on ERR_NO_RECORD / ERR_DNS_LOOKUP_FAILED
 opts.wellKnownTimeout = java.time.Duration.ofSeconds(2);
@@ -37,7 +37,7 @@ import org.agentcommunity.aid.AidRecord;
 
 public class Main {
   public static void main(String[] args) throws Exception {
-    AidRecord rec = Parser.parse("v=aid1;u=https://api.example.com/mcp;p=mcp;s=Example");
+    AidRecord rec = Parser.parse("v=aid2;u=https://api.example.com/mcp;p=mcp;s=Example");
     System.out.println(rec.uri);
   }
 }

@@ -119,6 +119,18 @@ public class AidV2Test {
   }
 
   @Test
+  void discoveryProtocolQueryNamesUseUnderscoreThenBase() {
+    assertEquals(List.of("_agent._mcp.example.com", "_agent.example.com"), Discovery.queryNames("example.com", "mcp"));
+    assertFalse(Discovery.queryNames("example.com", "mcp").contains("_agent.mcp.example.com"));
+  }
+
+  @Test
+  void discoveryTreatsDohNxDomainAsNoRecord() {
+    assertTrue(Discovery.isNoRecordDohStatus(3));
+    assertFalse(Discovery.isNoRecordDohStatus(2));
+  }
+
+  @Test
   void parserRejectsInvalidAid2PkaEncodings() {
     List<String> invalidKeys =
         List.of(
@@ -421,10 +433,56 @@ public class AidV2Test {
   }
 
   @Test
+  void rejectsCaseConfusedAidPkaSignatureInputDictionaryMembers() throws Exception {
+    JsonNode vector = loadPkaVector("v2-rfc9421-response-signature");
+    Map<String, String> headers = new java.util.HashMap<>(canonicalVectorHeaders(vector));
+    String caseConfused = headers.get("Signature-Input").replaceFirst("aid-pka=", "AID-PKA=");
+    headers.put("Signature-Input", headers.get("Signature-Input") + ", " + caseConfused);
+
+    AidError err =
+        assertThrows(
+            AidError.class,
+            () ->
+                Handshake.verifyV2Response(
+                    vector.get("record").get("u").asText(),
+                    vector.get("record").get("k").asText(),
+                    vector.get("nonce").asText(),
+                    vector.get("response").get("status").asInt(),
+                    headers,
+                    vector.get("created").asLong() + 30));
+
+    assertEquals("ERR_SECURITY", err.errorCode);
+    assertTrue(err.getMessage().contains("Duplicate aid-pka signature member"));
+  }
+
+  @Test
   void rejectsDuplicateAidPkaSignatureDictionaryMembers() throws Exception {
     JsonNode vector = loadPkaVector("v2-rfc9421-response-signature");
     Map<String, String> headers = new java.util.HashMap<>(canonicalVectorHeaders(vector));
     headers.put("Signature", headers.get("Signature") + ", " + headers.get("Signature"));
+
+    AidError err =
+        assertThrows(
+            AidError.class,
+            () ->
+                Handshake.verifyV2Response(
+                    vector.get("record").get("u").asText(),
+                    vector.get("record").get("k").asText(),
+                    vector.get("nonce").asText(),
+                    vector.get("response").get("status").asInt(),
+                    headers,
+                    vector.get("created").asLong() + 30));
+
+    assertEquals("ERR_SECURITY", err.errorCode);
+    assertTrue(err.getMessage().contains("Duplicate aid-pka signature member"));
+  }
+
+  @Test
+  void rejectsCaseConfusedAidPkaSignatureDictionaryMembers() throws Exception {
+    JsonNode vector = loadPkaVector("v2-rfc9421-response-signature");
+    Map<String, String> headers = new java.util.HashMap<>(canonicalVectorHeaders(vector));
+    String caseConfused = headers.get("Signature").replaceFirst("aid-pka=", "AID-PKA=");
+    headers.put("Signature", headers.get("Signature") + ", " + caseConfused);
 
     AidError err =
         assertThrows(
@@ -518,6 +576,31 @@ public class AidV2Test {
   }
 
   @Test
+  void rejectsUppercaseAid2CoveredComponentName() throws Exception {
+    JsonNode vector = loadPkaVector("v2-rfc9421-response-signature");
+    String signatureInput =
+        canonicalVectorHeaders(vector)
+            .get("Signature-Input")
+            .replace("\"@method\";req", "\"@METHOD\";req");
+    Map<String, String> headers = signedVectorHeaders(vector, signatureInput);
+
+    AidError err =
+        assertThrows(
+            AidError.class,
+            () ->
+                Handshake.verifyV2Response(
+                    vector.get("record").get("u").asText(),
+                    vector.get("record").get("k").asText(),
+                    vector.get("nonce").asText(),
+                    vector.get("response").get("status").asInt(),
+                    headers,
+                    vector.get("created").asLong() + 30));
+
+    assertEquals("ERR_SECURITY", err.errorCode);
+    assertTrue(err.getMessage().contains("required fields"));
+  }
+
+  @Test
   void rejectsUnknownAid2SignatureInputTopLevelParam() throws Exception {
     JsonNode vector = loadPkaVector("v2-rfc9421-response-signature");
     String signatureInput =
@@ -540,6 +623,38 @@ public class AidV2Test {
 
     assertEquals("ERR_SECURITY", err.errorCode);
     assertTrue(err.getMessage().contains("Unsupported Signature-Input parameter: foo"));
+  }
+
+  @Test
+  void rejectsMixedCaseAid2SignatureInputTopLevelParamNames() throws Exception {
+    JsonNode vector = loadPkaVector("v2-rfc9421-response-signature");
+    Map<String, String> replacements = Map.of("created", "Created", "keyid", "KeyID", "alg", "ALG");
+
+    for (Map.Entry<String, String> replacement : replacements.entrySet()) {
+      String signatureInput =
+          canonicalVectorHeaders(vector)
+              .get("Signature-Input")
+              .replace(";" + replacement.getKey() + "=", ";" + replacement.getValue() + "=");
+      Map<String, String> headers = signedVectorHeaders(vector, signatureInput);
+
+      AidError err =
+          assertThrows(
+              AidError.class,
+              () ->
+                  Handshake.verifyV2Response(
+                      vector.get("record").get("u").asText(),
+                      vector.get("record").get("k").asText(),
+                      vector.get("nonce").asText(),
+                      vector.get("response").get("status").asInt(),
+                      headers,
+                      vector.get("created").asLong() + 30),
+              replacement.getValue());
+
+      assertEquals("ERR_SECURITY", err.errorCode, replacement.getValue());
+      assertTrue(
+          err.getMessage().contains("Unsupported Signature-Input parameter: " + replacement.getValue()),
+          replacement.getValue());
+    }
   }
 
   @Test

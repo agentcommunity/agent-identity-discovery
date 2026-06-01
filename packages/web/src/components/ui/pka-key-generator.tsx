@@ -119,14 +119,14 @@ export function PkaKeyGenerator({ onPublicKey }: PkaKeyGeneratorProps) {
         </div>
         <div className="space-y-2">
           <label htmlFor={keyIdId} className="text-sm font-medium">
-            Key ID (RFC 7638 JWK thumbprint)
+            HTTP Signature keyid (derived RFC 7638 JWK thumbprint)
           </label>
           <div className="flex gap-2">
             <Input
               id={keyIdId}
               value={keyId}
               readOnly
-              placeholder="Derived after a valid public key is generated or entered"
+              placeholder="Derived after a valid public key is generated or entered; not a DNS TXT kid/i value"
             />
             <Button
               variant="outline"

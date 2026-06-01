@@ -59,7 +59,7 @@ def _query_txt_record(fqdn: str, timeout: float) -> Tuple[list[str], int]:
 
     try:
         answers = dns.resolver.resolve(fqdn, "TXT", lifetime=timeout)
-    except dns.resolver.NXDOMAIN as exc:
+    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer) as exc:
         raise AidError("ERR_NO_RECORD", str(exc)) from None
     except (dns.resolver.Timeout, dns.exception.DNSException) as exc:
         raise AidError("ERR_DNS_LOOKUP_FAILED", str(exc)) from None
@@ -223,7 +223,6 @@ def discover(
     if protocol:
         query_plan = [
             (f"{DNS_SUBDOMAIN}._{protocol}.{domain_alabel}".rstrip("."), True),
-            (f"{DNS_SUBDOMAIN}.{protocol}.{domain_alabel}".rstrip("."), True),
             (base_fqdn, False),
         ]
     else:

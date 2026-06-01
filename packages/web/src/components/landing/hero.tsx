@@ -138,7 +138,7 @@ export function Hero() {
             >
               <RecordRow k="u" v={`https://${current.domain}/${current.path}`} note="where" />
               <RecordRow k="p" v={current.proto} note="what protocol" />
-              <RecordRow k="k" v="z7rW8rTq8o4mM6vVf7w…" note="proof · Ed25519" accent />
+              <RecordRow k="k" v="ebVWLo_mVPlAeLES6K…" note="proof · Ed25519" accent />
             </div>
           </div>
         </div>

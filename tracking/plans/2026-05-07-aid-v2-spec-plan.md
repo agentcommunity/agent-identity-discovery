@@ -1,6 +1,6 @@
-# AID v2 Spec Plan
+# AID v2 Spec And Implementation Status Plan
 
-> **For agentic workers:** This is a research-phase spec and implementation plan. Do not implement SDK changes from this file until the v2 spec text and open decisions are reviewed. When implementation starts, use `superpowers:subagent-driven-development` or `superpowers:executing-plans` task by task.
+> **For agentic workers:** This file is now a draft-spec plus implementation-status tracker. SDK work has already started and checkpoint `57082f8` committed broad v2 alignment across protocol fixtures, generated constants, TypeScript, Go, Python, Rust, .NET, Java, conformance, tooling, web, and docs. Keep implementation work version-aware and scoped. Preserve the preview split: `packages/docs/specification_v2_explained.md` remains the v2 draft preview, while `packages/docs/specification.md` remains the v1.2 normative spec until a deliberate replacement PR.
 
 **Goal:** Produce a circulatable AID v2 spec draft that defines AID as the first-contact endpoint-and-key anchor while cleaning up PKA key encoding, key identity, and migration from `aid1`.
 
@@ -13,6 +13,8 @@
 **Shareable preview artifact:** `packages/docs/specification_v2_explained.md` is the current human-review draft. It is intentionally separate from `packages/docs/specification.md`, which remains the current v1.2 normative spec for comparison. Future agents should update this preview when decisions change, and only replace `specification.md` when the team deliberately moves from review artifact to v2 spec PR.
 
 **Implementation strategy:** Update the existing packages in place with dual-version support and clean versioned internals. Do not create public `*-v2` package families and do not rewrite the repo from scratch. The public SDK, CLI, conformance, engine, and web package names should remain stable, while internal records, parsers, PKA helpers, generated constants, fixtures, and docs become explicitly version-aware.
+
+**Checkpoint status after `57082f8` and follow-up fix workers:** the repo now contains committed `aid2` constants, a canonical v2 PKA vector, version-aware generated record metadata, migration/conformance fixtures, TS vector tests, and non-TS v2 coverage paths. Follow-up worktree fixes further adjust SDK and tooling slices. This does not mean v2 is released or governance-complete. Remaining work is release ownership, final verification in each ecosystem, docs/readme cleanup, showcase rollout decisions, and deliberate normative spec replacement.
 
 ---
 
@@ -177,7 +179,7 @@ The no-date re-spike and subsequent review settle the v2 PKA profile direction:
 - `@status` signs the response status that was actually returned. The response does not have to be `200`; this allows signed `401` responses that hand off to the next authorization or registration layer without weakening endpoint proof.
 - Signers emit `alg="ed25519"` lowercase; verifiers preserve the exact Structured Field value for signature-base reconstruction while comparing the semantic algorithm value case-insensitively.
 
-The remaining work is not another design debate over date vs nonce. The exact `Accept-Signature` shape has now been validated two ways; the remaining pre-SDK gate is a canonical vector checked by implementations.
+The remaining work is not another design debate over date vs nonce. The exact `Accept-Signature` shape has now been validated two ways and is pinned by the committed canonical vector plus implementation coverage.
 
 ### RFC 9421 Validation Pass
 
@@ -186,7 +188,8 @@ Status after the 2026-05-31 hardening pass:
 - Normative RFC check: the proposed shape matches RFC 9421's model for `Accept-Signature` as a Structured Fields dictionary, response-signature requests, request-derived response components with `;req`, `@status` as a response component, signature metadata parameters including `created`, `expires`, `nonce`, `alg`, `keyid`, and `tag`, and Ed25519 via the `ed25519` signature algorithm identifier.
 - Executable parser and crypto check: a temporary, out-of-repo Node workspace parsed and reserialized the proposed `Accept-Signature`, `Signature-Input`, and `Signature` fields with `structured-headers@2.0.2`; it generated a deterministic Ed25519 key, computed `k` as unpadded base64url JWK `x`, derived the RFC 7638 JWK thumbprint `keyid`, reconstructed the RFC 9421 signature base, and verified the Ed25519 signature with `@noble/ed25519@3.1.0`.
 - Result: the current field shape is syntactically valid and implementable as Structured Fields. It is acceptable to freeze the field shape for spec drafting.
-- Remaining gate: commit a canonical v2 PKA vector to `protocol/pka_vectors.json` and verify it through at least two independent implementation paths before SDK implementation begins. The temporary validation proved the shape; it is not a committed conformance artifact.
+- Committed artifact: `protocol/pka_vectors.json` includes `v2-rfc9421-response-signature` with `aid2`, base64url `k`, derived RFC 7638 `jwk_thumbprint`, nonce, `created`, `expires`, request `Accept-Signature`, response `Signature-Input`, response `Signature`, signature base, and `Cache-Control: no-store`.
+- Implementation coverage: `57082f8` added TS vector coverage, shared fixture/conformance coverage, and non-TS SDK coverage. Current worktree follow-up fixes touch additional SDK and tooling tests. Final release status still requires fresh package-level verification by the coordinator or release owner.
 
 Validated example shape:
 
@@ -333,7 +336,7 @@ Primary file: `packages/docs/specification.md`.
 
 2. Section 2.1 Format and key table
    - `version` row: for v2, `v` MUST be `aid2`.
-   - `pka`/`k` row: change from multibase to unpadded base64url Ed25519 JWK `x`.
+   - `pka`/`k` row: replace legacy multibase with unpadded base64url Ed25519 JWK `x`.
    - Remove `kid`/`i` row from the v2 table.
    - Add text: v2 providers MUST NOT publish `kid`/`i` for AID key identity. Clients MUST NOT use `kid`/`i` for v2 PKA verification.
    - Decide before implementation whether a v2 record containing `i` is invalid or ignored as unknown. Recommendation: invalid if `i` or `kid` is recognized, because otherwise stale v1 examples appear to work while verification uses different identity semantics.
@@ -403,7 +406,7 @@ Signature: aid-pka=:<base64-signature>:
 - The nonce MUST have at least 32 bytes of entropy and SHOULD be encoded as unpadded base64url for transport.
 - Verifiers compare the received `nonce` value exactly to the challenge value they sent.
 - Servers do not need to persist nonce state in v2 core because the verifier supplies the one-shot nonce and rejects responses that do not echo it in signed `@signature-params`.
-- Preferred challenge transport is RFC 9421 `Accept-Signature` with the required `nonce`. The exact Structured Fields syntax must be validated while drafting Appendix D and the canonical vector.
+- Preferred challenge transport is RFC 9421 `Accept-Signature` with the required `nonce`. The exact Structured Fields syntax is pinned by the committed canonical vector and must stay aligned with it.
 - Clients SHOULD send `Cache-Control: no-store` on PKA requests.
 - PKA responses MUST include `Cache-Control: no-store` unless the spec deliberately defines an exact cache-varying alternative. Do not leave this as implementation policy; nonce-bound endpoint proofs are per-request artifacts.
 - Missing response `Cache-Control: no-store` is a protocol error. Strict verifiers SHOULD fail; compatibility modes MAY warn only during migration.
@@ -485,7 +488,7 @@ Signers **MUST** emit `alg="ed25519"` lowercase. Case-insensitive verifier accep
 
 ### PKA Response Signature
 
-AID v2 PKA uses a nonce-bound RFC 9421 response signature. The current preferred shape, pending exact Structured Fields validation during canonical vector work, is:
+AID v2 PKA uses a nonce-bound RFC 9421 response signature. The preferred shape is pinned by `protocol/pka_vectors.json` and current implementation tests:
 
 ```http
 Accept-Signature: aid-pka=("@method";req "@target-uri";req "@authority";req "@status");created;expires;keyid="<jwk-thumbprint>";alg="ed25519";nonce="<client-challenge>";tag="aid-pka-v2"
@@ -649,7 +652,7 @@ Plan:
 
 Risk:
 
-- The current generator emits one current spec shape. Mutating the only `AidRecord` type to `aid2` would make migration and conformance brittle. The generator contract must become explicitly versioned before SDK implementation starts.
+- The previous generator emitted one current spec shape. Mutating the only `AidRecord` type to `aid2` would make migration and conformance brittle. Checkpoint `57082f8` moved the generated contract toward explicit v1/v2 shapes; future generator work must preserve that version split.
 
 ### TypeScript SDK `packages/aid`
 
@@ -790,7 +793,7 @@ Plan:
 - Reports should show `keyid`/thumbprint, not DNS `kid`.
 - Cache should store previous key thumbprints and trust source after an explicit schema migration from the current `{pka,kid}` shape.
 - Add cache schema versioning and read-old/write-new behavior for `~/.aid/cache.json`.
-- CLI `pka verify --key` help text must change from `z-prefixed multibase` to base64url JWK `x`.
+- CLI `pka verify --key` help text must change from legacy `z`-prefixed multibase to base64url JWK `x`.
 
 ### Web Workbench `packages/web`
 
@@ -913,34 +916,34 @@ These decisions are treated as settled unless a reviewer presents a concrete int
     This compatibility is a migration bridge, not a v2 design constraint: do not preserve v1 `kid`, multibase, `AID-Challenge`, signed `Date`, or rotation-label semantics inside v2 records or v2 PKA.
 27. Do not silently drop existing returning-client or aid-doctor security state. Add a cache/state schema version and read-old/write-new migration that backfills JWK thumbprints for old `{pka,kid}` v1 entries where possible.
 28. Use v2 shadow showcase domains first for live DNS rollout. Keep canonical showcase domains on v1 until v2 SDK/tooling clients can parse version-partitioned answers reliably, then decide whether to switch canonical records or publish side-by-side records.
-29. Keep `packages/docs/specification_v2_explained.md` as the spec-freeze preview until the canonical vector, independent verification, versioned codegen, and first TS implementation prove the model. Replace `packages/docs/specification.md` only in the deliberate normative spec PR.
+29. Keep `packages/docs/specification_v2_explained.md` as the draft preview even though the canonical vector, implementation coverage, versioned codegen, and first TS implementation now exist. Replace `packages/docs/specification.md` only in the deliberate normative spec PR.
 30. Release v2 with stable public package names. Do not create public `*-v2` package families. Use staged releases by ecosystem rather than pretending npm, PyPI, Go, Rust, NuGet, Maven/Gradle, docs, web, and showcase DNS all have the same automation or rollback model.
-31. Treat the first implementation sequence as: spec-freeze preview PR, canonical vector PR, versioned codegen PR, TypeScript core PR, tooling/web PR, non-TS SDK parity PRs, docs sweep PR, then release/showcase rollout.
+31. The original implementation sequence has now advanced through checkpoint `57082f8`. Treat the remaining sequence as docs/status hardening, final package verification, release/governance signoff, normative spec replacement when deliberate, then release/showcase rollout.
 
-## Spec Freeze Gates Before SDK Work
+## Post-Checkpoint Status Gates
 
-Do not begin SDK implementation until these gates are resolved and recorded in the plan or a successor implementation plan.
+Use these gates to avoid overstating the current draft. Implementation artifacts exist, but release and governance work are still not complete.
 
-| Gate                            | Status             | Required evidence                                                                                                                                               |
-| ------------------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| RFC 9421 field-shape validation | Done on 2026-05-31 | Normative RFC read plus executable Structured Fields parse/reserialize and Ed25519 verify of the proposed `aid-pka` shape.                                      |
-| Canonical v2 PKA vector         | Open               | Committed vector in `protocol/pka_vectors.json` with `k`, derived RFC 7638 `keyid`, nonce, `created`, `expires`, signature base, and signature.                 |
-| Independent vector verification | Open               | At least two implementation paths verify the committed vector, preferably TS plus one non-TS SDK or a dedicated independent Structured Fields/HMS library.      |
-| Versioned codegen contract      | Open               | `protocol/constants.yml` and generators produce v1 and v2 record types and constants before downstream package changes.                                         |
-| Migration vector suite          | Open               | Fixtures cover v1/v2 side-by-side, malformed selected-version records, stale `i`, unknown future versions, downgrade state, and `.well-known-tls` trust source. |
-| v1 compatibility policy         | Decided            | Keep v1 parse/discovery/PKA support during the compatibility window; default new generation to v2.                                                              |
-| Security-state migration        | Decided            | Schema-versioned read-old/write-new migration for aid-doctor and returning-client state; no silent cache drops.                                                 |
-| Showcase rollout plan           | Decided            | Use v2 shadow domains first; canonical showcase records stay v1 until v2 clients are released and smoke-tested.                                                 |
-| Normative spec replacement      | Decided            | Keep v2 preview separate until vector, codegen, and TS proof pass; replace `specification.md` only in a deliberate normative spec PR.                           |
-| Release policy                  | Decided            | Stable public package names and staged ecosystem releases; fill exact owners/artifact versions before release.                                                  |
-| Release matrix                  | Partially decided  | Policy is decided; package/release owners, artifacts, tests, publishing mechanism, docs deploy, and rollback notes still need concrete values.                  |
-| Governance signoff              | Open               | Explicit review owners for spec, security, SDK parity, docs, web/tooling, release, and ecosystem composition.                                                   |
+| Gate                            | Status                                      | Required evidence                                                                                                                                                                                              |
+| ------------------------------- | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| RFC 9421 field-shape validation | Done on 2026-05-31                          | Normative RFC read plus executable Structured Fields parse/reserialize and Ed25519 verify of the proposed `aid-pka` shape.                                                                                     |
+| Canonical v2 PKA vector         | Covered in `57082f8`                        | `protocol/pka_vectors.json` has the canonical `aid2` vector with `k`, derived RFC 7638 `keyid`, nonce, `created`, `expires`, signature base, signature, and `no-store`.                                        |
+| Independent vector verification | Covered by repo artifacts, final CI pending | TS plus non-TS SDK and conformance coverage reference the committed vector/discovery semantics. Fresh release verification still needs to run in the target toolchains.                                        |
+| Versioned codegen contract      | Covered in `57082f8`                        | `protocol/constants.yml` has `schemaVersion: '2.0.0'` and `specVersion: 'aid2'`; generated constants expose v1/v2 support metadata.                                                                            |
+| Migration vector suite          | Covered in fixtures/tests                   | Fixtures cover v1/v2 side-by-side, malformed selected-version records, stale `i`, downgrade state, and `.well-known-tls` trust source. Unknown-future-version policy should remain explicit in release checks. |
+| v1 compatibility policy         | Decided                                     | Keep v1 parse/discovery/PKA support during the compatibility window; default new generation to v2.                                                                                                             |
+| Security-state migration        | Decided                                     | Schema-versioned read-old/write-new migration for aid-doctor and returning-client state; no silent cache drops.                                                                                                |
+| Showcase rollout plan           | Decided                                     | Use v2 shadow domains first; canonical showcase records stay v1 until v2 clients are released and smoke-tested.                                                                                                |
+| Normative spec replacement      | Decided                                     | Keep v2 preview separate for now; replace `specification.md` only in a deliberate normative spec PR.                                                                                                           |
+| Release policy                  | Decided                                     | Stable public package names and staged ecosystem releases; fill exact owners/artifact versions before release.                                                                                                 |
+| Release matrix                  | Partially decided                           | Policy is decided; package/release owners, artifacts, tests, publishing mechanism, docs deploy, and rollback notes still need concrete values.                                                                 |
+| Governance signoff              | Open                                        | Explicit review owners for spec, security, SDK parity, docs, web/tooling, release, and ecosystem composition.                                                                                                  |
 
-### Remaining Checks Before Spec PR
+### Remaining Checks Before Normative Spec PR
 
-1. Canonical v2 PKA vector
-   - The 2026-05-31 executable validation proved that the current field shape parses and verifies, but it was not committed as a repo fixture.
-   - Before SDK implementation, create one canonical v2 PKA vector and verify it through at least two independent implementation paths.
+1. Vector and coverage freshness
+   - Keep the committed canonical vector and implementation coverage aligned when any RFC 9421 field shape changes.
+   - Re-run the relevant SDK and conformance gates before claiming release readiness.
 
 2. Authorization and identity profile handoff wording
    - Add non-normative handoff text without specifying ID-JAG `aud`, provider trust lists, registration payloads, profile metadata registry status, certificate lifecycle, SPIFFE bundle details, or WIMSE trust-domain mappings.
@@ -962,7 +965,7 @@ Do not begin SDK implementation until these gates are resolved and recorded in t
 - Trust-source confusion: `.well-known` fallback must not be described as DNS-rooted trust.
 - Authorization-profile overreach risk: AID can hand off to adjacent authorization, identity, workload, DNS-provider, and framework profiles, but must not become an authorization server, credential issuer, provider trust-list format, ID-JAG profile, certificate authority, or transparency registry.
 - Pkarr overclaim risk: AID uses compact Ed25519 key material, but does not adopt Pkarr key-addressed identity or signed DNS packet semantics.
-- Tooling drift risk: aid-doctor, aid-engine, web generator, live PKA demo, examples, and docs all currently teach `z...;i=g1`.
+- Tooling drift risk: old aid-doctor, aid-engine, web generator, live PKA demo, examples, and docs may still teach legacy v1 `z...;i=g1` unless readme/docs checks keep the split explicit.
 - Showcase rollout risk: live `_agent.*.agentcommunity.org` records are generated from examples and deployed by Terraform; a naive v2 switch can break demos and older clients.
 - Release-management risk: package ecosystems do not all publish through the same automation. A v2 major needs explicit release and rollback planning per ecosystem.
 
@@ -981,32 +984,20 @@ Ask reviewers these concrete questions:
 9. Does the non-normative authorization, identity, workload, DNS-provider, and framework-profile composition guardrail avoid overclaiming while preserving future profile work?
 10. Is the Pkarr boundary clear enough: compact Ed25519 key material, but not Pkarr's key-addressed identity model?
 
-## Suggested Work Sequence After Review
+## Suggested Work Sequence After Checkpoint
 
-Do not start SDK implementation until the open spec-freeze gates above are resolved.
+The vector, codegen, first TS implementation, tooling/web work, and non-TS SDK parity slices have progressed through checkpoint `57082f8` and follow-up worker edits. Continue from the live worktree instead of replaying the original sequencing.
 
-1. Spec-freeze preview PR
-   - Edit `packages/docs/specification_v2_explained.md`.
-   - Edit `tracking/plans/2026-05-07-aid-v2-spec-plan.md` if reviewer decisions change.
-   - Remove stale “pending RFC 9421 syntax” wording from preview docs.
-   - Keep `packages/docs/specification.md` unchanged.
+1. Docs and status hardening
+   - Keep `packages/docs/specification_v2_explained.md` as the v2 draft preview.
+   - Keep `packages/docs/specification.md` unchanged as the current v1.2 normative spec.
+   - Update readmes and reference docs so v2 default PKA and v1 compatibility are separated.
    - Run docs verification for changed docs paths.
 
-2. Canonical vector PR
-   - Edit `protocol/pka_vectors.json`.
-   - Include `k`, derived RFC 7638 `keyid`, nonce, `created`, `expires`, signature base, signature, response status, authority, and `Cache-Control: no-store` expectation.
-   - Verify the vector with at least two implementation paths.
-
-3. Versioned codegen PR
-   - Edit `protocol/constants.yml`.
-   - Edit `scripts/generate-constants.ts` and generated language constants.
-   - Generate `AidRecordV1`, `AidRecordV2`, and combined `AidRecord` where the language supports it.
-   - Run `pnpm gen`.
-
-4. Migration fixtures and conformance PR
-   - Edit `test-fixtures/golden.json`, `test-fixtures/enterprise.json`, and `packages/aid-conformance/**`.
-   - Add v1/v2 side-by-side, stale `i`, unknown future version, downgrade, and `.well-known-tls` trust-source cases.
-   - Run conformance tests.
+2. Fixture and invariant freshness
+   - Keep `protocol/pka_vectors.json` canonical vector fields aligned with `scripts/docs-check.mjs`.
+   - Keep `test-fixtures/golden.json`, `test-fixtures/enterprise.json`, and conformance tests aligned with version-partitioned discovery.
+   - Re-run conformance tests when vector or fixture semantics change.
 
 Preview branch before the spec PR:
 
@@ -1022,31 +1013,23 @@ Preview branch before the spec PR:
 - Push branch `update/aid-v2-spec-plan` or its successor to GitHub for a temporary preview.
 - If Cloudflare Workers branch previews are enabled, use the generated branch preview URL. If they are not enabled, use the GitHub branch as the shareable artifact and deploy manually only after confirming the Worker deployment target will not overwrite production.
 
-5. TypeScript core PR
-   - Implement version-aware parser and v2 PKA helper.
-   - Update Node/browser discovery and security state.
-   - Run `pnpm -C packages/aid test`.
+3. Implementation verification
+   - Re-run `pnpm -C packages/aid test` for TypeScript parser/discovery/PKA coverage.
+   - Re-run aid-engine, aid-doctor, conformance, and focused web tests for tooling behavior.
+   - Re-run Go, Python, Rust, .NET, and Java suites where toolchains are available. Report environment blockers without marking those ecosystems green.
 
-6. Tooling and web PR
-   - Update aid-engine, aid-doctor, workbench generator, PKA key UI, and demo endpoint.
-   - Run package tests and web tests.
-
-7. Non-TS SDK parity PRs
-   - Implement Go, Python, Rust, .NET, and Java with shared vectors.
-   - Run each language test suite.
-
-8. Normative spec and documentation sweep PR
-   - Replace `packages/docs/specification.md` only after the vector, codegen, and TypeScript proof are complete.
+4. Normative spec and documentation sweep PR
+   - Replace `packages/docs/specification.md` only in a deliberate normative v2 spec PR.
    - Edit `packages/docs/Reference/versioning.md`.
    - Update quickstarts, Reference pages, Tooling docs, README, EXAMPLES, and AGENTS.
    - Run `pnpm docs:verify`.
 
-9. Showcase rollout PR
+5. Showcase rollout PR
    - Add v2 shadow showcase records first.
    - Keep canonical showcase records on v1 until released clients are smoke-tested.
    - Run `pnpm gen`, Terraform validation, and live DNS smoke after deploy.
 
-10. Full release verification
+6. Full release verification
 
 - `pnpm build`
 - `pnpm test`
@@ -1061,7 +1044,7 @@ Use this matrix when turning the plan into implementation PRs. Each PR must stat
 | PR                  | Primary files                                                                                                            | Generated outputs                                                                      | Compatibility behavior                                                          | Required verification                                                                 | Release / rollback note                                                         |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | Spec freeze preview | `packages/docs/specification_v2_explained.md`, `tracking/plans/2026-05-07-aid-v2-spec-plan.md`                           | Docs export manifest if docs change                                                    | `specification.md` remains v1.2 until deliberate normative replacement          | `pnpm docs:verify` for docs changes; Prettier and `git diff --check` for plan changes | Docs-only rollback is revert of spec-preview/docs PR.                           |
-| Codegen contract    | `protocol/constants.yml`, `scripts/generate-constants.ts`, generated language constants                                  | `protocol/spec.ts`, `packages/web/src/generated/spec.ts`, language generated constants | v1 and v2 types coexist                                                         | `pnpm gen`, TS typecheck/package tests                                                | Do not merge downstream SDK PRs until this contract is stable.                  |
+| Codegen contract    | `protocol/constants.yml`, `scripts/generate-constants.ts`, generated language constants                                  | `protocol/spec.ts`, `packages/web/src/generated/spec.ts`, language generated constants | v1 and v2 types coexist                                                         | `pnpm gen`, TS typecheck/package tests                                                | Keep downstream SDK assumptions aligned with the versioned generated contract.  |
 | Vectors/conformance | `protocol/pka_vectors.json`, `test-fixtures/golden.json`, `test-fixtures/enterprise.json`, `packages/aid-conformance/**` | Any generated vector copies/resources                                                  | v1 fixtures retained; v2 fixtures added                                         | conformance tests, `pnpm test:parity` subset where available                          | Vector rollback requires reverting SDK assumptions that consumed them.          |
 | TypeScript core     | `packages/aid/src/**`                                                                                                    | none beyond package build output                                                       | default discovery supports `aid1` and `aid2`, prefers v2 by policy              | `pnpm -C packages/aid test`                                                           | npm major release; retain prior npm version for rollback.                       |
 | Tooling and web     | `packages/aid-engine/**`, `packages/aid-doctor/**`, `packages/web/**`                                                    | generated examples/spec files                                                          | v2 default generation, v1 import/display support during window                  | package tests, web tests, focused PKA demo check                                      | Web rollback must not leave showcase DNS on incompatible records.               |

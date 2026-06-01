@@ -313,6 +313,14 @@ def _extract_dictionary_member(value: str, member: str) -> str:
     prefix = f"{member}="
     found: str | None = None
     for part in _split_dictionary_members(value):
+        label_end = len(part)
+        for separator in ("=", ";"):
+            separator_index = part.find(separator)
+            if separator_index >= 0:
+                label_end = min(label_end, separator_index)
+        label = part[:label_end].strip()
+        if _ascii_lower_ct(label) == member and label != member:
+            raise AidError("ERR_SECURITY", f"Duplicate {member} signature member")
         if part.startswith(prefix):
             if found is not None:
                 raise AidError("ERR_SECURITY", f"Duplicate {member} signature member")
@@ -364,7 +372,7 @@ def _parse_signature_params(
         name_start = index
         while index < len(value) and re.match(r"[A-Za-z0-9_*.-]", value[index]):
             index += 1
-        key = value[name_start:index].lower()
+        key = value[name_start:index]
         if not key:
             raise AidError("ERR_SECURITY", "Invalid Signature-Input parameter")
         if allowed is not None and key not in allowed:

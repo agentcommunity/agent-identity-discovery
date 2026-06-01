@@ -313,11 +313,13 @@ function splitDictionaryMembers(input: string): string[] {
 
 function extractDictionaryMember(input: string, label: string): string {
   let found: string | undefined;
+  const expectedLabel = asciiLowerCase(label);
   for (const part of splitDictionaryMembers(input)) {
     const eq = part.indexOf('=');
     if (eq <= 0) continue;
-    if (part.slice(0, eq).trim() === label) {
-      if (found !== undefined) {
+    const memberLabel = part.slice(0, eq).trim();
+    if (asciiLowerCase(memberLabel) === expectedLabel) {
+      if (memberLabel !== label || found !== undefined) {
         throw new AidError('ERR_SECURITY', `Duplicate ${label} signature member`);
       }
       found = part.slice(eq + 1).trim();
@@ -391,7 +393,7 @@ function parseSignatureParams(
     while (i < raw.length && /\s/.test(raw[i])) i++;
     const nameStart = i;
     while (i < raw.length && /[A-Za-z0-9_*.-]/.test(raw[i])) i++;
-    const name = asciiLowerCase(raw.slice(nameStart, i));
+    const name = raw.slice(nameStart, i);
     if (!name) throw new AidError('ERR_SECURITY', 'Invalid Signature-Input parameter');
     if (!allowedParams.has(name)) {
       throw new AidError('ERR_SECURITY', `Unsupported Signature-Input parameter: ${name}`);

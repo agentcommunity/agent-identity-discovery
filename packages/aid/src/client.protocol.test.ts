@@ -10,14 +10,11 @@ describe('Client protocol resolution', () => {
     vi.restoreAllMocks();
   });
 
-  it('queries underscore, plain protocol, and then base when protocol is specified', async () => {
+  it('queries underscore protocol name and then base when protocol is specified', async () => {
     const { query } = await import('dns-query');
     (query as any).mockImplementation(async ({ question }: { question: { name: string } }) => {
       if (question.name === '_agent._mcp.example.com') {
         // Simulate no record found for the protocol-specific query
-        return { rcode: 'NXDOMAIN', answers: [] };
-      }
-      if (question.name === '_agent.mcp.example.com') {
         return { rcode: 'NXDOMAIN', answers: [] };
       }
       if (question.name === '_agent.example.com') {
@@ -39,9 +36,11 @@ describe('Client protocol resolution', () => {
 
     expect((query as any).mock.calls.map(([request]: any[]) => request.question.name)).toEqual([
       '_agent._mcp.example.com',
-      '_agent.mcp.example.com',
       '_agent.example.com',
     ]);
+    expect(
+      (query as any).mock.calls.map(([request]: any[]) => request.question.name),
+    ).not.toContain('_agent.mcp.example.com');
 
     expect(record.uri).toBe('https://fallback.example.com');
     expect(queryName).toBe('_agent.example.com');
@@ -53,9 +52,6 @@ describe('Client protocol resolution', () => {
     (query as any).mockImplementation(async ({ question }: { question: { name: string } }) => {
       calls.push(question.name);
       if (question.name === '_agent._mcp.app.team.example.com') {
-        return { rcode: 'NXDOMAIN', answers: [] };
-      }
-      if (question.name === '_agent.mcp.app.team.example.com') {
         return { rcode: 'NXDOMAIN', answers: [] };
       }
       if (question.name === '_agent.app.team.example.com') {
@@ -77,11 +73,8 @@ describe('Client protocol resolution', () => {
 
     expect(record.uri).toBe('https://app.team.example.com/mcp');
     expect(queryName).toBe('_agent.app.team.example.com');
-    expect(calls).toEqual([
-      '_agent._mcp.app.team.example.com',
-      '_agent.mcp.app.team.example.com',
-      '_agent.app.team.example.com',
-    ]);
+    expect(calls).toEqual(['_agent._mcp.app.team.example.com', '_agent.app.team.example.com']);
+    expect(calls).not.toContain('_agent.mcp.app.team.example.com');
     expect(calls).not.toContain('_agent._mcp.team.example.com');
     expect(calls).not.toContain('_agent.team.example.com');
     expect(calls).not.toContain('_agent.example.com');

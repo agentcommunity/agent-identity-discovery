@@ -168,7 +168,7 @@ _agent.example.com. 300 IN TXT "v=aid2;p=mcp;u=https://api.example.com/mcp;k=<sa
 When given a domain, an AID client performs these steps:
 
 1. Normalize the domain. If the domain contains non-ASCII characters, convert it to its Punycode A-label representation.
-2. Query TXT records for `_agent.<exact-host-user-entered>`. Clients MUST NOT walk up to parent domains.
+2. Query TXT records for the canonical base name `_agent.<exact-host-user-entered>`. Clients MUST NOT walk up to parent domains.
 3. Parse returned TXT answers as semicolon-delimited `key=value` records.
 4. Partition valid records by AID major version.
 5. Select the highest supported valid version allowed by local policy, normally `aid2` before `aid1`.
@@ -182,6 +182,10 @@ Malformed answers do not matter when there is exactly one valid record in the se
 Returning clients that previously selected `aid2` SHOULD treat an `aid1`-only result as a version downgrade.
 
 > **Explainer:** The v2 migration needs version partitioning. Publishing `aid1` and `aid2` side by side should not trigger the same ambiguity rule as two competing `aid2` records.
+
+If an application explicitly requests a protocol, v2 clients still query the canonical base name `_agent.<exact-host-user-entered>` first. Protocol-prefixed `_agent._<proto>.<exact-host-user-entered>` probing is legacy, diagnostic, or base-failure-only behavior where supported and explicitly configured. Clients MUST NOT perform a compatibility lookup at `_agent.<proto>.<domain>`.
+
+`aid-doctor` diagnostics are base-first by default. A protocol hint does not change the primary lookup away from `_agent.<domain>` unless an explicit protocol-probe option requests diagnostic probing of `_agent._<proto>.<domain>`.
 
 ### 2.4 Exact-Host Semantics And Delegation
 
@@ -198,7 +202,9 @@ _agent.shared.team.example.com. 300 IN TXT "v=aid2;p=mcp;u=https://gateway.team.
 
 ### 2.5 Multiple Protocols
 
-The canonical location remains `_agent.<domain>`. Providers MAY additionally publish protocol-specific names such as `_agent._mcp.<domain>` or `_agent._a2a.<domain>` when an application explicitly requests a protocol.
+The canonical v2 location remains `_agent.<domain>`, and clients query that base name by default. Providers MAY additionally publish protocol-specific names such as `_agent._mcp.<domain>` or `_agent._a2a.<domain>` for legacy clients, diagnostics, or explicitly configured base-failure probing.
+
+Protocol-specific names always use the underscore form `_agent._<proto>.<domain>`. The form `_agent.<proto>.<domain>` is not part of v2 discovery.
 
 ---
 

@@ -27,6 +27,17 @@ public static class Discovery
         catch { return domain; }
     }
 
+    internal static IReadOnlyList<string> QueryNames(string alabel, string? protocol)
+    {
+        var names = new List<string>();
+        if (!string.IsNullOrEmpty(protocol))
+        {
+            names.Add($"{Constants.DnsSubdomain}._{protocol}.{alabel}".TrimEnd('.'));
+        }
+        names.Add($"{Constants.DnsSubdomain}.{alabel}".TrimEnd('.'));
+        return names;
+    }
+
     private static async Task<(List<string> txts, int ttl)> QueryTxtDoHAsync(string fqdn, TimeSpan timeout)
     {
         // Cloudflare DoH JSON endpoint
@@ -112,13 +123,7 @@ public static class Discovery
         options ??= new DiscoveryOptions();
         var alabel = ToALabel(domain);
 
-        var names = new List<string>();
-        if (!string.IsNullOrEmpty(options.Protocol))
-        {
-            names.Add($"{Constants.DnsSubdomain}._{options.Protocol}.{alabel}".TrimEnd('.'));
-            names.Add($"{Constants.DnsSubdomain}.{options.Protocol}.{alabel}".TrimEnd('.'));
-        }
-        names.Add($"{Constants.DnsSubdomain}.{alabel}".TrimEnd('.'));
+        var names = QueryNames(alabel, options.Protocol);
 
         AidError? last = null;
         foreach (var name in names)

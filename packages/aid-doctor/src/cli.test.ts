@@ -57,6 +57,13 @@ describe('AID Doctor CLI', () => {
       expect(cliContent).toContain('base64url JWK x');
       expect(cliContent).not.toContain('z-prefixed multibase Ed25519 public key');
     });
+
+    it('should not reference protocol-specific subdomain ordering', () => {
+      const cliPath = path.resolve(__dirname, './cli.ts');
+      const cliContent = readFileSync(cliPath, 'utf8');
+
+      expect(cliContent).not.toContain('Try protocol-specific subdomain first');
+    });
   });
 
   describe('Output formatting', () => {

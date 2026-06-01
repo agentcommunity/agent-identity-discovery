@@ -409,6 +409,24 @@ public class PkaTests
         Assert.Equal(nameof(Constants.ERR_SECURITY), ex.ErrorCode);
     }
 
+    [Fact]
+    public async Task V2RejectsMixedCaseCoveredComponentName()
+    {
+        var ex = await Assert.ThrowsAsync<AidError>(() => RunV2VectorWithResponseAsync(
+            (response, vector) =>
+            {
+                var input = vector.GetProperty("response").GetProperty("signature_input").GetString()!;
+                var mutated = input.Replace("\"@method\";req", "\"@METHOD\";req");
+                response.Headers.Remove("Signature-Input");
+                response.Headers.Remove("Signature");
+                response.Headers.TryAddWithoutValidation("Signature-Input", mutated);
+                response.Headers.TryAddWithoutValidation("Signature", SignV2Response(vector, mutated));
+            }
+        ));
+
+        Assert.Equal(nameof(Constants.ERR_SECURITY), ex.ErrorCode);
+    }
+
     [Theory]
     [InlineData("created")]
     [InlineData("expires")]
@@ -453,6 +471,28 @@ public class PkaTests
             {
                 var input = vector.GetProperty("response").GetProperty("signature_input").GetString()!;
                 var mutated = $"{input};foo=\"bar\"";
+                response.Headers.Remove("Signature-Input");
+                response.Headers.Remove("Signature");
+                response.Headers.TryAddWithoutValidation("Signature-Input", mutated);
+                response.Headers.TryAddWithoutValidation("Signature", SignV2Response(vector, mutated));
+            }
+        ));
+
+        Assert.Equal(nameof(Constants.ERR_SECURITY), ex.ErrorCode);
+        Assert.Contains("Unsupported Signature-Input parameter", ex.Message);
+    }
+
+    [Theory]
+    [InlineData("created=", "Created=")]
+    [InlineData("keyid=", "KeyID=")]
+    [InlineData("alg=", "ALG=")]
+    public async Task V2RejectsMixedCaseTopLevelSignatureInputParameterNames(string original, string replacement)
+    {
+        var ex = await Assert.ThrowsAsync<AidError>(() => RunV2VectorWithResponseAsync(
+            (response, vector) =>
+            {
+                var input = vector.GetProperty("response").GetProperty("signature_input").GetString()!;
+                var mutated = input.Replace(original, replacement);
                 response.Headers.Remove("Signature-Input");
                 response.Headers.Remove("Signature");
                 response.Headers.TryAddWithoutValidation("Signature-Input", mutated);
@@ -520,6 +560,77 @@ public class PkaTests
 
         Assert.Equal(nameof(Constants.ERR_SECURITY), ex.ErrorCode);
         Assert.Contains("Duplicate aid-pka signature member", ex.Message);
+    }
+
+    [Theory]
+    [InlineData("AID-PKA")]
+    [InlineData("Aid-Pka")]
+    public async Task V2RejectsMixedCaseSignatureInputDictionaryMember(string label)
+    {
+        var ex = await Assert.ThrowsAsync<AidError>(() => RunV2VectorWithResponseAsync(
+            (response, vector) =>
+            {
+                var input = vector.GetProperty("response").GetProperty("signature_input").GetString()!;
+                var mutated = input.Replace("aid-pka=", $"{label}=");
+                response.Headers.Remove("Signature-Input");
+                response.Headers.Remove("Signature");
+                response.Headers.TryAddWithoutValidation("Signature-Input", mutated);
+                response.Headers.TryAddWithoutValidation("Signature", SignV2Response(vector, mutated));
+            }
+        ));
+
+        Assert.Equal(nameof(Constants.ERR_SECURITY), ex.ErrorCode);
+        Assert.Contains("Missing aid-pka signature member", ex.Message);
+    }
+
+    [Theory]
+    [InlineData("AID-PKA")]
+    [InlineData("Aid-Pka")]
+    public async Task V2RejectsMixedCaseSignatureDictionaryMember(string label)
+    {
+        var ex = await Assert.ThrowsAsync<AidError>(() => RunV2VectorWithResponseAsync(
+            (response, vector) =>
+            {
+                var signature = vector.GetProperty("response").GetProperty("signature").GetString()!;
+                response.Headers.Remove("Signature");
+                response.Headers.TryAddWithoutValidation("Signature", signature.Replace("aid-pka=", $"{label}="));
+            }
+        ));
+
+        Assert.Equal(nameof(Constants.ERR_SECURITY), ex.ErrorCode);
+        Assert.Contains("Missing aid-pka signature member", ex.Message);
+    }
+
+    [Fact]
+    public async Task V2RejectsExactPlusMixedCaseSignatureInputDictionaryMember()
+    {
+        var ex = await Assert.ThrowsAsync<AidError>(() => RunV2VectorWithResponseAsync(
+            (response, vector) =>
+            {
+                var input = vector.GetProperty("response").GetProperty("signature_input").GetString()!;
+                response.Headers.Remove("Signature-Input");
+                response.Headers.TryAddWithoutValidation("Signature-Input", $"{input}, AID-PKA=(\"@method\");created=1767139200");
+            }
+        ));
+
+        Assert.Equal(nameof(Constants.ERR_SECURITY), ex.ErrorCode);
+        Assert.Contains("aid-pka signature member", ex.Message);
+    }
+
+    [Fact]
+    public async Task V2RejectsExactPlusMixedCaseSignatureDictionaryMember()
+    {
+        var ex = await Assert.ThrowsAsync<AidError>(() => RunV2VectorWithResponseAsync(
+            (response, vector) =>
+            {
+                var signature = vector.GetProperty("response").GetProperty("signature").GetString()!;
+                response.Headers.Remove("Signature");
+                response.Headers.TryAddWithoutValidation("Signature", $"{signature}, Aid-Pka=:QUFB:");
+            }
+        ));
+
+        Assert.Equal(nameof(Constants.ERR_SECURITY), ex.ErrorCode);
+        Assert.Contains("aid-pka signature member", ex.Message);
     }
 
     [Theory]

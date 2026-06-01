@@ -23,7 +23,8 @@ icon: material/tools
 - 1000 ERR_NO_RECORD: `_agent.<domain>` TXT not found
   - Add at subdomain `_agent` (not apex). Verify propagation.
 - 1001 ERR_INVALID_TXT: malformed record
-  - Required keys: `v=aid1;uri=...;proto=<token>`.
+  - Required keys for new records: `v=aid2;uri=...;proto=<token>`.
+  - Legacy `v=aid1` records remain accepted only for backward compatibility.
   - Use `proto` (preferred) or `p` (shorthand), not both.
   - Remote URIs must be `https://` and parseable.
 - 1002 ERR_UNSUPPORTED_PROTO: unsupported `proto`

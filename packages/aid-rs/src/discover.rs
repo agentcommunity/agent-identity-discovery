@@ -81,15 +81,19 @@ fn select_from_txt_answers(raw_records: Vec<String>, query_name: &str) -> Result
     Ok(None)
 }
 
+fn discovery_query_names(alabel: &str, protocol: Option<&str>) -> Vec<String> {
+    let mut names = Vec::new();
+    if let Some(proto) = protocol {
+        names.push(format!("_agent._{}.{}", proto, alabel));
+    }
+    names.push(format!("_agent.{}", alabel));
+    names
+}
+
 pub async fn discover_with_options(domain: &str, options: DiscoveryOptions) -> Result<AidRecord, AidError> {
     // IDNA → A-label
     let alabel = domain_to_ascii(domain).unwrap_or_else(|_| domain.to_string());
-    let mut names: Vec<String> = Vec::new();
-    if let Some(proto) = &options.protocol {
-        names.push(format!("_agent._{}.{}", proto, alabel));
-        names.push(format!("_agent.{}.{}", proto, alabel));
-    }
-    names.push(format!("_agent.{}", alabel));
+    let names = discovery_query_names(&alabel, options.protocol.as_deref());
 
     // DNS lookup using system resolver
     let resolver = TokioAsyncResolver::tokio_from_system_conf()
@@ -158,6 +162,14 @@ mod tests {
 
     fn valid_records(raw: &[&str]) -> Vec<AidRecord> {
         raw.iter().filter_map(|txt| parse(txt).ok()).collect()
+    }
+
+    #[test]
+    fn protocol_query_names_use_underscore_then_base() {
+        assert_eq!(
+            discovery_query_names("example.com", Some("mcp")),
+            vec!["_agent._mcp.example.com".to_string(), "_agent.example.com".to_string()]
+        );
     }
 
     #[test]

@@ -33,12 +33,23 @@ It uses a single DNS `TXT` record to make any agent service—whether it speaks 
 
 **Built by the team at [agentcommunity.org](https://agentcommunity.org)**
 
+### v2 Preview Defaults
+
+AID v2 is implemented in the current worktree as a draft-preview protocol surface. `packages/docs/specification_v2_explained.md` is the review artifact, while `packages/docs/specification.md` remains the current v1.2 normative spec until an intentional replacement.
+
+- **Record version:** new generated records default to `v=aid2`.
+- **PKA key:** `k`/`pka` is the unpadded base64url Ed25519 JWK `x` value.
+- **Key identity:** HTTP Message Signature `keyid` is the RFC 7638 JWK thumbprint derived from `k`; v2 records do not publish DNS `kid`/`i`.
+- **PKA challenge:** clients request an RFC 9421 response signature with `Accept-Signature` and a nonce.
+- **Freshness:** v2 PKA requires `created`, `expires`, exact nonce echo, and response `Cache-Control: no-store`.
+- **No v1 defaults in v2:** no signed HTTP `Date`, no `AID-Challenge`, no base58 `z...` key, and no DNS `kid`/`i`.
+
 ### v1.2 Highlights
 
 - ✅ **DNS-first discovery** with optional protocol-specific subdomains (`_agent._<proto>.<domain>`)
 - ✅ **Well-known fallback** (HTTPS-only, JSON, ≤64KB, ~2s timeout, no redirects; TTL=300 on success)
-- ✅ **PKA endpoint proof** with Ed25519 HTTP Message Signatures (RFC 9421) and ±300s time windows
-- ✅ **Key aliases** for byte efficiency (single-letter keys: `v,p,u,s,a,d,e,k,i`)
+- ✅ **Legacy aid1 PKA endpoint proof** with Ed25519 HTTP Message Signatures (RFC 9421), `AID-Challenge`, signed `Date`, and ±300s time windows
+- ✅ **Key aliases** for byte efficiency (single-letter keys: `v,p,u,s,a,d,e,k`; legacy aid1 also uses `i`)
 - ✅ **Metadata fields** (`docs` for documentation URLs, `dep` for deprecation timestamps)
 - ✅ **New protocols** (gRPC, GraphQL, WebSocket, Zeroconf)
 - ✅ **Multi-language parity** (TypeScript, Python, Go, Rust, .NET, Java)
@@ -65,9 +76,10 @@ graph TD
 
 > Notes:
 >
-> - Canonical location is `_agent.<domain>`. When a specific protocol is requested, clients may query `_agent._<proto>.<domain>` then `_agent.<proto>.<domain>` before the base record.
+> - Canonical location is `_agent.<domain>`. Clients query the base record first. Protocol-specific `_agent._<proto>.<domain>` probing is legacy, diagnostic, or base-failure-only behavior where explicitly supported and configured.
 > - `.well-known` JSON fallback is allowed only on DNS failure (HTTPS-only, JSON content-type, ≤64KB, ~2s timeout, no redirects). On success, TTL=300.
-> - If `pka`/`kid` are present, clients perform an Ed25519 HTTP Message Signatures handshake with exact covered fields and ±300s windows.
+> - For `aid2`, if `pka`/`k` is present, clients perform nonce-bound RFC 9421 endpoint proof using the derived JWK thumbprint keyid and response `Cache-Control: no-store`.
+> - For legacy `aid1`, `pka`/`kid` still use the v1 compatibility handshake with `AID-Challenge`, signed `Date`, and `keyid` matching DNS `kid`.
 
 ## Guiding Principles
 

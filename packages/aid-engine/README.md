@@ -63,7 +63,7 @@ try {
   console.log('Found', result.record.proto, 'agent at', result.record.uri);
 
   // Validate a TXT record string
-  const validation = validateTxtRecord('v=aid1;u=https://api.example.com/agent;p=mcp');
+  const validation = validateTxtRecord('v=aid2;u=https://api.example.com/agent;p=mcp');
   console.log('Valid:', validation.isValid);
 
   // Build the canonical short-key TXT form
@@ -72,12 +72,12 @@ try {
     uri: 'https://api.example.com/agent',
     proto: 'mcp',
     auth: 'pat',
-  }); // Canonical v1.x output uses short keys
+  }); // Canonical v2 output uses short keys
 
   console.log('TXT record:', record);
 
   // Verify a PKA public key
-  const pkaResult = verifyPka('zAbRwF269wzcmKEQpZTXXCvLXi7KN5v6QJmhsMbb8T56k');
+  const pkaResult = verifyPka('ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ');
   console.log('PKA valid:', pkaResult.valid);
 } catch (error) {
   console.error('AID error:', error.message);
@@ -97,7 +97,7 @@ const options: CheckOptions = {
   allowFallback: true, // Enable .well-known fallback
   wellKnownTimeoutMs: 2000, // HTTP timeout for fallback
   showDetails: true, // Include TLS/PKA details
-  probeProtoSubdomain: true, // Try _agent._<proto>.<domain>
+  probeProtoSubdomain: true, // Query _agent.<domain> first; probe _agent._<proto>.<domain> only for diagnostics/base failure
 };
 
 const result = await runCheck('example.com', options);
@@ -114,11 +114,10 @@ const data: AidGeneratorData = {
   proto: 'mcp',
   auth: 'pat',
   desc: 'Example Agent',
-  pka: 'zAbRwF269wzcmKEQpZTXXCvLXi7KN5v6QJmhsMbb8T56k', // v1.1 PKA
-  kid: 'g1',
+  pka: 'ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ', // aid2 PKA
 };
 
-// Canonical short-key output: v=aid1;u=...;p=...
+// Canonical short-key output: v=aid2;u=...;p=...
 const record = buildTxtRecordVariant(data);
 ```
 
@@ -127,7 +126,7 @@ const record = buildTxtRecordVariant(data);
 ```typescript
 import { validateTxtRecord } from '@agentcommunity/aid-engine';
 
-const result = validateTxtRecord('v=aid1;u=https://api.example.com/agent;p=mcp');
+const result = validateTxtRecord('v=aid2;u=https://api.example.com/agent;p=mcp');
 
 if (result.isValid) {
   console.log('✅ Valid AID record');
@@ -142,7 +141,7 @@ if (result.isValid) {
 import { verifyPka, generateEd25519KeyPair } from '@agentcommunity/aid-engine';
 
 // Verify a PKA public key
-const verification = verifyPka('zAbRwF269wzcmKEQpZTXXCvLXi7KN5v6QJmhsMbb8T56k');
+const verification = verifyPka('ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ');
 
 // Generate a new key pair (pure function)
 const { publicKey, privateKeyPem } = await generateEd25519KeyPair();
@@ -156,9 +155,9 @@ const { publicKey, privateKeyPem } = await generateEd25519KeyPair();
 - Protocol-specific subdomain probing (`_agent._<proto>.<domain>`)
 - IDNA/Punycode domain normalization
 
-### ✅ Security Built-In (v1.1)
+### ✅ Security Built-In (v2 default)
 
-- **PKA Handshake**: Ed25519 HTTP Message Signatures with ±300s time windows
+- **PKA Handshake**: aid2 uses Ed25519 HTTP Message Signatures with RFC 9421 nonce, derived JWK thumbprint `keyid`, `created`, `expires`, and response `Cache-Control: no-store`
 - **TLS Validation**: Certificate chain verification and expiry warnings
 - **DNSSEC Presence**: RRSIG detection for integrity verification
 - **Redirect Policy**: Cross-origin redirect protection
@@ -177,12 +176,14 @@ const { publicKey, privateKeyPem } = await generateEd25519KeyPair();
 - Local protocols (Docker, npx, pip)
 - Zeroconf (mDNS/DNS-SD)
 
-### ✅ v1.1 Compliance
+### ✅ v2 Default and v1 Compatibility
 
-- `pka`/`kid` fields for endpoint proof
+- `aid2` endpoint proof uses `pka`/`k` as unpadded base64url Ed25519 JWK `x`
+- DNS `kid`/`i` is not emitted for `aid2`; the key id is derived as the RFC 7638 JWK thumbprint
+- Legacy `aid1` compatibility can still read `k=z...` base58btc with `i`/`kid`, `AID-Challenge`, signed `Date`, and `keyid` matching DNS `kid`
 - `docs` field for documentation URLs
 - `dep` field for deprecation warnings
-- Alias support (`v`,`u`,`p`,`a`,`s`,`d`,`e`,`k`,`i`)
+- Alias support (`v`,`u`,`p`,`a`,`s`,`d`,`e`,`k`; legacy `aid1` also uses `i`)
 
 ## When to Use aid-engine
 

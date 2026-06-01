@@ -76,6 +76,19 @@ public final class Discovery {
     AidRecord fetch(String domain, Duration timeout);
   }
 
+  static List<String> queryNames(String alabel, String protocol) {
+    List<String> names = new ArrayList<>();
+    if (protocol != null && !protocol.isEmpty()) {
+      names.add(Constants.DNS_SUBDOMAIN + "._" + protocol + "." + alabel);
+    }
+    names.add(Constants.DNS_SUBDOMAIN + "." + alabel);
+    return names;
+  }
+
+  static boolean isNoRecordDohStatus(int status) {
+    return status == 3;
+  }
+
   private static DoHResponse queryTxtDoH(String fqdn, Duration timeout) {
     String url = "https://cloudflare-dns.com/dns-query?name=" + URI.create("http://x/"+fqdn).getRawPath().substring(3) + "&type=TXT";
     HttpClient http = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).connectTimeout(timeout).build();
@@ -85,7 +98,10 @@ public final class Discovery {
       if (res.statusCode() / 100 != 2) throw new AidError("ERR_DNS_LOOKUP_FAILED", "DoH HTTP "+res.statusCode());
       ObjectMapper mapper = new ObjectMapper();
       DoHResponse doh = mapper.readValue(res.body(), DoHResponse.class);
-      if (doh.status != 0) throw new AidError("ERR_DNS_LOOKUP_FAILED", "DoH status: " + doh.status);
+      if (doh.status != 0) {
+        if (isNoRecordDohStatus(doh.status)) throw new AidError("ERR_NO_RECORD", "No TXT answers for " + fqdn);
+        throw new AidError("ERR_DNS_LOOKUP_FAILED", "DoH status: " + doh.status);
+      }
       if (doh.answer == null || doh.answer.isEmpty()) throw new AidError("ERR_NO_RECORD", "No TXT answers for "+fqdn);
       // Clean up quoted string data from DoH response
       for (DoHAnswer ans : doh.answer) {
@@ -163,12 +179,7 @@ public final class Discovery {
   public static DiscoveryResult discover(String domain, DiscoveryOptions options) {
     if (options == null) options = new DiscoveryOptions();
     String alabel = toALabel(domain);
-    List<String> names = new ArrayList<>();
-    if (options.protocol != null && !options.protocol.isEmpty()) {
-      names.add(Constants.DNS_SUBDOMAIN + "._" + options.protocol + "." + alabel);
-      names.add(Constants.DNS_SUBDOMAIN + "." + options.protocol + "." + alabel);
-    }
-    names.add(Constants.DNS_SUBDOMAIN + "." + alabel);
+    List<String> names = queryNames(alabel, options.protocol);
 
     AidError last = null;
     for (String name : names) {

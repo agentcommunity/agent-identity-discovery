@@ -30,7 +30,7 @@ GET https://yourdomain.com/.well-known/agent
 
 ```json
 {
-  "v": "aid1",
+  "v": "aid2",
   "u": "https://api.yourdomain.com/mcp",
   "p": "mcp",
   "s": "My Agent"
@@ -62,7 +62,7 @@ AID doesn't replace MCP or A2A. It's the directory lookup that happens before th
 
 ## What about multiple agents on one domain?
 
-The primary `_agent.<domain>` record points to the domain's main agent. For additional agents, AID v1.1 provides **protocol-specific subdomains** (non-normative guidance):
+The primary `_agent.<domain>` record is the default v2 lookup and points to the domain's main agent. Some legacy or diagnostic deployments may also publish **protocol-prefixed subdomains** where supported and configured:
 
 ```
 _agent.example.com          → primary agent (MCP)
@@ -70,20 +70,20 @@ _agent._a2a.example.com     → A2A agent
 _agent._openapi.example.com → OpenAPI endpoint
 ```
 
-Clients query the protocol-specific subdomain when they know which protocol they want, and fall back to the primary `_agent.<domain>` record.
+Current clients query the base `_agent.<domain>` record first. Protocol-prefixed names such as `_agent._a2a.<domain>` are for legacy compatibility, diagnostics, or explicit base-failure probing where a deployment supports them.
 
 ## How do I migrate from v1.0 to v1.1?
 
 v1.1 is **fully backward-compatible** with v1.0. All v1.0 records are valid v1.1 records — no changes needed.
 
-To take advantage of v1.1 features while staying on `aid1`:
+For new records, use the current `aid2` profile and add optional fields as needed:
 
-1. **Canonical short keys:** Publish short keys (`u`, `p`, `s`, etc.) for v1.x. Parsers still accept long keys for compatibility.
+1. **Canonical short keys:** Publish short keys (`u`, `p`, `s`, etc.).
 2. **New metadata:** Add `docs`/`d` for documentation and `dep`/`e` for deprecation.
-3. **PKA:** Add `pka`/`k` and `kid`/`i` for cryptographic identity.
+3. **PKA:** Add `pka`/`k` for cryptographic identity. Do not publish `kid`/`i` in `aid2`.
 4. **New protocols:** Use `grpc`, `graphql`, `websocket`, `zeroconf`, or `ucp` tokens.
 
-The `v=aid1` key remains the same — both v1.0 and v1.1 use it.
+The `v=aid1` profile remains available only for legacy compatibility.
 
 ## What changes for v2 PKA?
 

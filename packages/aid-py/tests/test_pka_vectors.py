@@ -389,11 +389,38 @@ def test_v2_signature_input_rejects_trailing_bytes_after_quoted_param():
 
 
 @pytest.mark.parametrize(
+    ("canonical", "mixed_case"),
+    [
+        ("created", "Created"),
+        ("keyid", "KeyID"),
+        ("alg", "ALG"),
+    ],
+)
+def test_v2_signature_input_rejects_mixed_case_top_level_params(canonical, mixed_case):
+    import aid_py.pka as pka_module
+
+    vector = _vector_by_id("v2-rfc9421-response-signature")
+    headers = {
+        "Signature-Input": vector["response"]["signature_input"].replace(
+            f";{canonical}=",
+            f";{mixed_case}=",
+            1,
+        ),
+        "Signature": vector["response"]["signature"],
+    }
+
+    with pytest.raises(AidError) as exc_info:
+        pka_module._parse_v2_signature_headers(headers)
+    assert exc_info.value.error_code == "ERR_SECURITY"
+
+
+@pytest.mark.parametrize(
     ("case_id", "mutate"),
     [
         ("duplicate_req", lambda value: value.replace('"@method";req', '"@method";req;req', 1)),
         ("uppercase_req", lambda value: value.replace('"@method";req', '"@method";REQ', 1)),
         ("mixed_case_req", lambda value: value.replace('"@method";req', '"@method";ReQ', 1)),
+        ("uppercase_component", lambda value: value.replace('"@method";req', '"@METHOD";req', 1)),
         ("unknown_param", lambda value: value.replace('"@method";req', '"@method";req;foo', 1)),
         ("duplicate_name", lambda value: value.replace('"@target-uri";req', '"@method";req', 1)),
         ("missing_required", lambda value: value.replace(' "@authority";req', "", 1)),
@@ -426,6 +453,24 @@ def test_v2_headers_reject_duplicate_aid_pka_dictionary_member(header_name):
     }
     source = "signature_input" if header_name == "Signature-Input" else "signature"
     headers[header_name] = f'{vector["response"][source]}, {vector["response"][source]}'
+
+    with pytest.raises(AidError) as exc_info:
+        pka_module._parse_v2_signature_headers(headers)
+    assert exc_info.value.error_code == "ERR_SECURITY"
+
+
+@pytest.mark.parametrize("header_name", ["Signature-Input", "Signature"])
+def test_v2_headers_reject_case_confused_aid_pka_dictionary_member(header_name):
+    import aid_py.pka as pka_module
+
+    vector = _vector_by_id("v2-rfc9421-response-signature")
+    headers = {
+        "Signature-Input": vector["response"]["signature_input"],
+        "Signature": vector["response"]["signature"],
+    }
+    source = "signature_input" if header_name == "Signature-Input" else "signature"
+    duplicate_member = vector["response"][source].split("=", 1)[1]
+    headers[header_name] = f'{vector["response"][source]}, AID-PKA={duplicate_member}'
 
     with pytest.raises(AidError) as exc_info:
         pka_module._parse_v2_signature_headers(headers)

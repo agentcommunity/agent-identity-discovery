@@ -187,7 +187,7 @@ program
 program
   .command('json <domain>')
   .description('Check a domain for AID records and output machine-readable JSON')
-  .option('-p, --protocol <protocol>', 'Try protocol-specific subdomain first')
+  .option('-p, --protocol <protocol>', 'Diagnostics hint only; base-first remains canonical')
   .option('-t, --timeout <ms>', 'DNS query timeout in milliseconds', '5000')
   .option('--no-fallback', 'Disable .well-known fallback on DNS miss', false)
   .option('--fallback-timeout <ms>', 'Timeout for .well-known fetch (ms)', '2000')

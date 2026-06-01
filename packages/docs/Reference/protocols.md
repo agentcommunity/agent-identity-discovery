@@ -10,7 +10,7 @@ The `proto` key (alias `p`) declares which protocol the agent endpoint speaks. T
 
 ## Supported `proto` Tokens
 
-AID v1.1 defines **9 protocol tokens**. Remote protocols require `https://` URIs (or `wss://` for WebSocket). Local protocols use scheme-specific URIs.
+AID v2 defines **9 protocol tokens**. Remote protocols require `https://` URIs (or `wss://` for WebSocket). Local protocols use scheme-specific URIs.
 
 ### `mcp` — Model Context Protocol
 
@@ -20,7 +20,7 @@ JSON-RPC endpoint implementing the [Model Context Protocol](https://modelcontext
 - **Use case:** LLM tool servers, AI assistants, coding agents
 
 ```text
-v=aid1;u=https://api.example.com/mcp;p=mcp;a=oauth2_code;s=AI Assistant
+v=aid2;u=https://api.example.com/mcp;p=mcp;a=oauth2_code;s=AI Assistant
 ```
 
 ### `a2a` — Agent-to-Agent Protocol
@@ -31,7 +31,7 @@ URL to an [A2A AgentCard](https://a2aprotocol.ai/) (`agent.json`). Used for agen
 - **Use case:** Multi-agent orchestration, agent marketplaces
 
 ```text
-v=aid1;u=https://agent.example.com/.well-known/agent.json;p=a2a;s=Task Agent
+v=aid2;u=https://agent.example.com/.well-known/agent.json;p=a2a;s=Task Agent
 ```
 
 ### `openapi` — OpenAPI Specification
@@ -42,7 +42,7 @@ URL to an OpenAPI document (JSON or YAML). Allows clients to discover and intera
 - **Use case:** Traditional REST APIs, API gateways, tools that generate client code
 
 ```text
-v=aid1;u=https://api.example.com/openapi.json;p=openapi;s=Public API
+v=aid2;u=https://api.example.com/openapi.json;p=openapi;s=Public API
 ```
 
 ### `grpc` — gRPC over HTTP/2
@@ -53,7 +53,7 @@ gRPC service endpoint. Clients connect using gRPC over HTTP/2 (or HTTP/3).
 - **Use case:** High-performance inter-service communication, streaming, polyglot environments
 
 ```text
-v=aid1;u=https://grpc.example.com;p=grpc;a=mtls;s=Inference Service
+v=aid2;u=https://grpc.example.com;p=grpc;a=mtls;s=Inference Service
 ```
 
 ### `graphql` — GraphQL over HTTP
@@ -64,7 +64,7 @@ GraphQL endpoint. Clients send queries via HTTP POST (or GET for persisted queri
 - **Use case:** Flexible data queries, frontend-driven APIs, aggregation layers
 
 ```text
-v=aid1;u=https://api.example.com/graphql;p=graphql;a=pat;s=Data Gateway
+v=aid2;u=https://api.example.com/graphql;p=graphql;a=pat;s=Data Gateway
 ```
 
 ### `websocket` — WebSocket Transport
@@ -75,7 +75,7 @@ WebSocket endpoint for persistent, bidirectional communication.
 - **Use case:** Real-time streaming, chat agents, event-driven architectures
 
 ```text
-v=aid1;u=wss://ws.example.com/agent;p=websocket;s=Live Agent
+v=aid2;u=wss://ws.example.com/agent;p=websocket;s=Live Agent
 ```
 
 ### `local` — Local Execution
@@ -87,9 +87,9 @@ The agent runs locally on the client machine. URI uses scheme-specific locators 
 - **Security:** Requires explicit user consent before execution. See [Security](security.md#local-execution-safeguards-protolocal).
 
 ```text
-v=aid1;u=docker:myorg/agent:latest;p=local;s=Local Dev Agent
-v=aid1;u=npx:@myorg/agent-cli;p=local;s=CLI Agent
-v=aid1;u=pip:my-agent;p=local;s=Python Agent
+v=aid2;u=docker:myorg/agent:latest;p=local;s=Local Dev Agent
+v=aid2;u=npx:@myorg/agent-cli;p=local;s=CLI Agent
+v=aid2;u=pip:my-agent;p=local;s=Python Agent
 ```
 
 ### `zeroconf` — mDNS/DNS-SD Service Discovery
@@ -100,7 +100,7 @@ Local network service discovery via mDNS/DNS-SD. Used to find agents on the same
 - **Use case:** IoT devices, local development environments, LAN-only agents
 
 ```text
-v=aid1;u=zeroconf:_mcp._tcp;p=zeroconf;s=Office Agent
+v=aid2;u=zeroconf:_mcp._tcp;p=zeroconf;s=Office Agent
 ```
 
 ### `ucp` — Universal Commerce Protocol
@@ -111,7 +111,7 @@ Endpoint implementing the Universal Commerce Protocol for commercial agent trans
 - **Use case:** E-commerce agents, payment flows, commercial service orchestration
 
 ```text
-v=aid1;u=https://commerce.example.com/ucp;p=ucp;a=oauth2_code;s=Commerce Agent
+v=aid2;u=https://commerce.example.com/ucp;p=ucp;a=oauth2_code;s=Commerce Agent
 ```
 
 ## Protocol Summary
@@ -146,7 +146,7 @@ The `auth` key (alias `a`) tells clients what authentication method to expect. I
 ### Example with auth
 
 ```text
-v=aid1;u=https://api.example.com/mcp;p=mcp;a=pat;s=Example MCP
+v=aid2;u=https://api.example.com/mcp;p=mcp;a=pat;s=Example MCP
 ```
 
 ## Notes

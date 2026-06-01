@@ -30,7 +30,7 @@ import { query } from 'dns-query';
 export interface DiscoveryOptions {
   /** Timeout for DNS query in milliseconds (default: 5000) */
   timeout?: number;
-  /** Protocol-specific subdomain to try (optional). When provided, underscore and non-underscore forms are attempted. */
+  /** Protocol-specific subdomain to try first (optional), using _agent._<proto>.<domain>. */
   protocol?: string;
   /** Enable .well-known fallback on ERR_NO_RECORD or ERR_DNS_LOOKUP_FAILED (default: true) */
   wellKnownFallback?: boolean;
@@ -453,8 +453,8 @@ export async function discover(
   const baseName = constructQueryName(domain);
 
   const runDns = async (): Promise<DiscoveryResult> => {
-    // Canonical: base _agent.<domain> query
-    // If protocol is explicitly requested, attempt protocol-specific subdomains afterwards
+    // Canonical: base _agent.<domain> query.
+    // If protocol is explicitly requested, first try _agent._<proto>.<domain>.
     if (!protocol) {
       return await Promise.race([
         queryOnce(baseName),
@@ -468,9 +468,8 @@ export async function discover(
       ]);
     }
 
-    // Protocol explicitly requested: try underscore form, plain protocol form, then base.
+    // Protocol explicitly requested: try underscore form, then base.
     const protoNameUnderscore = constructQueryName(domain, protocol, true);
-    const protoNamePlain = constructQueryName(domain, protocol);
 
     // 1) underscore form
     try {
@@ -495,27 +494,7 @@ export async function discover(
       }
     }
 
-    // 2) plain protocol form
-    try {
-      return await Promise.race([
-        queryOnce(protoNamePlain),
-        new Promise<never>((_, reject) =>
-          setTimeout(
-            () =>
-              reject(
-                new AidError('ERR_DNS_LOOKUP_FAILED', `DNS query timeout for ${protoNamePlain}`),
-              ),
-            timeout,
-          ),
-        ),
-      ]);
-    } catch (error) {
-      if (!(error instanceof AidError) || error.errorCode !== 'ERR_NO_RECORD') {
-        throw error;
-      }
-    }
-
-    // 3) fallback to base
+    // 2) fallback to base
     return await Promise.race([
       queryOnce(baseName),
       new Promise<never>((_, reject) =>

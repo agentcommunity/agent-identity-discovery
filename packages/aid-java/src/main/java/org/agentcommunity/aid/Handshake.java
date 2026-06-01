@@ -439,11 +439,13 @@ public final class Handshake {
 
   private static String extractDictionaryMember(String input, String label) {
     String found = null;
+    String foldedLabel = asciiToLower(label);
     for (String part : splitDictionaryMembers(input)) {
       int idx = part.indexOf('=');
       if (idx <= 0) continue;
-      if (part.substring(0, idx).trim().equals(label)) {
-        if (found != null) {
+      String memberLabel = part.substring(0, idx).trim();
+      if (asciiToLower(memberLabel).equals(foldedLabel)) {
+        if (found != null || !memberLabel.equals(label)) {
           throw new AidError("ERR_SECURITY", "Duplicate " + label + " signature member");
         }
         found = part.substring(idx + 1).trim();
@@ -574,7 +576,7 @@ public final class Handshake {
 
       int nameStart = index;
       while (index < raw.length() && isSignatureParamNameChar(raw.charAt(index))) index++;
-      String name = asciiToLower(raw.substring(nameStart, index));
+      String name = raw.substring(nameStart, index);
       if (name.isEmpty()) {
         throw new AidError("ERR_SECURITY", "Invalid Signature-Input parameter");
       }

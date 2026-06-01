@@ -19,6 +19,13 @@ public class DiscoveryV2Tests
     }
 
     [Fact]
+    public void QueryNamesUseUnderscoreProtocolThenBase()
+    {
+        Assert.Equal(new[] { "_agent._mcp.example.com", "_agent.example.com" }, Discovery.QueryNames("example.com", "mcp"));
+        Assert.DoesNotContain("_agent.mcp.example.com", Discovery.QueryNames("example.com", "mcp"));
+    }
+
+    [Fact]
     public void SelectionPrefersOneValidAid2OverAid1()
     {
         var rec = Select(new[]

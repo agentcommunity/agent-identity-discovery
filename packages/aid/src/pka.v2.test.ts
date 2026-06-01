@@ -253,6 +253,23 @@ describe('AID v2 PKA handshake', () => {
     },
   );
 
+  it.each(['Created', 'KeyID'] as const)(
+    'rejects mixed-case %s Signature-Input parameter names',
+    async (param) => {
+      const vector = loadCanonicalV2Vector();
+      const canonicalParam = param === 'Created' ? 'created' : 'keyid';
+      const signatureInput = vector.response.signature_input.replace(
+        `;${canonicalParam}=`,
+        `;${param}=`,
+      );
+      mockSignedV2Response(vector, signatureInput);
+
+      await expect(performPKAHandshake(vector.record.u, vector.record.k)).rejects.toThrow(
+        `Unsupported Signature-Input parameter: ${param}`,
+      );
+    },
+  );
+
   it.each(['created', 'expires'] as const)(
     'rejects quoted %s Signature-Input timestamp parameters',
     async (param) => {
@@ -302,6 +319,46 @@ describe('AID v2 PKA handshake', () => {
     );
   });
 
+  it.each(['AID-PKA', 'Aid-Pka'] as const)(
+    'rejects exact-plus-mixed %s Signature-Input dictionary members',
+    async (member) => {
+      const vector = loadCanonicalV2Vector();
+      const nonceBytes = Uint8Array.from(Array.from({ length: 32 }, (_, index) => 160 + index));
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date(vector.created * 1000));
+      getRandomValuesSpy = vi.spyOn(g.crypto!, 'getRandomValues').mockImplementation((array) => {
+        (array as Uint8Array).set(nonceBytes);
+        return array;
+      });
+
+      const caseConfusedSignatureInput = vector.response.signature_input.replace(
+        /^aid-pka=/,
+        `${member}=`,
+      );
+
+      g.fetch = vi.fn(async () => ({
+        ok: false,
+        status: vector.response.status,
+        headers: {
+          get: (name: string) => {
+            const normalized = name.toLowerCase();
+            if (normalized === 'signature-input') {
+              return `${vector.response.signature_input}, ${caseConfusedSignatureInput}`;
+            }
+            if (normalized === 'signature') return vector.response.signature;
+            if (normalized === 'cache-control') return vector.response.cache_control;
+            return null;
+          },
+        },
+        text: async () => '',
+      }));
+
+      await expect(performPKAHandshake(vector.record.u, vector.record.k)).rejects.toThrow(
+        'Duplicate aid-pka signature member',
+      );
+    },
+  );
+
   it('rejects duplicate aid-pka Signature dictionary members', async () => {
     const vector = loadCanonicalV2Vector();
     const nonceBytes = Uint8Array.from(Array.from({ length: 32 }, (_, index) => 160 + index));
@@ -334,6 +391,43 @@ describe('AID v2 PKA handshake', () => {
     );
   });
 
+  it.each(['AID-PKA', 'Aid-Pka'] as const)(
+    'rejects exact-plus-mixed %s Signature dictionary members',
+    async (member) => {
+      const vector = loadCanonicalV2Vector();
+      const nonceBytes = Uint8Array.from(Array.from({ length: 32 }, (_, index) => 160 + index));
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date(vector.created * 1000));
+      getRandomValuesSpy = vi.spyOn(g.crypto!, 'getRandomValues').mockImplementation((array) => {
+        (array as Uint8Array).set(nonceBytes);
+        return array;
+      });
+
+      const caseConfusedSignature = vector.response.signature.replace(/^aid-pka=/, `${member}=`);
+
+      g.fetch = vi.fn(async () => ({
+        ok: false,
+        status: vector.response.status,
+        headers: {
+          get: (name: string) => {
+            const normalized = name.toLowerCase();
+            if (normalized === 'signature-input') return vector.response.signature_input;
+            if (normalized === 'signature') {
+              return `${vector.response.signature}, ${caseConfusedSignature}`;
+            }
+            if (normalized === 'cache-control') return vector.response.cache_control;
+            return null;
+          },
+        },
+        text: async () => '',
+      }));
+
+      await expect(performPKAHandshake(vector.record.u, vector.record.k)).rejects.toThrow(
+        'Duplicate aid-pka signature member',
+      );
+    },
+  );
+
   it.each([
     ['duplicate req parameter', '"@method";req;req'],
     ['uppercase req parameter', '"@method";REQ'],
@@ -364,6 +458,11 @@ describe('AID v2 PKA handshake', () => {
       'date as an extra covered field',
       (input: string) => input.replace('"@status"', '"date"'),
       /Unsupported covered field: date/,
+    ],
+    [
+      'mixed-case covered component name',
+      (input: string) => input.replace('"@method";req', '"@Method";req'),
+      /Unsupported covered field: @Method/,
     ],
   ])('rejects %s', async (_name, mutate, message) => {
     const vector = loadCanonicalV2Vector();

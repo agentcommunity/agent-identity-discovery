@@ -51,8 +51,6 @@ def test_discover_protocol_specific_falls_back_to_base_after_protocol_names(monk
         queries.append(name)
         if name == "_agent._mcp.example.com":
             raise dns.resolver.NXDOMAIN()
-        if name == "_agent.mcp.example.com":
-            raise dns.resolver.NXDOMAIN()
         if name == "_agent.example.com":
             # Base record has the desired protocol
             return _FakeAnswer(["v=aid1;uri=https://api.example.com/mcp;proto=mcp"], 333)
@@ -63,7 +61,28 @@ def test_discover_protocol_specific_falls_back_to_base_after_protocol_names(monk
     assert record["proto"] == "mcp"
     assert record["uri"] == "https://api.example.com/mcp"
     assert ttl == 333
-    assert queries == ["_agent._mcp.example.com", "_agent.mcp.example.com", "_agent.example.com"]
+    assert queries == ["_agent._mcp.example.com", "_agent.example.com"]
+    assert "_agent.mcp.example.com" not in queries
+
+
+def test_discover_protocol_specific_no_answer_continues_to_base(monkeypatch):
+    import dns.resolver
+
+    queries = []
+
+    def _fake_resolve(name, rdtype, lifetime=5.0):
+        queries.append(name)
+        if name == "_agent._mcp.example.com":
+            raise dns.resolver.NoAnswer()
+        if name == "_agent.example.com":
+            return _FakeAnswer(["v=aid1;uri=https://api.example.com/mcp;proto=mcp"], 333)
+        raise dns.resolver.NXDOMAIN()
+
+    monkeypatch.setattr(dns.resolver, "resolve", _fake_resolve)
+    record, ttl = discover("example.com", protocol="mcp")
+    assert record["proto"] == "mcp"
+    assert ttl == 333
+    assert queries == ["_agent._mcp.example.com", "_agent.example.com"]
 
 def test_discover_protocol_specific_fallback_to_subdomain(monkeypatch):
     import dns.resolver
@@ -96,8 +115,6 @@ def test_discover_fallback_to_base(monkeypatch):
         queries.append(name)
         if name == "_agent._mcp.example.com":
             raise dns.resolver.NXDOMAIN()
-        if name == "_agent.mcp.example.com":
-            raise dns.resolver.NXDOMAIN()
         if name == "_agent.example.com":
             return _FakeAnswer(["v=aid1;uri=https://fallback.com;p=a2a"], 555)
         raise dns.resolver.NXDOMAIN()
@@ -107,7 +124,8 @@ def test_discover_fallback_to_base(monkeypatch):
     assert record["proto"] == "a2a"
     assert record["uri"] == "https://fallback.com"
     assert ttl == 555
-    assert queries == ["_agent._mcp.example.com", "_agent.mcp.example.com", "_agent.example.com"]
+    assert queries == ["_agent._mcp.example.com", "_agent.example.com"]
+    assert "_agent.mcp.example.com" not in queries
 
 
 def test_discover_no_record(monkeypatch):

@@ -117,12 +117,9 @@ describe('Browser client', () => {
   });
 
   describe('protocol resolution', () => {
-    it('queries underscore, plain protocol, and then base when protocol is specified', async () => {
+    it('queries underscore protocol name and then base when protocol is specified', async () => {
       const dohResponses: Record<string, unknown> = {
         'https://cloudflare-dns.com/dns-query?name=_agent._mcp.example.com&type=TXT': {
-          Status: 2 /* NXDOMAIN */,
-        },
-        'https://cloudflare-dns.com/dns-query?name=_agent.mcp.example.com&type=TXT': {
           Status: 2 /* NXDOMAIN */,
         },
         'https://cloudflare-dns.com/dns-query?name=_agent.example.com&type=TXT': {
@@ -154,9 +151,11 @@ describe('Browser client', () => {
 
       expect((g.fetch as any).mock.calls.map(([url]: [string]) => url)).toEqual([
         'https://cloudflare-dns.com/dns-query?name=_agent._mcp.example.com&type=TXT',
-        'https://cloudflare-dns.com/dns-query?name=_agent.mcp.example.com&type=TXT',
         'https://cloudflare-dns.com/dns-query?name=_agent.example.com&type=TXT',
       ]);
+      expect((g.fetch as any).mock.calls.map(([url]: [string]) => url)).not.toContain(
+        'https://cloudflare-dns.com/dns-query?name=_agent.mcp.example.com&type=TXT',
+      );
 
       expect(record.uri).toBe('https://fallback.example.com');
       expect(queryName).toBe('_agent.example.com');
@@ -166,9 +165,6 @@ describe('Browser client', () => {
       const calls: string[] = [];
       const dohResponses: Record<string, unknown> = {
         'https://cloudflare-dns.com/dns-query?name=_agent._mcp.app.team.example.com&type=TXT': {
-          Status: 2,
-        },
-        'https://cloudflare-dns.com/dns-query?name=_agent.mcp.app.team.example.com&type=TXT': {
           Status: 2,
         },
         'https://cloudflare-dns.com/dns-query?name=_agent.app.team.example.com&type=TXT': {
@@ -205,9 +201,11 @@ describe('Browser client', () => {
       expect(queryName).toBe('_agent.app.team.example.com');
       expect(calls).toEqual([
         'https://cloudflare-dns.com/dns-query?name=_agent._mcp.app.team.example.com&type=TXT',
-        'https://cloudflare-dns.com/dns-query?name=_agent.mcp.app.team.example.com&type=TXT',
         'https://cloudflare-dns.com/dns-query?name=_agent.app.team.example.com&type=TXT',
       ]);
+      expect(calls).not.toContain(
+        'https://cloudflare-dns.com/dns-query?name=_agent.mcp.app.team.example.com&type=TXT',
+      );
       expect(calls).not.toContain(
         'https://cloudflare-dns.com/dns-query?name=_agent._mcp.team.example.com&type=TXT',
       );

@@ -40,7 +40,7 @@ Discovers an agent by looking up the `_agent` TXT record for the exact host you 
 **Parameters:**
 
 - `domain` (str): The domain name to discover
-- `protocol` (str, optional): Try protocol-specific subdomain names for the same exact host first (e.g., `mcp`)
+- `protocol` (str, optional): Filter for the requested protocol after querying `_agent.<domain>` first. Protocol-specific `_agent._<proto>.<domain>` probing is legacy, diagnostic, or base-failure-only behavior where explicitly supported and configured.
 - `timeout` (float): DNS timeout in seconds (default 5.0)
 - `well_known_fallback` (bool): If true, falls back to `https://<domain>/.well-known/agent` on `ERR_NO_RECORD` or `ERR_DNS_LOOKUP_FAILED` (default True)
 - `well_known_timeout` (float): Timeout for the `.well-known` HTTP fetch (default 2.0)
@@ -59,7 +59,7 @@ Parses and validates a raw TXT record string.
 
 **Parameters:**
 
-- `txt` (str): Raw TXT record content (e.g., "v=aid1;uri=https://...")
+- `txt` (str): Raw TXT record content (e.g., "v=aid2;u=https://...;p=mcp")
 
 **Returns:**
 
@@ -75,7 +75,7 @@ Parses and validates a raw TXT record string.
 
 Represents a parsed AID record with the following attributes:
 
-- `v` (str): Protocol version (always "aid1")
+- `v` (str): Protocol version (defaults to "aid2"; "aid1" is supported for legacy compatibility)
 - `uri` (str): Agent endpoint URI
 - `proto` (str): Protocol identifier (e.g., "mcp", "openapi")
 - `auth` (str, optional): Authentication method
@@ -130,7 +130,7 @@ except AidError as e:
 ```python
 from aid_py import parse, AidError
 
-txt_record = "v=aid1;uri=https://api.example.com/agent;proto=mcp;desc=Example Agent"
+txt_record = "v=aid2;u=https://api.example.com/agent;p=mcp;s=Example Agent"
 
 try:
     record = parse(txt_record)
@@ -139,9 +139,9 @@ except AidError as e:
     print(f"Invalid record: {e}")
 ```
 
-### v1.1 Notes (PKA + Fallback)
+### aid2 Notes (PKA + Fallback)
 
-- PKA handshake: When a record includes `pka` (`k`) and `kid` (`i`), the client performs an Ed25519 HTTP Message Signatures handshake to verify endpoint control. This requires an Ed25519 verification backend. Install one of:
+- PKA handshake: For `aid2`, when a record includes `k` (`pka`), the client performs an Ed25519 HTTP Message Signatures handshake to verify endpoint control. The HTTP signature `keyid` is derived from the `aid2` key. `kid` (`i`) is legacy `aid1` compatibility only, not a v2 requirement. This requires an Ed25519 verification backend. Install one of:
   - `pip install aid-discovery[pka]` (installs `PyNaCl` and `cryptography`)
   - Or add `PyNaCl>=1.5` or `cryptography>=42` to your environment
     If no backend is available, discovery raises `ERR_SECURITY` when PKA is present.

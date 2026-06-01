@@ -34,7 +34,7 @@ The minimalist design of AID v1 delivers several key advantages:
 - **Human-Readable and Easily Debuggable:** The `key=value` format is simple to read and write. A developer can debug any AID record with a single command (`dig TXT _agent.example.com`) without needing special tools, which dramatically lowers the barrier to entry. The optional `p` alias for `proto` is a minor but thoughtful concession to brevity in this human-readable context.
 - **Superior User Experience via the `desc` Key:** The optional `desc` key is a small but critical feature. It allows a client to provide human-readable context _before_ a connection is made (e.g., "Connect to 'Google's AI Tools'?"), which builds user trust and clarity.
 - **Elegant Support for Local Execution:** The `proto=local` token and its associated `uri` schemes (`docker:`, `npx:`, etc.) provide a clever, manifest-free way to support local agents. This retains the essence of a powerful use case from earlier, more complex drafts of AID without the overhead of a JSON manifest. It keeps the protocol lean while enabling a crucial feature.
-- **Clear Path to the Future:** The specification explicitly acknowledges DNS SRV records as the likely path for a future `v=aid2`. This signals foresight, addresses technical purism, and assures the community that AID is an evolving standard, not a myopic, short-term fix.
+- **Current v2 Path:** New records should use `v=aid2` as the default profile. v2 keeps DNS TXT deployability while tightening identity semantics around PKA, derived key identity, and base-first discovery behavior.
 
 ### **4. What AID v1 Intentionally Does NOT Do (Defining the Boundaries)**
 
@@ -91,13 +91,13 @@ Discovery answers “where and how do I connect?” Identity answers “am I rea
 Practical outcomes:
 
 - **Enterprise policy:** Require `pka` for sensitive connections; alert on downgrade.
-- **Rotation:** Use `kid` for explicit key rotation without breaking clients.
+- **Rotation:** For v2, clients derive key identity from the `pka` value using the RFC 7638 thumbprint. DNS `kid` remains only for legacy `aid1` compatibility.
 - **Operational clarity:** `docs` and `dep` metadata provide human context and safe deprecations.
 
 ### **7. Practical Use Cases**
 
 - **SaaS integration with trust:** `proto=mcp` + `pka`, user authenticates via the hinted scheme (e.g., `auth=pat` or OAuth), client verifies endpoint proof before sending tokens.
-- **Vendor migration:** Publish new endpoint with `dep` on the old one; rotate PKA via `kid`; clients follow safely.
+- **Vendor migration:** Publish the new endpoint with `dep` on the old one. v2 clients track PKA rotation through the derived key identity; legacy `aid1` deployments may still use DNS `kid`.
 - **Hybrid local/remote:** Local dev via `proto=local`/`zeroconf:` with explicit consent, production via remote `https://` + PKA.
 - **Multi-protocol exposure:** Same domain can expose `mcp`, `a2a`, or `openapi`; clients select supported protocol.
 - **Development and operations:** Use the [aid-doctor CLI](../Tooling/aid_doctor.md) for validation, security checks, record generation, and PKA key management.
@@ -128,7 +128,7 @@ AID v1 is a deliberately focused and pragmatic standard. It provides a simple, r
     F -->|No| G[ERR_NO_RECORD]
     F -->|Yes| H[Concatenate DNS strings if split]
     H --> I[Parse key=value pairs]
-    I --> J{Contains v=aid1?}
+    I --> J{Contains v=aid2?}
     J -->|No| K[ERR_INVALID_TXT]
     J -->|Yes| L{Contains uri and proto?}
     L -->|No| K

@@ -14,11 +14,12 @@ The Agent Identity & Discovery (AID) standard is designed to be a stable, living
 
 ## The `v` Key in the TXT Record
 
-The `v` key within an AID `TXT` record (e.g., `v=aid1`) signifies the **major version** of the specification that the record conforms to.
+The `v` key within an AID `TXT` record (for example, `v=aid2`) signifies the **major version** of the specification that the record conforms to.
 
-- **`v=aid1`**: This corresponds to the entire v1.x.x series of the specification defined in this documentation.
-- **Breaking Changes:** Any change that is not backward-compatible with the `v=aid1` rules (e.g., adding a new required key, changing the record name structure, or moving to SRV records) will result in a new major version, `v=aid2`.
-- **Client Behavior:** A client that only understands `aid1` **MUST** ignore any record that does not have `v=aid1`.
+- **`v=aid2`**: This is the current v2 default and preferred profile for new records.
+- **`v=aid1`**: This is the legacy v1.x.x compatibility profile. Clients may continue to read it for backward compatibility.
+- **Breaking Changes:** Any future change that is not backward-compatible with the `v=aid2` rules will result in a new major version.
+- **Client Behavior:** A client that only understands `aid1` **MUST** ignore records that do not have `v=aid1`. Current clients should prefer `aid2` and use `aid1` only as legacy compatibility input.
 
 ## Specification Updates and Releases
 
@@ -62,4 +63,4 @@ We believe a discovery protocol must be exceptionally stable. Our commitment to 
 
 1.  **Breaking Changes are Rare:** Major version bumps will be infrequent and will only be made when there is a significant, community-vetted reason to do so.
 2.  **Clarity Through Communication:** Any upcoming minor or major changes will be discussed openly in the community repository before being finalized.
-3.  **The v1 Standard is a Long-Term Foundation:** The `aid1` specification is designed to be a durable, long-term solution. You can build on it with confidence.
+3.  **v2 is the Current Foundation:** New deployments should publish `aid2` records. The `aid1` profile remains supported only for legacy and backward-compatibility clients.

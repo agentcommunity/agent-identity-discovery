@@ -407,20 +407,11 @@ export async function discover(
   };
 
   const runDns = async (): Promise<DiscoveryResult> => {
-    // If protocol is explicitly requested, try both protocol names before base.
+    // If protocol is explicitly requested, try _agent._<proto>.<domain> before base.
     if (protocol) {
       const underscoreName = constructQueryName(domain, protocol, true);
       try {
         return await tryQuery(underscoreName);
-      } catch (error) {
-        if (!(error instanceof AidError) || error.errorCode !== 'ERR_NO_RECORD') {
-          throw error;
-        }
-      }
-
-      const plainName = constructQueryName(domain, protocol);
-      try {
-        return await tryQuery(plainName);
       } catch (error) {
         if (!(error instanceof AidError) || error.errorCode !== 'ERR_NO_RECORD') {
           throw error;

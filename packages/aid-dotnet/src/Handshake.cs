@@ -454,6 +454,7 @@ public static class Pka
     private static string ExtractDictionaryMember(string input, string label)
     {
         string? value = null;
+        var sawCaseConfusedLabel = false;
         foreach (var part in SplitDictionaryMembers(input))
         {
             var eq = part.IndexOf('=');
@@ -461,7 +462,8 @@ public static class Pka
             {
                 continue;
             }
-            if (string.Equals(AsciiToLower(part[..eq].Trim()), label, StringComparison.Ordinal))
+            var memberLabel = part[..eq].Trim();
+            if (string.Equals(memberLabel, label, StringComparison.Ordinal))
             {
                 if (value is not null)
                 {
@@ -469,9 +471,17 @@ public static class Pka
                 }
                 value = part[(eq + 1)..].Trim();
             }
+            else if (string.Equals(memberLabel, label, StringComparison.OrdinalIgnoreCase))
+            {
+                sawCaseConfusedLabel = true;
+            }
         }
         if (value is not null)
         {
+            if (sawCaseConfusedLabel)
+            {
+                throw new AidError(nameof(Constants.ERR_SECURITY), $"Invalid {label} signature member casing");
+            }
             return value;
         }
         throw new AidError(nameof(Constants.ERR_SECURITY), $"Missing {label} signature member");
@@ -521,7 +531,7 @@ public static class Pka
         {
             throw new AidError(nameof(Constants.ERR_SECURITY), "Invalid Signature-Input covered item");
         }
-        var name = AsciiToLower(match.Groups[1].Value);
+        var name = match.Groups[1].Value;
         var req = false;
         var paramRaw = match.Groups[2].Value;
         if (paramRaw.Length > 0)
@@ -610,7 +620,7 @@ public static class Pka
             while (i < raw.Length && char.IsWhiteSpace(raw[i])) i++;
             var nameStart = i;
             while (i < raw.Length && IsParamNameChar(raw[i])) i++;
-            var name = AsciiToLower(raw[nameStart..i]);
+            var name = raw[nameStart..i];
             if (name.Length == 0) throw new AidError(nameof(Constants.ERR_SECURITY), "Invalid Signature-Input parameter");
             if (!allowedParameters.Contains(name))
             {

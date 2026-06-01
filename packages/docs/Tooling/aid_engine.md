@@ -185,19 +185,27 @@ const result = await runCheck('example.com', {
   checkDowngrade: true, // Enable downgrade detection
   previousCacheEntry: {
     // For downgrade checking
-    lastSeen: '2024-01-01T00:00:00Z',
-    pka: 'zPreviousKey',
+    lastSeen: '2026-05-01T00:00:00.000Z',
+    version: 'aid2',
+    trustSource: 'dns',
+    pka: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+    kid: null,
+    keyid: 'ogRZbCR5KTrPFCAfuYmCMwj0w7Yuk3Lr6YWQWfpkbf0',
+    jwkX: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+    hash: null,
   },
 });
 ```
 
 ### Protocol-Specific Probing
 
+`aid-engine` diagnostics are base-first. The `protocol` option labels the requested protocol in the report, but the primary lookup remains `_agent.<domain>`.
+
 ```typescript
 const result = await runCheck('example.com', {
   protocol: 'mcp', // Hint for protocol-specific subdomain
-  probeProtoSubdomain: true, // Try _agent._mcp.example.com first
-  probeProtoEvenIfBase: false, // Don't probe if base exists
+  probeProtoSubdomain: true, // After base failure, probe _agent._mcp.example.com for diagnostics
+  probeProtoEvenIfBase: false, // Set true to probe after base success and warn on drift
 });
 ```
 

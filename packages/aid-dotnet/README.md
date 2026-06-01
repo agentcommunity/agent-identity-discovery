@@ -6,12 +6,13 @@ Minimal .NET library for Agent Identity & Discovery (AID) parsing, discovery, an
 - No external runtime dependencies
 - DNS-first discovery included via DNS-over-HTTPS (DoH)
 
-## v1.1 Notes (PKA + .well-known)
+## v2 PKA Default
 
-This library supports the v1.1 fields `pka`/`kid` and the PKA handshake (Ed25519 HTTP Message Signatures). It also includes a guarded `.well-known` fallback helper for environments where DNS is restricted.
+This library supports `aid2` records and the v2 PKA handshake (Ed25519 HTTP Message Signatures). It also includes a guarded `.well-known` fallback helper for environments where DNS is restricted.
 
-- Multibase public key: `pka` uses base58btc (`z...`).
-- Handshake: verifies required covered fields, `created` ±300s, HTTP `Date` ±300s, `alg="ed25519"`, `keyid` matches `kid`.
+- v2 public key: `pka`/`k` is the unpadded base64url Ed25519 JWK `x` value.
+- v2 key identity: the HTTP signature `keyid` is the RFC 7638 JWK thumbprint derived from `k`; DNS `kid`/`i` is not used in `aid2`.
+- v2 handshake: uses RFC 9421 `Accept-Signature` with a nonce, required `created` and `expires`, exact nonce echo, and response `Cache-Control: no-store`.
 - Verification backend: recommended `NSec.Cryptography` (Ed25519). Alternatively, `Chaos.NaCl`.
 
 ### Example: .well-known fallback + handshake
@@ -38,7 +39,7 @@ using AidDiscovery;
 var result = await Discovery.DiscoverAsync(
   domain: "example.com",
   new DiscoveryOptions {
-    Protocol = "mcp",              // Try protocol-specific names for the same exact host, then the exact-host base
+    Protocol = "mcp",              // Query exact-host base first; protocol-specific probing is diagnostic/base-failure-only where configured
     Timeout = TimeSpan.FromSeconds(5),
     WellKnownFallback = true,       // Only on ERR_NO_RECORD / ERR_DNS_LOOKUP_FAILED
     WellKnownTimeout = TimeSpan.FromSeconds(2)
@@ -56,8 +57,8 @@ Discovery is exact-host only. Passing `app.team.example.com` does not cause impl
 using AidDiscovery;
 
 // After parsing a TXT or loading from elsewhere
-var rec = Aid.Parse("v=aid1;uri=https://api.example.com/mcp;p=mcp;k=zBase58Key;i=g1");
-await Pka.PerformHandshakeAsync(rec.Uri, rec.Pka!, rec.Kid!, TimeSpan.FromSeconds(2));
+var rec = Aid.Parse("v=aid2;uri=https://api.example.com/mcp;p=mcp;k=ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ");
+await Pka.PerformHandshakeAsync(rec.Uri, rec.Pka!, "", TimeSpan.FromSeconds(2));
 ```
 
 ## Usage
@@ -65,7 +66,7 @@ await Pka.PerformHandshakeAsync(rec.Uri, rec.Pka!, rec.Kid!, TimeSpan.FromSecond
 ```csharp
 using AidDiscovery;
 
-var rec = Aid.Parse("v=aid1;uri=https://api.example.com/mcp;p=mcp");
+var rec = Aid.Parse("v=aid2;uri=https://api.example.com/mcp;p=mcp");
 Console.WriteLine($"proto={rec.Proto}, uri={rec.Uri}");
 ```
 
@@ -94,4 +95,8 @@ If the initial request to a discovered URI returns a redirect to a different ori
 
 ## More on PKA
 
-See the documentation “Quick Start → PKA handshake expectations” for the exact header coverage, algorithm, timestamps, and key format enforced by v1.1.
+See the Identity & PKA reference for exact v2 header coverage, algorithm, timestamps, key format, and legacy v1 compatibility behavior.
+
+## v1 compatibility
+
+Legacy `aid1` records may still use `k=z...` base58btc plus `i`/`kid`. In that mode, clients send `AID-Challenge` and signed HTTP `Date`, and signature `keyid` must match DNS `kid`.

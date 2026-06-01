@@ -147,7 +147,7 @@ _agent.app.team.example.com. 300 IN CNAME _agent.shared.team.example.com.
 _agent.shared.team.example.com. 300 IN TXT "v=aid1;p=mcp;u=https://gateway.team.example.com/mcp"
 ```
 
-Protocol-specific lookups follow the same exact-host rule. If a client explicitly requests `mcp` for `app.team.example.com`, it may query `_agent._mcp.app.team.example.com` before `_agent.app.team.example.com`, but it **MUST NOT** query parent hosts unless the operator has delegated the exact child name in DNS.
+Protocol-specific probing follows the same exact-host rule. Clients query the canonical base name `_agent.<exact-host>` first. If a client explicitly requests `mcp` for `app.team.example.com`, legacy, diagnostic, or explicitly configured base-failure probing may query `_agent._mcp.app.team.example.com`, but it **MUST NOT** query parent hosts unless the operator has delegated the exact child name in DNS.
 
 ### **2.5. Exposing Multiple Protocols (Non-Normative Guidance)**
 
@@ -163,7 +163,7 @@ _agent._a2a.example.com. 300 IN TXT "v=aid1;p=a2a;u=..."
 **Client behavior:**
 
 - By default, clients query the base `_agent.<exact-host>`.
-- When a specific protocol is explicitly requested (by the application), clients **MAY** first query the protocol-specific subdomain `_agent._<proto>.<exact-host>` and, if not found, fall back to the base record for that same exact host.
+- When a specific protocol is explicitly requested (by the application), clients still query the base `_agent.<exact-host>` first and filter that record for the requested protocol. Protocol-specific `_agent._<proto>.<exact-host>` probing is legacy, diagnostic, or base-failure-only behavior where explicitly supported and configured.
 - Providers that publish only the base record remain fully compliant.
 
 ---

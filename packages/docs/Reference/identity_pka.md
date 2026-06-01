@@ -10,7 +10,7 @@ icon: material/shield-lock-outline
 
 - **Problem:** DNS tells you where to go, but how do you know the server there is the right one?
 - **Answer:** The domain publishes a public key. On first contact, the server proves it owns the matching private key by signing a small challenge. Your client checks the signature.
-- **Result:** You get a simple, extra layer of trust on top of TLS, without changing DNS. Conceptually similar to “pkarr”-style public‑key anchored identity, wrapped into AID.
+- **Result:** You get a simple, extra layer of endpoint proof on top of TLS, rooted in the domain owner's DNS record.
 
 ## What “PKA” Means
 
@@ -23,13 +23,13 @@ PKA stands for **P**ublic **K**ey for **A**gent.
 
 ## Relationship to Pkarr
 
-The PKA mechanism is heavily inspired by [Pkarr](https://pkarr.org/) (Public Key Addressable Resource Records), a standard for creating sovereign identities using public keys.
+AID PKA and [Pkarr](https://pkarr.org/) both use compact Ed25519 public keys, but they make different trust claims.
 
-**Shared Philosophy:** Like Pkarr, AID believes that a public key is the ultimate root of a decentralized identity. Both protocols aim to create a verifiable link between an identity and the online resources it controls.
+Pkarr is public-key-rooted: the key is the address and signs resource records under that key.
 
-**The Key Difference: Simplicity and Deployability.** Where Pkarr uses a Distributed Hash Table (DHT) for maximum censorship resistance, PKA integrates the public key directly into the AID DNS record. This was a deliberate design choice that aligns with AID's core principle of **Pragmatism over Purity**. By leveraging existing, universal DNS infrastructure, PKA provides a robust identity verification layer that any domain owner can deploy _today_, without needing to run or rely on DHT relays.
+AID is DNS-authority-rooted: the domain owner publishes the current endpoint and current endpoint-proof key in `_agent.<domain>`. PKA proves that the reached endpoint controls the private key for the DNS-current public key. It does not make the public key the domain's address, and it does not create cryptographic continuity across key changes.
 
-In short, PKA applies the powerful identity philosophy of Pkarr with the pragmatic, "works everywhere" delivery mechanism of AID.
+That boundary is intentional. AID stays deployable through ordinary DNS while giving clients a narrow endpoint proof they can compose with TLS, DNSSEC, authorization, and policy layers.
 
 ## How it works (high level)
 
@@ -84,17 +84,17 @@ For `aid1`, `k` is multibase `z...` base58btc, `i`/`kid` is required with `k`, t
 
 ## Why PKA Instead of a DID Scheme?
 
-Decentralized Identifiers (DIDs) are a powerful and important standard for the future of the web. We evaluated supporting a generic DID scheme (e.g., `did:key` or `did:web`) and concluded that the focused PKA approach is superior for the specific goal of AID: providing a simple, immediately deployable **identity bootstrap layer**.
+Decentralized Identifiers (DIDs) are a powerful and important standard for the future of the web. We evaluated supporting a generic DID scheme (e.g., `did:key` or `did:web`) and concluded that the focused PKA approach is better for the specific goal of AID: simple, immediately deployable endpoint proof.
 
 Our decision was based on AID's core philosophy of **Pragmatism over Purity**.
 
-1.  **Minimalism and Reduced Complexity.** PKA is just one key-value pair with a clear purpose. Supporting the full DID standard would require clients to implement complex and often heavy DID resolver logic. This introduces significant dependencies and contradicts AID's "minimal bootstrap" philosophy. PKA delivers the core value of verifiable identity with a fraction of the implementation cost.
+1.  **Minimalism and Reduced Complexity.** PKA is just one key-value pair with a clear purpose. Supporting the full DID standard would require clients to implement complex and often heavy DID resolver logic. This introduces significant dependencies and contradicts AID's minimal endpoint-discovery role. PKA verifies endpoint key possession with a fraction of the implementation cost.
 
 2.  **No New Infrastructure Required.** PKA works entirely within the existing DNS infrastructure that AID is already built on. Many DID methods rely on new, specialized, or opinionated infrastructure, such as blockchains or specific resolver networks. Governing, maintaining, and securing this new infrastructure is a massive undertaking that distracts from the core goal of providing a simple identity system that just works.
 
-3.  **Self-Contained and Immediately Usable.** With PKA, the AID record is a complete, self-contained "identity document" for the agent. The client performs one lookup and gets everything it needs to verify the endpoint. Many DID methods require further network lookups to retrieve the full DID Document, adding latency and points of failure.
+3.  **Self-Contained and Immediately Usable.** With PKA, the AID record carries the current endpoint-proof key. The client performs one lookup and gets what it needs to verify the endpoint. Many DID methods require further network lookups to retrieve the full DID Document, adding latency and points of failure.
 
-In short, PKA provides the most critical value of a DID—a verifiable, decentralized public key—while intentionally avoiding the operational complexity and infrastructural brittleness of the broader DID ecosystem. It is the "80/20" solution that perfectly fits the AID philosophy, with a clear path to potentially supporting specific, well-established DID methods in the future as the ecosystem matures.
+In short, PKA provides a DNS-published public key for endpoint proof while intentionally avoiding the operational complexity and infrastructural brittleness of the broader DID ecosystem. Future profiles can compose AID with specific DID methods without making DIDs part of v2 core.
 
 ## See also
 

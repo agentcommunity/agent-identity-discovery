@@ -2,6 +2,7 @@ package aid
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -17,7 +18,7 @@ var lookupTXT = net.DefaultResolver.LookupTXT
 // Returns record and a TTL (0 when unknown).
 // DiscoveryOptions provides optional behavior controls for discovery.
 type DiscoveryOptions struct {
-	// Protocol: when set, try _agent._<proto>.<domain> then _agent.<proto>.<domain> before base.
+	// Protocol: when set, try _agent._<proto>.<domain> before base.
 	Protocol string
 	// WellKnownFallback: if true, attempt HTTPS .well-known fallback on ERR_NO_RECORD or ERR_DNS_LOOKUP_FAILED.
 	WellKnownFallback bool
@@ -32,6 +33,14 @@ func Discover(domain string, timeout time.Duration) (AidRecord, uint32, error) {
 	return DiscoverWithOptions(domain, timeout, opts)
 }
 
+func classifyLookupError(err error) *AidError {
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) && dnsErr.IsNotFound {
+		return newAidError("ERR_NO_RECORD", err.Error())
+	}
+	return newAidError("ERR_DNS_LOOKUP_FAILED", err.Error())
+}
+
 // DiscoverWithOptions performs discovery with protocol-specific DNS flow and well-known controls.
 func DiscoverWithOptions(domain string, timeout time.Duration, opts DiscoveryOptions) (AidRecord, uint32, error) {
 	// IDN → A-label
@@ -44,7 +53,7 @@ func DiscoverWithOptions(domain string, timeout time.Duration, opts DiscoveryOpt
 		defer cancel()
 		txts, err := lookupTXT(ctx, fqdn)
 		if err != nil {
-			return AidRecord{}, 0, newAidError("ERR_DNS_LOOKUP_FAILED", err.Error())
+			return AidRecord{}, 0, classifyLookupError(err)
 		}
 		var lastErr error
 		validByVersion := map[string][]AidRecord{
@@ -91,10 +100,7 @@ func DiscoverWithOptions(domain string, timeout time.Duration, opts DiscoveryOpt
 	// Query order
 	var names []string
 	if opts.Protocol != "" {
-		names = append(names,
-			DnsSubdomain+"._"+opts.Protocol+"."+alabel,
-			DnsSubdomain+"."+opts.Protocol+"."+alabel,
-		)
+		names = append(names, DnsSubdomain+"._"+opts.Protocol+"."+alabel)
 	}
 	names = append(names, DnsSubdomain+"."+alabel)
 

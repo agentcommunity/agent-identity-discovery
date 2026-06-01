@@ -487,7 +487,11 @@ func extractDictionaryMember(input, label string) (string, error) {
 		if eq <= 0 {
 			continue
 		}
-		if asciiToLower(strings.TrimSpace(part[:eq])) == lowerLabel {
+		memberLabel := strings.TrimSpace(part[:eq])
+		if asciiToLower(memberLabel) == lowerLabel && memberLabel != label {
+			return "", newAidError("ERR_SECURITY", "Invalid "+label+" signature member")
+		}
+		if memberLabel == label {
 			if found {
 				return "", newAidError("ERR_SECURITY", "Duplicate "+label+" signature member")
 			}
@@ -635,7 +639,7 @@ func parseSignatureParams(raw string) (map[string]string, error) {
 		for i < len(raw) && isParamNameChar(raw[i]) {
 			i++
 		}
-		name := asciiToLower(raw[nameStart:i])
+		name := raw[nameStart:i]
 		if name == "" {
 			return nil, newAidError("ERR_SECURITY", "Invalid Signature-Input parameter")
 		}
