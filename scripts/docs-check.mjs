@@ -24,6 +24,7 @@ const REQUIRED_DOCS = [
   ['versioning.md', 'Reference/versioning.md'],
   ['Reference/discovery_api.md'],
   ['Reference/identity_pka.md'],
+  ['Reference/pka.md'],
   ['Reference/protocols.md'],
   ['Reference/troubleshooting.md'],
   ['Tooling/aid_doctor.md'],
@@ -54,6 +55,7 @@ const V2_GUIDANCE_FILES = [
   'packages/docs/quickstart/quickstart_browser.md',
   'packages/docs/Reference/discovery_api.md',
   'packages/docs/Reference/identity_pka.md',
+  'packages/docs/Reference/pka.md',
   'packages/docs/Reference/protocols.md',
   'packages/docs/Reference/troubleshooting.md',
   'packages/docs/Reference/versioning.md',
@@ -82,6 +84,10 @@ const STALE_V2_MARKERS = [
   /future\s+`?v=aid2`?/i,
   /Use\s+`?kid`?\s+for explicit key rotation/i,
   /rotate PKA via\s+`?kid`?/i,
+  /Draft preview, not the current normative specification/i,
+  /does not replace the current\s+\[AID v1\.2 specification\]/i,
+  /v1\.2 normative key table/i,
+  /v1\.2 spec appendix/i,
 ];
 
 const LEGACY_CONTEXT = /\b(v1(?:\.\d+)?|aid1|legacy|compatib|migration|migrating)\b/i;
@@ -123,14 +129,13 @@ const walkFiles = async (root, predicate) => {
 const isUnpaddedBase64Url = (value) => /^[A-Za-z0-9_-]+$/.test(value) && !value.includes('=');
 
 const contextForLine = (lines, index, radius = 4) =>
-  lines
-    .slice(Math.max(0, index - radius), Math.min(lines.length, index + radius + 1))
-    .join('\n');
+  lines.slice(Math.max(0, index - radius), Math.min(lines.length, index + radius + 1)).join('\n');
 
-const surroundingContextForLine = (lines, index, radius = 10) => [
-  ...lines.slice(Math.max(0, index - radius), index),
-  ...lines.slice(index + 1, Math.min(lines.length, index + radius + 1)),
-].join('\n');
+const surroundingContextForLine = (lines, index, radius = 10) =>
+  [
+    ...lines.slice(Math.max(0, index - radius), index),
+    ...lines.slice(index + 1, Math.min(lines.length, index + radius + 1)),
+  ].join('\n');
 
 const isLegacyOrContrast = (line, heading, context = '') =>
   LEGACY_CONTEXT.test(line) ||
@@ -187,15 +192,17 @@ const guidanceFilesToScan = async (repoRoot) => {
   const docsFiles = await walkFiles(path.join(repoRoot, 'packages', 'docs'), (filePath) =>
     /\.(?:md|json)$/.test(filePath),
   );
-  const generatedDocsIndex = path.join(repoRoot, 'packages', 'web', 'src', 'generated', 'docs-index.json');
+  const generatedDocsIndex = path.join(
+    repoRoot,
+    'packages',
+    'web',
+    'src',
+    'generated',
+    'docs-index.json',
+  );
 
   return [
-    ...new Set([
-      ...explicitFiles,
-      ...packageReadmes,
-      ...docsFiles,
-      generatedDocsIndex,
-    ]),
+    ...new Set([...explicitFiles, ...packageReadmes, ...docsFiles, generatedDocsIndex]),
   ].sort();
 };
 
@@ -780,7 +787,7 @@ const main = async () => {
   console.log('docs:check passed');
   console.log('Canonical docs source: packages/docs');
   console.log('External docs links map to in-repo markdown files.');
-  console.log('AID v2 draft invariants are covered by docs, fixtures, and implementation tests.');
+  console.log('AID v2 invariants are covered by docs, fixtures, and implementation tests.');
 };
 
 main().catch((error) => {

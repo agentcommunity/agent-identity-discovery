@@ -89,7 +89,7 @@ connectToA2aAgent('a2a.agentcommunity.org'); // Fictional example domain
 
 **Why AID here?** DNS gives you a stable, network-level pointer to the `AgentCard`. A2A handles the rest.
 
-For libraries in other languages (including Rust/.NET/Java WIP), see the [Package Overview](./index.md#package-overview).
+For libraries in other languages, see [SDKs and Packages](../Reference/packages.md).
 
 ---
 

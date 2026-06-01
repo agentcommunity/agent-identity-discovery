@@ -180,7 +180,7 @@ export function QuickStart() {
                     {[
                       { href: '/docs/quickstart', label: 'Quick Start Guide' },
                       { href: '/docs/specification', label: 'Specification' },
-                      { href: '/docs/Tooling/aid_doctor', label: 'aid-doctor CLI' },
+                      { href: '/docs/tooling/aid_doctor', label: 'aid-doctor CLI' },
                     ].map((l) => (
                       <Link
                         key={l.href}
@@ -203,10 +203,10 @@ export function QuickStart() {
                   </div>
                   <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-border bg-card px-4 py-3">
                     {[
-                      { href: '/docs/Tooling/aid_doctor', label: 'aid-doctor CLI' },
-                      { href: '/docs/Tooling/aid_engine', label: 'Engine Docs' },
-                      { href: '/docs/Tooling/conformance', label: 'Conformance Suite' },
-                      { href: '/docs/Reference/identity_pka', label: 'PKA Identity' },
+                      { href: '/docs/tooling/aid_doctor', label: 'aid-doctor CLI' },
+                      { href: '/docs/tooling/aid_engine', label: 'Engine Docs' },
+                      { href: '/docs/tooling/conformance', label: 'Conformance Suite' },
+                      { href: '/docs/reference/identity_pka', label: 'PKA Identity' },
                     ].map((l) => (
                       <Link
                         key={l.href}

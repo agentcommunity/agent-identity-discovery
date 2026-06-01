@@ -1,5 +1,5 @@
 ---
-title: 'Specification - AID'
+title: 'Specification'
 description: 'Specification'
 icon: material/file-document-outline
 

@@ -98,7 +98,7 @@ console.log(result.security.warnings);
 - `expires` is after `created` and the validity window is short.
 - `pka` is unpadded base64url for a 32-byte Ed25519 public key.
 
-## v1.2 Notes (Legacy PKA + .well-known)
+## Legacy aid1 Notes (PKA + .well-known)
 
 - Legacy `aid1` fields: `pka` (`k`) and `kid` (`i`). When an `aid1` record includes `pka`, the client performs a Public Key for Agent (PKA) handshake using HTTP Message Signatures (Ed25519).
 - Legacy `aid1` `pka` is a multibase string using base58btc (`z...`) of the raw 32-byte Ed25519 public key.

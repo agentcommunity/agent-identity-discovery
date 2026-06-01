@@ -3,7 +3,9 @@
   "pages": [
     "protocols",
     "discovery_api",
+    "packages",
     "identity_pka",
+    "pka",
     "well_known_json",
     "security",
     "enterprise_rollout",

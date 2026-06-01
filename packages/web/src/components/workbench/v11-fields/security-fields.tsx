@@ -33,7 +33,7 @@ export function SecurityFields({ pka, onChange }: SecurityFieldsProps) {
       </div>
       <p className="text-xs text-muted-foreground">
         Learn more about PKA in{' '}
-        <Link href="/docs/Reference/identity_pka" className="underline">
+        <Link href="/docs/reference/identity_pka" className="underline">
           the docs
         </Link>
         . Private key is generated locally and not saved by the app.

@@ -48,7 +48,7 @@ export async function GET(request: Request) {
         'Send a GET request with Accept-Signature to perform the AID v2 handshake.',
       publicKey: PUBLIC_KEY_X,
       keyid: KEYID,
-      spec: 'https://docs.agentcommunity.org/docs/Reference/identity_pka',
+      spec: 'https://docs.agentcommunity.org/docs/reference/pka',
     });
   }
 

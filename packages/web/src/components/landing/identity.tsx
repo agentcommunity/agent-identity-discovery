@@ -82,7 +82,7 @@ export function Identity() {
 
                   <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-1">
                     <Button variant="outline" asChild>
-                      <Link href="/docs/Reference/identity_pka">Learn more</Link>
+                      <Link href="/docs/reference/identity_pka">Learn more</Link>
                     </Button>
                     <Link
                       href="https://agentcommunity.org/blog/external_identity_anchor"

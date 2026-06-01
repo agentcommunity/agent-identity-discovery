@@ -72,9 +72,7 @@ _agent._openapi.example.com → OpenAPI endpoint
 
 Current clients query the base `_agent.<domain>` record first. Protocol-prefixed names such as `_agent._a2a.<domain>` are for legacy compatibility, diagnostics, or explicit base-failure probing where a deployment supports them.
 
-## How do I migrate from v1.0 to v1.1?
-
-v1.1 is **fully backward-compatible** with v1.0. All v1.0 records are valid v1.1 records — no changes needed.
+## How do I migrate to v2?
 
 For new records, use the current `aid2` profile and add optional fields as needed:
 
@@ -83,7 +81,7 @@ For new records, use the current `aid2` profile and add optional fields as neede
 3. **PKA:** Add `pka`/`k` for cryptographic identity. Do not publish `kid`/`i` in `aid2`.
 4. **New protocols:** Use `grpc`, `graphql`, `websocket`, `zeroconf`, or `ucp` tokens.
 
-The `v=aid1` profile remains available only for legacy compatibility.
+The `v=aid1` profile remains available only for legacy compatibility. Clients that support both versions prefer `aid2` when policy allows it.
 
 ## What changes for v2 PKA?
 

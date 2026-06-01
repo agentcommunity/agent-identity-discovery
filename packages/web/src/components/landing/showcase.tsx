@@ -85,7 +85,7 @@ const TOOLS = [
   {
     name: 'AID Doctor (CLI)',
     blurb: 'Validate and generate records from the terminal.',
-    href: '/docs/Tooling/aid_doctor',
+    href: '/docs/tooling/aid_doctor',
   },
   {
     name: 'Conformance Suite',

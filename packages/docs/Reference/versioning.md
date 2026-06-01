@@ -26,10 +26,27 @@ The `v` key within an AID `TXT` record (for example, `v=aid2`) signifies the **m
 The AID specification and its surrounding tooling (libraries, validators) are versioned using Git tags in the official repository.
 
 - **Major Versions (e.g., v2.0.0):** Reserved for breaking changes to the protocol, requiring a new `v` key (e.g., `v=aid2`). These will be accompanied by a major update to the documentation.
-- **Minor Versions (e.g., v1.2.0):** Reserved for new, non-breaking features that are backward-compatible. For example, adding a new _optional_ key to the `TXT` record would be a minor release. Implementers can adopt these features at their own pace.
+- **Minor Versions (e.g., v2.1.0):** Reserved for new, non-breaking features that are backward-compatible with the current major version. For example, adding a new optional metadata key to the `TXT` record would be a minor release. Implementers can adopt these features at their own pace.
 - **Patch Versions (e.g., v1.0.1):** Used for clarifications, typo fixes, and documentation improvements that do not change the protocol's behavior. These are backward-compatible by definition.
 
 ## Version History
+
+### v2.0.0 — June 2026
+
+- **Current record profile:** `v=aid2` is the preferred profile for new records.
+- **Base-first discovery:** `_agent.<domain>` is the canonical lookup. Protocol-prefixed names are legacy, diagnostic, or explicitly configured base-failure probing.
+- **PKA key cleanup:** `k` is the unpadded base64url Ed25519 JWK `x` value.
+- **Derived key identity:** HTTP signature `keyid` is the RFC 7638 JWK thumbprint derived from `k`.
+- **No DNS `kid` in v2:** `kid`/`i` remains valid only for legacy `aid1` PKA.
+- **RFC 9421 endpoint proof:** v2 PKA uses nonce-bound HTTP Message Signatures with `created`, `expires`, and `Cache-Control: no-store`.
+- **Trust source:** Discovery results distinguish DNS-rooted records from `.well-known` records with `trustSource=dns` or `trustSource=well-known-tls`.
+
+### v1.2.0 — Compatibility Baseline
+
+- Finalized the `aid1` compatibility baseline used during the v2 migration window.
+- Added `docs`/`d`, `dep`/`e`, `pka`/`k`, and `kid`/`i` as legacy v1-compatible fields.
+- Preserved single-letter aliases for compact TXT records.
+- Kept legacy PKA behavior available for existing `aid1` clients.
 
 ### v1.1.0 — August 2025
 

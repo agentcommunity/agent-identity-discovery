@@ -1,7 +1,7 @@
 # Agent Identity & Discovery (AID)
 
 <div align="center">
-  <p><strong>DNS for Agents: Type a domain. Connect to its agent. Instantly.</strong></p>
+  <p><strong>The 0-th hop for agent discovery.</strong></p>
   <p>
     <a href="https://github.com/agentcommunity/agent-identity-discovery/actions/workflows/ci.yml">
       <img src="https://github.com/agentcommunity/agent-identity-discovery/actions/workflows/ci.yml/badge.svg" alt="Build Status" />
@@ -27,15 +27,15 @@
   </p>
 </div>
 
-AID is a minimal, open standard that answers one question: **"Given a domain name, where is its AI agent?"**
+AID is a minimal, open standard that answers one question: **"Given a domain name, where does its agent interaction begin?"**
 
 It uses a single DNS `TXT` record to make any agent service—whether it speaks MCP, A2A, or another protocol—instantly discoverable. No more digging through API docs, no more manual configuration.
 
 **Built by the team at [agentcommunity.org](https://agentcommunity.org)**
 
-### v2 Preview Defaults
+### v2 Defaults
 
-AID v2 is implemented in the current worktree as a draft-preview protocol surface. `packages/docs/specification_v2_explained.md` is the review artifact, while `packages/docs/specification.md` remains the current v1.2 normative spec until an intentional replacement.
+AID v2 is the current normative protocol surface in `packages/docs/specification.md`. `packages/docs/specification_v2_explained.md` remains as non-normative design history.
 
 - **Record version:** new generated records default to `v=aid2`.
 - **PKA key:** `k`/`pka` is the unpadded base64url Ed25519 JWK `x` value.
@@ -44,11 +44,11 @@ AID v2 is implemented in the current worktree as a draft-preview protocol surfac
 - **Freshness:** v2 PKA requires `created`, `expires`, exact nonce echo, and response `Cache-Control: no-store`.
 - **No v1 defaults in v2:** no signed HTTP `Date`, no `AID-Challenge`, no base58 `z...` key, and no DNS `kid`/`i`.
 
-### v1.2 Highlights
+### v2 Highlights
 
-- ✅ **DNS-first discovery** with optional protocol-specific subdomains (`_agent._<proto>.<domain>`)
+- ✅ **DNS-first discovery** with canonical base lookup at `_agent.<domain>`
 - ✅ **Well-known fallback** (HTTPS-only, JSON, ≤64KB, ~2s timeout, no redirects; TTL=300 on success)
-- ✅ **Legacy aid1 PKA endpoint proof** with Ed25519 HTTP Message Signatures (RFC 9421), `AID-Challenge`, signed `Date`, and ±300s time windows
+- ✅ **AID v2 PKA endpoint proof** with Ed25519 HTTP Message Signatures (RFC 9421), derived JWK thumbprint `keyid`, nonce, `created`, `expires`, and `no-store`
 - ✅ **Key aliases** for byte efficiency (single-letter keys: `v,p,u,s,a,d,e,k`; legacy aid1 also uses `i`)
 - ✅ **Metadata fields** (`docs` for documentation URLs, `dep` for deprecation timestamps)
 - ✅ **New protocols** (gRPC, GraphQL, WebSocket, Zeroconf)
@@ -311,20 +311,19 @@ The single source of truth for all protocol constants is `protocol/constants.yml
     ```
     Commit the changes to `protocol/constants.yml` along with all the newly generated files. The CI pipeline will fail if they are not in sync.
 
-### v1.2 Release Status: ✅ READY
+### Current Branch Status
 
-**Implementation Complete** - All v1.2 features implemented across 6+ languages with comprehensive testing. CLI enhanced with advanced features.
+**AID v2 implementation and docs are aligned in this branch.** Package publication and release governance are still separate release steps.
 
-**Ready for Release:**
+**Implemented in the worktree:**
 
-- ✅ All tests passing (70+ TypeScript tests + Python/Go parity tests)
-- ✅ All builds successful (7/7 packages)
-- ✅ Changesets prepared for version bumps
-- ✅ Release workflow configured (npm + PyPI automation)
-- ✅ Multi-language SDKs ready (TS, Python, Go, Rust, .NET, Java)
-- ✅ Enhanced CLI with draft saving, standardized errors, and full test coverage
+- ✅ `aid2` constants and generated spec metadata
+- ✅ v1/v2 parser and discovery compatibility
+- ✅ v2 PKA vector and Ed25519 signature verification coverage
+- ✅ TypeScript, Python, Go, Rust, .NET, and Java package tests
+- ✅ aid-doctor, aid-engine, conformance, web workbench, and docs verification paths
 
-**Next Step:** Merge to `main` with `chore(release)` commit message to trigger automated release.
+**Next Step:** finalize release ownership, package publication, and showcase DNS rollout.
 
 ### Development Environment
 

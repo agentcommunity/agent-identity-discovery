@@ -190,7 +190,8 @@ For production adoption across separate DNS and application owners, follow the [
 
 ## See Also
 
-- [Identity & PKA](identity_pka.md) — Full PKA handshake details
+- [Identity & PKA](identity_pka.md) — Conceptual endpoint-proof overview
+- [PKA Endpoint Proof](pka.md) — Full PKA handshake details
 - [Enterprise Rollout](enterprise_rollout.md) — DNS team and application team rollout checklist
 - [Specification](../specification.md) — Normative security requirements
 - [Troubleshooting](troubleshooting.md) — Common security-related errors

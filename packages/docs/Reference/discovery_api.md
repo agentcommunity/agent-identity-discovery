@@ -50,7 +50,7 @@ Cross-language parity for AID `discover()` wrappers with consistent security and
 
 - Loopback relax: allowed only for `.well-known` fallback and only on loopback hosts; env/flag gated per language (never for TXT).
 - Rust PKA is behind the `handshake` feature; enable it to run handshake verification.
-- `balanced` and `strict` are the normative enterprise presets for v1.2.x.
+- `balanced` and `strict` are the current enterprise policy presets.
 - The reference TypeScript SDK and `aid-doctor` CLI currently expose the full preset/knob surface. Other SDKs should map to the same policy model as they catch up.
 - Test your implementation using the [aid-doctor CLI](../Tooling/aid_doctor.md) tool for real-world validation.
 

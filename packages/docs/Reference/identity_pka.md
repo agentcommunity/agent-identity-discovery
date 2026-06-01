@@ -4,7 +4,7 @@ description: 'Optional endpoint proof for AID v2 and v1 compatibility'
 icon: material/shield-lock-outline
 ---
 
-[View v2 explainer](../specification_v2_explained.md#appendix-b-pka-handshake) or the [v1.2 spec appendix](../specification.md#appendix-d-pka-handshake-normative).
+[Read the implementer reference](pka.md) or the [normative specification appendix](../specification.md#appendix-b-pka-handshake).
 
 ## Identity & PKA (ELI5)
 
@@ -31,6 +31,12 @@ AID is DNS-authority-rooted: the domain owner publishes the current endpoint and
 
 That boundary is intentional. AID stays deployable through ordinary DNS while giving clients a narrow endpoint proof they can compose with TLS, DNSSEC, authorization, and policy layers.
 
+## Historical Background
+
+The Agent Community blog post [External Identity Anchors](https://agentcommunity.org/blog/external_identity_anchor) explains the security problem PKA addresses: first-contact endpoint proof without assuming a registry, federation, connector, or prior integration.
+
+That post predates the AID v2 wire format. Treat it as background for the identity model, not as implementation guidance. Current `aid2` records use unpadded base64url Ed25519 JWK `x` values, RFC 7638-derived `keyid`, RFC 9421 `nonce`, mandatory `expires`, and no signed HTTP `Date`.
+
 ## How it works (high level)
 
 1. The TXT record includes `k` (or `pka`) with the current Ed25519 public key.
@@ -50,8 +56,7 @@ _agent.example.com. 300 IN TXT "v=aid2;p=mcp;u=https://api.example.com/mcp;k=JrQ
 - Key: Ed25519, unpadded base64url JWK `x` encoded in `k`/`pka`.
 - Key identity: RFC 7638 JWK thumbprint over `{"crv":"Ed25519","kty":"OKP","x":"<k>"}`.
 - Proof: HTTP Message Signatures (RFC 9421). Client requests a nonce-bound response signature; server returns `Signature-Input` and `Signature`.
-- Covered fields: `"@method";req`, `"@target-uri";req`, `"@authority";req`, and `"@status"`.
-- Freshness: `created` and `expires` are mandatory and short-lived. HTTP `Date` is not signed in v2.
+- Full handshake details: see [PKA Endpoint Proof](pka.md).
 - Rotation: AID v2 core publishes the current key. It does not define DNS-level rotation labels. Returning clients can detect a changed key by comparing derived thumbprints.
 - Downgrade warnings: If `k`/`pka` disappears after being present, clients should warn.
 - Together with TLS (required) and DNSSEC (recommended), PKA creates defense in depth.
@@ -98,7 +103,8 @@ In short, PKA provides a DNS-published public key for endpoint proof while inten
 
 ## See also
 
-- v2 explainer: [PKA Handshake](../specification_v2_explained.md#appendix-b-pka-handshake)
-- v1.2 spec appendix: [PKA Handshake](../specification.md#appendix-d-pka-handshake-normative)
+- [PKA Endpoint Proof](pka.md)
+- [Specification Appendix B](../specification.md#appendix-b-pka-handshake)
 - [Security Best Practices](security.md)
 - [Rationale](../Understand/rationale.md)
+- [External Identity Anchors](https://agentcommunity.org/blog/external_identity_anchor) - historical background, pre-v2 wire format

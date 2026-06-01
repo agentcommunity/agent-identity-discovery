@@ -8,15 +8,15 @@ icon: material/dns
 
 # Agent Identity & Discovery (AID)
 
-> ## DNS for Agents. **Identity for the Agentic Web.**
+> ## The 0-th hop for agent discovery.
 
-> Type a domain. Connect to its agent. Instantly.
+> Type a domain. Find the current agent endpoint.
 
-AID as the public address book for the agentic web.
+AID is a small, DNS-first standard for the first contact with an agent or tool service.
 
-It's a simple, open standard that uses the internet's own directory—DNS—to answer one question: **"Given a domain, where is its AI agent, and how do I know it's the real one?"**
+It answers one question: **"Given a domain, where does the agent interaction begin?"**
 
-No more hunting through API docs. No more manual configuration. It's the zero-friction layer for a world of interconnected agents.
+One `_agent` TXT record maps a domain to an endpoint, protocol hint, and optional endpoint-proof key. From there, the selected protocol, auth, policy, and capability layers take over.
 
 !!! tip "New to AID?"
 Start with [Core Concepts](Understand/concepts.md) for a quick overview, then follow the [Quick Start](quickstart/index.md) to publish your first agent.
@@ -27,15 +27,15 @@ Start with [Core Concepts](Understand/concepts.md) for a quick overview, then fo
 
 ## Why It Matters
 
-AID creates a seamless experience for everyone in the ecosystem.
+AID gives clients a stable starting point without creating a central registry.
 
 !!! user "For Users: It Just Works - no setup wizard, no MCP copy-pasting."
 
     You want to connect your Notion to a new AI assistant. You type `notion.so`. The connection happens automatically. Your experience is instant.
 
-!!! agent "For Agents: Autonomous Discovery - the foundation for true agent-to-agent interoperability"
+!!! agent "For Agents: Autonomous Discovery - a standard first hop for interoperability"
 
-    As an autonomous agent, you're tasked with analyzing a dataset stored in a Supabase project. You don't need to be pre-configured. You can programmatically discover the `supabase.com` agent endpoint, negotiate a connection, and complete your task.
+    As an autonomous agent, you're tasked with analyzing a dataset stored in a Supabase project. You don't need a hard-coded endpoint. You can discover the `supabase.com` agent endpoint, then continue into the protocol and auth layer.
 
 ---
 
@@ -46,7 +46,7 @@ The entire mechanism is a single DNS lookup. It's simple, decentralized, and bui
 1.  **Publish:** A provider (e.g., `supabase.com`) adds one `TXT` record to their DNS at a standard location: `_agent.supabase.com`.
 2.  **Discover:** A client, given `supabase.com`, makes a single DNS query for the `TXT` record at that address.
 3.  **Connect:** The record contains the agent's `uri`. The client uses it to connect directly.
-4.  **Verify:** If a public key (`pka`) is present, the client performs a quick cryptographic handshake to prove the server's identity, ensuring a secure connection. (Optional)
+4.  **Verify:** If a public key (`k`) is present, the client performs PKA endpoint proof before trusting the endpoint. (Optional)
 
 [Try this flow now](https://aid.agentcommunity.org/workbench)
 
@@ -66,7 +66,8 @@ flowchart LR
 
 - [**Specification**](specification.md) – _The exact format, algorithms, and security rules._
 - [**Core Concepts**](Understand/concepts.md) – _How DNS discovery, protocols, and identity fit together._
-- [**Identity & PKA**](Reference/identity_pka.md) – _How AID provides cryptographic proof of an agent's identity._
+- [**Identity & PKA**](Reference/identity_pka.md) – _What endpoint proof adds and where its boundary is._
+- [**PKA Endpoint Proof**](Reference/pka.md) – _The exact HTTP signature profile for implementers._
 - [**Rationale**](Understand/rationale.md) – _The design philosophy behind AID._
 - [**Security Best Practices**](Reference/security.md) – _DNSSEC, redirect handling, local execution, IDN safety, TTL & caching._
 - [**Enterprise Rollout**](Reference/enterprise_rollout.md) – _Change windows, delegation patterns, and DNS team vs app team ownership._
@@ -88,7 +89,7 @@ AID has official libraries and tools across multiple languages, with additional 
 - Java: `aid-java`
 - Web Workbench: Interactive generator/resolver
 
-See the full package overview in the [Quick Start](quickstart/index.md#package-overview) and the cross-language [Discovery API](Reference/discovery_api.md).
+See the full package overview in [SDKs and Packages](Reference/packages.md) and the cross-language [Discovery API](Reference/discovery_api.md).
 
 ---
 
