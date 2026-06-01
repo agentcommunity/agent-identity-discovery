@@ -57,7 +57,7 @@ Discovers an agent by looking up the `_agent` TXT record for the exact host you 
 **Parameters:**
 
 - `domain` (str): The domain name to discover
-- `protocol` (str, optional): Try protocol-specific subdomain names for the same exact host first (e.g., `mcp`)
+- `protocol` (str, optional): Filter for the requested protocol after querying `_agent.<domain>` first. Protocol-specific `_agent._<proto>.<domain>` probing is legacy, diagnostic, or base-failure-only behavior where explicitly supported and configured.
 - `timeout` (float): DNS timeout in seconds (default 5.0)
 - `well_known_fallback` (bool): If true, falls back to `https://<domain>/.well-known/agent` on `ERR_NO_RECORD` or `ERR_DNS_LOOKUP_FAILED` (default True)
 - `well_known_timeout` (float): Timeout for the `.well-known` HTTP fetch (default 2.0)
