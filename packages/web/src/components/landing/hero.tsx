@@ -108,7 +108,7 @@ export function Hero() {
 
           {/* headline */}
           <h1 className="mb-6 text-5xl md:text-7xl font-bold tracking-tighter text-foreground animate-fade-in-up">
-            DKIM for Agents<span className="text-emerald-500">.</span>
+            the 0-th hop for agent discovery<span className="text-emerald-500">.</span>
           </h1>
 
           {/* lede — the payoff */}
