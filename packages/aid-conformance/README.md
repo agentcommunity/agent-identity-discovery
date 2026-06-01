@@ -68,7 +68,7 @@ Exit code is non-zero if any case fails. Output includes a concise summary.
 ### v1.2 and v2 Draft Notes
 
 - Fixtures contain records exercising `docs`, `dep`, PKA, and version-aware `aid1`/`aid2` selection.
-- The runner validates fixture shape and required PKA proof material. It does not perform cryptographic PKA verification.
+- The runner validates fixture shape and required PKA proof material, including Ed25519 verification for AID v2 PKA response signatures.
 - Negative PKA vectors must include structured proof-material defects or explicit override fields; `id` and `desc` wording is metadata only.
 
 ## Development

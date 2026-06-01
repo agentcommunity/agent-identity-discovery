@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { createPublicKey, verify as verifySignature } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import type {
   EnterpriseFixture,
@@ -122,6 +123,52 @@ function countOccurrences(value: string, needle: string): number {
 function quotedParameter(value: string, parameter: string): string | undefined {
   const pattern = new RegExp(`${parameter}="([^"]+)"`, 'i');
   return pattern.exec(value)?.[1];
+}
+
+function signatureParamsFromInput(signatureInput: string): string | undefined {
+  const prefix = 'aid-pka=';
+  return signatureInput.startsWith(prefix) ? signatureInput.slice(prefix.length) : undefined;
+}
+
+function signatureBytesFromHeader(signature: string): Buffer | undefined {
+  const match = /^aid-pka=:([A-Za-z0-9+/]+={0,2}):$/.exec(signature);
+  return match ? Buffer.from(match[1], 'base64') : undefined;
+}
+
+function validateV2SignatureBaseMatchesInput(
+  signatureBase: string,
+  signatureInput: string,
+): string | undefined {
+  const signatureParams = signatureParamsFromInput(signatureInput);
+  if (!signatureParams) return 'aid2 vector Signature-Input must use exact aid-pka label';
+
+  const expectedSignatureParamsLine = `"@signature-params": ${signatureParams}`;
+  const actualSignatureParamsLine = signatureBase.split('\n').at(-1);
+  if (actualSignatureParamsLine !== expectedSignatureParamsLine) {
+    return 'aid2 vector signature_base @signature-params must match Signature-Input';
+  }
+
+  return undefined;
+}
+
+function verifyV2PkaSignature(
+  publicX: string,
+  signatureBase: string,
+  signature: string,
+): string | undefined {
+  const signatureBytes = signatureBytesFromHeader(signature);
+  if (!signatureBytes) return 'aid2 vector Signature must contain exact aid-pka base64 bytes';
+
+  try {
+    const publicKey = createPublicKey({
+      key: { kty: 'OKP', crv: 'Ed25519', x: publicX },
+      format: 'jwk',
+    });
+    const ok = verifySignature(null, Buffer.from(signatureBase, 'utf8'), publicKey, signatureBytes);
+    return ok ? undefined : 'aid2 vector Signature must verify against signature_base';
+  } catch {
+    return 'aid2 vector key.public_x must import as an Ed25519 JWK public key';
+  }
 }
 
 async function runRecordCases(
@@ -273,9 +320,11 @@ function validateV2PkaProofMaterial(vector: RuntimePkaVector, key: UnknownRecord
   const request = isRecord(vector.request) ? vector.request : undefined;
   const response = isRecord(vector.response) ? vector.response : undefined;
   const thumbprint = stringField(key, 'jwk_thumbprint');
+  const publicKey = stringField(key, 'public_x');
   const signatureInput = response ? stringField(response, 'signature_input') : undefined;
   const signature = response ? stringField(response, 'signature') : undefined;
   const acceptSignature = request ? stringField(request, 'accept_signature') : undefined;
+  const signatureBase = isNonEmptyString(vector.signature_base) ? vector.signature_base : undefined;
 
   if (!request) errors.push('aid2 vector request material must be present');
   if (!response) errors.push('aid2 vector response material must be present');
@@ -303,7 +352,7 @@ function validateV2PkaProofMaterial(vector: RuntimePkaVector, key: UnknownRecord
   if (!signature) errors.push('aid2 vector response.signature is required');
   if (!isFiniteNumber(vector.expires)) errors.push('aid2 vector expires must be a number');
   if (!isNonEmptyString(vector.nonce)) errors.push('aid2 vector nonce must be non-empty');
-  if (!isNonEmptyString(vector.signature_base)) {
+  if (!signatureBase) {
     errors.push('aid2 vector signature_base must be non-empty');
   }
 
@@ -355,6 +404,16 @@ function validateV2PkaProofMaterial(vector: RuntimePkaVector, key: UnknownRecord
 
   if (signature && countOccurrences(signature, 'aid-pka=') !== 1) {
     errors.push('aid2 vector Signature must contain exactly one aid-pka member');
+  }
+
+  if (signatureInput && signatureBase) {
+    const signatureBaseError = validateV2SignatureBaseMatchesInput(signatureBase, signatureInput);
+    if (signatureBaseError) errors.push(signatureBaseError);
+  }
+
+  if (publicKey && signatureBase && signature) {
+    const verificationError = verifyV2PkaSignature(publicKey, signatureBase, signature);
+    if (verificationError) errors.push(verificationError);
   }
 
   return errors;

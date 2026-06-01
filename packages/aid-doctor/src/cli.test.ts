@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -9,8 +9,226 @@ import type { DoctorReport } from '@agentcommunity/aid-engine';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const makeReport = (overrides: Partial<DoctorReport> = {}): DoctorReport => ({
+  domain: 'example.com',
+  queried: {
+    strategy: 'base-first',
+    hint: { source: 'cli', present: false },
+    attempts: [{ name: '_agent.example.com', type: 'TXT', result: 'NOERROR', ttl: 300 }],
+    wellKnown: {
+      attempted: false,
+      used: false,
+      url: null,
+      httpStatus: null,
+      contentType: null,
+      byteLength: null,
+      status: null,
+      snippet: null,
+    },
+  },
+  record: {
+    raw: 'v=aid2;u=https://a.co;p=mcp;k=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+    parsed: {
+      v: 'aid2',
+      uri: 'https://a.co',
+      proto: 'mcp',
+      pka: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+    },
+    valid: true,
+    warnings: [],
+    errors: [],
+  },
+  dnssec: { present: true, method: 'RRSIG', proof: {} },
+  tls: {
+    checked: true,
+    valid: true,
+    host: 'a.co',
+    sni: 'a.co',
+    issuer: 'Test',
+    san: ['a.co'],
+    validFrom: '',
+    validTo: '',
+    daysRemaining: 90,
+    redirectBlocked: false,
+  },
+  pka: {
+    present: true,
+    attempted: true,
+    verified: true,
+    kid: 'legacy-dns-kid-that-must-not-render',
+    alg: 'ed25519',
+    createdSkewSec: 1,
+    covered: [],
+  },
+  downgrade: { checked: true, previous: null, status: 'first_seen' },
+  exitCode: 0,
+  cacheEntry: null,
+  ...overrides,
+});
+
+const importCliWithMocks = async (runCheck = vi.fn()) => {
+  vi.resetModules();
+
+  vi.doMock('@agentcommunity/aid-engine', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('@agentcommunity/aid-engine')>();
+    return { ...actual, runCheck };
+  });
+  vi.doMock('ora', () => ({
+    default: () => ({
+      start() {
+        return this;
+      },
+      stop() {},
+    }),
+  }));
+
+  return await import('./cli');
+};
+
 // Basic smoke tests for the aid-doctor CLI
 describe('AID Doctor CLI', () => {
+  let consoleLogSpy: ReturnType<typeof vi.spyOn>;
+  let processExitSpy: ReturnType<typeof vi.spyOn>;
+  let originalExitCode: string | number | undefined;
+
+  beforeEach(() => {
+    originalExitCode = process.exitCode;
+    consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((code?: string | number | null) => {
+        process.exitCode = Number(code ?? 0);
+        return undefined as never;
+      });
+  });
+
+  afterEach(() => {
+    vi.doUnmock('@agentcommunity/aid-engine');
+    vi.doUnmock('ora');
+    vi.restoreAllMocks();
+    process.exitCode = originalExitCode;
+  });
+
+  describe('CLI action paths', () => {
+    it('enables well-known fallback by default for the check command', async () => {
+      const runCheck = vi.fn().mockResolvedValue(makeReport());
+      const { createCliProgram } = await importCliWithMocks(runCheck);
+      const program = createCliProgram();
+
+      await program.parseAsync(['check', 'example.com'], { from: 'user' });
+
+      expect(runCheck).toHaveBeenCalledWith(
+        'example.com',
+        expect.objectContaining({
+          allowFallback: true,
+        }),
+      );
+      expect(processExitSpy).toHaveBeenCalledWith(0);
+    });
+
+    it('passes check command protocol probing and strict v2 security options to runCheck', async () => {
+      const runCheck = vi.fn().mockResolvedValue(makeReport());
+      const { createCliProgram } = await importCliWithMocks(runCheck);
+      const program = createCliProgram();
+
+      await program.parseAsync(
+        [
+          'check',
+          'example.com',
+          '--protocol',
+          'mcp',
+          '--probe-proto-subdomain',
+          '--probe-proto-even-if-base',
+          '--timeout',
+          '750',
+          '--no-fallback',
+          '--fallback-timeout',
+          '1250',
+          '--security-mode',
+          'strict',
+          '--dnssec',
+          'require',
+          '--pka-policy',
+          'require',
+          '--downgrade-policy',
+          'fail',
+          '--well-known-policy',
+          'disable',
+          '--show-details',
+          '--dump-well-known',
+          '/tmp/aid-well-known.txt',
+        ],
+        { from: 'user' },
+      );
+
+      expect(runCheck).toHaveBeenCalledWith(
+        'example.com',
+        expect.objectContaining({
+          protocol: 'mcp',
+          timeoutMs: 750,
+          allowFallback: false,
+          wellKnownTimeoutMs: 1250,
+          securityMode: 'strict',
+          dnssecPolicy: 'require',
+          pkaPolicy: 'require',
+          downgradePolicy: 'fail',
+          wellKnownPolicy: 'disable',
+          showDetails: true,
+          probeProtoSubdomain: true,
+          probeProtoEvenIfBase: true,
+          dumpWellKnownPath: '/tmp/aid-well-known.txt',
+          checkDowngrade: false,
+        }),
+      );
+      expect(processExitSpy).toHaveBeenCalledWith(0);
+    });
+
+    it('renders the strict PKA check path with the derived v2 keyid', async () => {
+      const runCheck = vi.fn().mockResolvedValue(makeReport());
+      const { createCliProgram } = await importCliWithMocks(runCheck);
+      const program = createCliProgram();
+
+      await program.parseAsync(
+        [
+          'check',
+          'example.com',
+          '--security-mode',
+          'strict',
+          '--pka-policy',
+          'require',
+          '--no-color',
+        ],
+        { from: 'user' },
+      );
+
+      const output = consoleLogSpy.mock.calls.map(([line]) => String(line)).join('\n');
+      expect(output).toContain(
+        'Verified (alg=ed25519, keyid=ogRZbCR5KTrPFCAfuYmCMwj0w7Yuk3Lr6YWQWfpkbf0)',
+      );
+      expect(output).not.toContain('legacy-dns-kid-that-must-not-render');
+      expect(processExitSpy).toHaveBeenCalledWith(0);
+    });
+
+    it('uses AidError codes for check command failures when --code is set', async () => {
+      const runCheck = vi.fn();
+      const { createCliProgram } = await importCliWithMocks(runCheck);
+      const { AidError } = await import('@agentcommunity/aid');
+      runCheck.mockRejectedValue(new AidError('ERR_SECURITY', 'DNSSEC validation failed'));
+      const program = createCliProgram();
+
+      await program.parseAsync(['check', 'missing.example', '--code'], {
+        from: 'user',
+      });
+
+      expect(runCheck).toHaveBeenCalledWith('missing.example', expect.any(Object));
+      expect(consoleLogSpy.mock.calls.map(([line]) => String(line)).join('\n')).toContain(
+        'AID Discovery Failed for missing.example',
+      );
+      expect(processExitSpy).toHaveBeenCalledWith(1003);
+    });
+  });
+
   describe('Package integrity', () => {
     it('should have a valid package.json', () => {
       const packagePath = path.resolve(__dirname, '../package.json');

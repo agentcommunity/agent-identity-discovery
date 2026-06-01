@@ -139,6 +139,13 @@ const isLegacyOrContrast = (line, heading, context = '') =>
   CONTRAST_CONTEXT.test(line) ||
   CONTRAST_CONTEXT.test(context);
 
+const isStrictLineAllowedContext = (line, heading, context = '') =>
+  LEGACY_CONTEXT.test(line) ||
+  LEGACY_CONTEXT.test(heading) ||
+  LEGACY_CONTEXT.test(context) ||
+  CONTRAST_CONTEXT.test(line) ||
+  CONTRAST_CONTEXT.test(heading);
+
 const PROTO_FIRST_ALLOWED_CONTEXT =
   /\b(legacy|back-compat(?:ibility)?|compatib(?:ility|le)?|diagnostic|diagnostics|base[- ]failure|base\s+fail(?:s|ure)?|if\s+base\s+fails|when\s+base\s+fails|after\s+base\s+fails|only\s+after\s+base|fallback\s+probing|probe-only|contrast)\b/i;
 const PROTO_FIRST_STALE_PATTERNS = [
@@ -237,7 +244,7 @@ const verifyVersionAlignment = async (repoRoot) => {
 
   const specVersion = extractVersion(
     specContent,
-    /Agent Identity & Discovery \(AID\)\s+—\s+v(\d+\.\d+\.\d+)/,
+    /Agent Identity & Discovery \(AID\)\s+(?:—|-)\s+v(\d+\.\d+\.\d+)/,
     'spec version from packages/docs/specification.md',
   );
   const constantsVersion = extractVersion(
@@ -261,29 +268,27 @@ const verifyVersionAlignment = async (repoRoot) => {
 
   const constantsMajor = constantsVersion.split('.')[0];
   const specMajor = specVersion.split('.')[0];
-  const hasV2DraftPreview =
-    constantsMajor === '2' &&
-    constantsSpecVersion === 'aid2' &&
-    specMajor === '1' &&
-    specVersion.startsWith('1.2.') &&
-    /^# Agent Identity & Discovery \(AID\) v2 - Explained Draft$/m.test(v2PreviewContent) &&
-    /Status:\*\* Draft preview, not the current normative specification/.test(v2PreviewContent) &&
-    /^\s*-\s*v2\s*$/m.test(v2PreviewContent) &&
-    v2PreviewContent.includes('`aid2`');
-
   if (constantsMajor === '2' && constantsSpecVersion !== 'aid2') {
     mismatches.push(
       `Version mismatch: protocol/constants.yml schemaVersion=${constantsVersion} but specVersion=${constantsSpecVersion}`,
     );
   }
 
-  if (constantsVersion !== specVersion && !hasV2DraftPreview) {
+  if (constantsMajor === '2' && specMajor !== '2') {
+    mismatches.push(
+      `Version mismatch: protocol/constants.yml schemaVersion=${constantsVersion} but specification.md=${specVersion}; /docs/specification must be the current v2 normative spec`,
+    );
+  }
+
+  if (constantsVersion !== specVersion) {
     mismatches.push(
       `Version mismatch: protocol/constants.yml schemaVersion=${constantsVersion} but specification.md=${specVersion}`,
     );
   }
 
-  if (aidPackage.version !== specVersion) {
+  const sdkReleaseMatchesSpec = aidPackage.version === specVersion;
+
+  if (!sdkReleaseMatchesSpec && aidPackage.version.split('.')[0] === specMajor) {
     mismatches.push(
       `Version mismatch: packages/aid/package.json version=${aidPackage.version} but specification.md=${specVersion}`,
     );
@@ -309,20 +314,22 @@ const verifyVersionAlignment = async (repoRoot) => {
     );
   }
 
-  if (!rootReadme.includes(`### v${minor} Highlights`)) {
-    mismatches.push(`README.md mismatch: expected heading "### v${minor} Highlights"`);
-  }
+  if (sdkReleaseMatchesSpec) {
+    if (!rootReadme.includes(`### v${minor} Highlights`)) {
+      mismatches.push(`README.md mismatch: expected heading "### v${minor} Highlights"`);
+    }
 
-  if (!rootReadme.includes(`### v${minor} Release Status`)) {
-    mismatches.push(`README.md mismatch: expected heading "### v${minor} Release Status"`);
-  }
+    if (!rootReadme.includes(`### v${minor} Release Status`)) {
+      mismatches.push(`README.md mismatch: expected heading "### v${minor} Release Status"`);
+    }
 
-  if (!aidReadme.includes(`## v${minor} Notes`)) {
-    mismatches.push(`packages/aid/README.md mismatch: expected heading "## v${minor} Notes"`);
-  }
+    if (!aidReadme.includes(`## v${minor} Notes`)) {
+      mismatches.push(`packages/aid/README.md mismatch: expected heading "## v${minor} Notes"`);
+    }
 
-  if (!agentsContent.includes(`### v${minor} notes (Final)`)) {
-    mismatches.push(`AGENTS.md mismatch: expected heading "### v${minor} notes (Final)"`);
+    if (!agentsContent.includes(`### v${minor} notes (Final)`)) {
+      mismatches.push(`AGENTS.md mismatch: expected heading "### v${minor} notes (Final)"`);
+    }
   }
 
   return mismatches;
@@ -540,8 +547,7 @@ const verifyV2Guidance = async (repoRoot) => {
     const relativeFile = path.relative(repoRoot, absoluteFile);
     if (!(await fileExists(absoluteFile))) continue;
     const content = await readUtf8(absoluteFile);
-    const runStrictV2LineChecks =
-      V2_GUIDANCE_FILES.includes(relativeFile) && relativeFile !== 'packages/docs/specification.md';
+    const runStrictV2LineChecks = V2_GUIDANCE_FILES.includes(relativeFile);
 
     for (const marker of STALE_V2_MARKERS) {
       if (marker.test(content)) {
@@ -591,7 +597,7 @@ const verifyV2Guidance = async (repoRoot) => {
         );
       }
 
-      if (hasLegacyOrContrastContext || !runStrictV2LineChecks) continue;
+      if (!runStrictV2LineChecks || isStrictLineAllowedContext(line, heading, context)) continue;
 
       if (/\bAID-Challenge\b/.test(line)) {
         failures.push(

@@ -60,6 +60,49 @@ describe('aid-conformance runner', () => {
     expect(result.categories.pkaVectors).toEqual({ total: 1, passed: 0, failed: 1 });
   });
 
+  it('fails PKA pass vectors with an invalid v2 response signature', async () => {
+    const vector = validAid2PkaVector();
+    if (!vector.response?.signature) throw new Error('missing valid aid2 PKA signature');
+    const invalidPkaVectors: PkaVectorFixture = {
+      version: 1,
+      vectors: [
+        {
+          ...vector,
+          id: 'v2-invalid-response-signature',
+          desc: 'A pass vector cannot include a signature that does not verify',
+          response: {
+            ...vector.response,
+            signature: vector.response.signature.replace('Tymq', 'Aymq'),
+          },
+        },
+      ],
+    };
+
+    const result = await runFixture(emptyFixture, { pkaVectors: invalidPkaVectors });
+
+    expect(result.categories.pkaVectors).toEqual({ total: 1, passed: 0, failed: 1 });
+  });
+
+  it('fails PKA pass vectors with a mismatched v2 signature base', async () => {
+    const vector = validAid2PkaVector();
+    if (!vector.signature_base) throw new Error('missing valid aid2 PKA signature base');
+    const invalidPkaVectors: PkaVectorFixture = {
+      version: 1,
+      vectors: [
+        {
+          ...vector,
+          id: 'v2-mismatched-signature-base',
+          desc: 'A pass vector cannot include a signature base that was not signed',
+          signature_base: vector.signature_base.replace(': GET', ': POST'),
+        },
+      ],
+    };
+
+    const result = await runFixture(emptyFixture, { pkaVectors: invalidPkaVectors });
+
+    expect(result.categories.pkaVectors).toEqual({ total: 1, passed: 0, failed: 1 });
+  });
+
   it('fails record sets when the only preferred-version selection differs from expectedSelected', async () => {
     const fixture: GoldenFixture = {
       records: [],

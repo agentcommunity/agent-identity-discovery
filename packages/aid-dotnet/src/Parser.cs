@@ -89,11 +89,19 @@ public static class Aid
         {
             throw new AidError(nameof(Constants.ERR_INVALID_TXT), "Cannot specify both \"proto\" and \"p\" fields");
         }
-        if (!hasProto && !hasP)
+        string proto;
+        if (hasProto && protoVal is not null)
+        {
+            proto = protoVal;
+        }
+        else if (hasP && pVal is not null)
+        {
+            proto = pVal;
+        }
+        else
         {
             throw new AidError(nameof(Constants.ERR_INVALID_TXT), "Missing required field: proto (or p)");
         }
-        var proto = hasProto ? protoVal : pVal;
 
         if (!ProtocolTokens.Contains(proto))
         {
