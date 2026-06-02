@@ -8,18 +8,36 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import hmac
 import os
 import re
 import time
-import hmac # Added for constant-time comparisons
 from urllib.parse import urlparse, urlunparse
 import urllib.request
 import urllib.error
+from collections.abc import Iterable
 
 from .parser import AidError
 import pathlib
 import tempfile
-import logging # Added for logging in empty except block
+import logging
+
+
+def _token_eq(left: str, right: str) -> bool:
+    return hmac.compare_digest(left.encode("utf-8"), right.encode("utf-8"))
+
+
+def _token_in(value: str, candidates: Iterable[str]) -> bool:
+    return any(_token_eq(value, candidate) for candidate in candidates)
+
+
+def _token_startswith(value: str, prefix: str) -> bool:
+    return len(value) >= len(prefix) and _token_eq(value[: len(prefix)], prefix)
+
+
+def _token_endswith(value: str, suffix: str) -> bool:
+    return len(value) >= len(suffix) and _token_eq(value[-len(suffix) :], suffix)
+
 
 def _ascii_lower_ct(s: str) -> str:
     """Performs ASCII lowercasing in a way that is less susceptible to timing attacks."""
@@ -284,26 +302,26 @@ def _split_dictionary_members(value: str) -> list[str]:
             escaped = False
             continue
         if in_quote:
-            if char == "\\":
+            if _token_eq(char, "\\"):
                 escaped = True
-            elif char == '"':
+            elif _token_eq(char, '"'):
                 in_quote = False
             continue
-        if char == '"':
+        if _token_eq(char, '"'):
             in_quote = True
             continue
-        if char == ":":
+        if _token_eq(char, ":"):
             in_bytes = not in_bytes
             continue
         if in_bytes:
             continue
-        if char == "(":
+        if _token_eq(char, "("):
             depth += 1
             continue
-        if char == ")" and depth > 0:
+        if _token_eq(char, ")") and depth > 0:
             depth -= 1
             continue
-        if char == "," and depth == 0:
+        if _token_eq(char, ",") and depth == 0:
             parts.append(value[start:index].strip())
             start = index + 1
     parts.append(value[start:].strip())
@@ -320,9 +338,9 @@ def _extract_dictionary_member(value: str, member: str) -> str:
             if separator_index >= 0:
                 label_end = min(label_end, separator_index)
         label = part[:label_end].strip()
-        if _ascii_lower_ct(label) == member and label != member:
+        if _token_eq(_ascii_lower_ct(label), member) and not _token_eq(label, member):
             raise AidError("ERR_SECURITY", f"Duplicate {member} signature member")
-        if part.startswith(prefix):
+        if _token_startswith(part, prefix):
             if found is not None:
                 raise AidError("ERR_SECURITY", f"Duplicate {member} signature member")
             found = part[len(prefix):].strip()
@@ -364,7 +382,7 @@ def _parse_signature_params(
             index += 1
         if index >= len(value):
             break
-        if value[index] != ";":
+        if not _token_eq(value[index], ";"):
             raise AidError("ERR_SECURITY", "Invalid Signature-Input parameters")
         index += 1
         while index < len(value) and value[index].isspace():
@@ -376,14 +394,14 @@ def _parse_signature_params(
         key = value[name_start:index]
         if not key:
             raise AidError("ERR_SECURITY", "Invalid Signature-Input parameter")
-        if allowed is not None and key not in allowed:
+        if allowed is not None and not _token_in(key, allowed):
             raise AidError("ERR_SECURITY", "Unsupported Signature-Input parameter")
-        if key in critical and key in params:
+        if _token_in(key, critical) and _token_in(key, params):
             raise AidError("ERR_SECURITY", "Duplicate Signature-Input parameter")
 
         while index < len(value) and value[index].isspace():
             index += 1
-        if index >= len(value) or value[index] != "=":
+        if index >= len(value) or not _token_eq(value[index], "="):
             params[key] = ""
             continue
 
@@ -391,16 +409,16 @@ def _parse_signature_params(
         while index < len(value) and value[index].isspace():
             index += 1
         value_start = index
-        if index < len(value) and value[index] == '"':
+        if index < len(value) and _token_eq(value[index], '"'):
             index += 1
             escaped = False
             while index < len(value):
                 char = value[index]
                 if escaped:
                     escaped = False
-                elif char == "\\":
+                elif _token_eq(char, "\\"):
                     escaped = True
-                elif char == '"':
+                elif _token_eq(char, '"'):
                     index += 1
                     break
                 index += 1
@@ -409,23 +427,23 @@ def _parse_signature_params(
             raw = value[value_start:index].strip()
             while index < len(value) and value[index].isspace():
                 index += 1
-            if index < len(value) and value[index] != ";":
+            if index < len(value) and not _token_eq(value[index], ";"):
                 raise AidError("ERR_SECURITY", "Invalid Signature-Input parameters")
         else:
-            while index < len(value) and value[index] != ";":
+            while index < len(value) and not _token_eq(value[index], ";"):
                 index += 1
             raw = value[value_start:index].strip()
 
-        if key in bare_required and raw.startswith('"'):
+        if _token_in(key, bare_required) and _token_startswith(raw, '"'):
             raise AidError("ERR_SECURITY", "Invalid Signature-Input parameter")
-        if raw.startswith('"') and raw.endswith('"'):
+        if _token_startswith(raw, '"') and _token_endswith(raw, '"'):
             unquoted: list[str] = []
             escaped = False
             for char in raw[1:-1]:
                 if escaped:
                     unquoted.append(char)
                     escaped = False
-                elif char == "\\":
+                elif _token_eq(char, "\\"):
                     escaped = True
                 else:
                     unquoted.append(char)
@@ -440,16 +458,16 @@ def _parse_v2_covered_item(raw: str) -> dict[str, object]:
         raise AidError("ERR_SECURITY", "Invalid Signature-Input covered item")
     name = match.group(1)
     params = [part for part in match.group(2).split(";") if part]
-    if name not in ("@method", "@target-uri", "@authority", "@status"):
+    if not _token_in(name, ("@method", "@target-uri", "@authority", "@status")):
         raise AidError("ERR_SECURITY", f"Unsupported covered field: {name}")
     seen_params: set[str] = set()
     for param in params:
-        if param in seen_params:
+        if _token_in(param, seen_params):
             raise AidError("ERR_SECURITY", "Duplicate Signature-Input covered item parameter")
-        if param != "req":
+        if not _token_eq(param, "req"):
             raise AidError("ERR_SECURITY", "Unsupported Signature-Input covered item parameter")
         seen_params.add(param)
-    req = "req" in seen_params
+    req = _token_in("req", seen_params)
     return {"raw": raw, "name": name, "req": req}
 
 
@@ -466,10 +484,21 @@ def _validate_v2_covered_set(covered: list[dict[str, object]]) -> None:
     for item in covered:
         name = item["name"]
         req = item["req"]
-        if not isinstance(name, str) or name in seen or expected.get(name) != req:
+        if not isinstance(name, str):
+            raise AidError("ERR_SECURITY", "Signature-Input must cover required fields")
+        if not isinstance(req, bool):
+            raise AidError("ERR_SECURITY", "Signature-Input must cover required fields")
+        expected_req = None
+        for expected_name, candidate_req in expected.items():
+            if _token_eq(name, expected_name):
+                expected_req = candidate_req
+                break
+        if _token_in(name, seen) or expected_req is None:
+            raise AidError("ERR_SECURITY", "Signature-Input must cover required fields")
+        if (expected_req is True and req is not True) or (expected_req is False and req is not False):
             raise AidError("ERR_SECURITY", "Signature-Input must cover required fields")
         seen.add(name)
-    if seen != set(expected):
+    if len(seen) != len(expected) or any(not _token_in(expected_name, seen) for expected_name in expected):
         raise AidError("ERR_SECURITY", "Signature-Input must cover required fields")
 
 
@@ -480,7 +509,7 @@ def _parse_v2_signature_headers(headers) -> dict[str, object]:
         raise AidError("ERR_SECURITY", "Missing signature headers")
 
     signature_params_raw = _extract_dictionary_member(sig_input, "aid-pka")
-    if not signature_params_raw.startswith("("):
+    if not _token_startswith(signature_params_raw, "("):
         raise AidError("ERR_SECURITY", "Invalid Signature-Input")
     close_index = signature_params_raw.find(")")
     if close_index < 0:
@@ -499,7 +528,7 @@ def _parse_v2_signature_headers(headers) -> dict[str, object]:
         allowed=required_set,
         bare_required={"created", "expires"},
     )
-    if any(param not in params for param in required):
+    if any(not _token_in(param, params) for param in required):
         raise AidError("ERR_SECURITY", "Invalid Signature-Input")
     if not re.fullmatch(r"\d+", params["created"]) or not re.fullmatch(r"\d+", params["expires"]):
         raise AidError("ERR_SECURITY", "Invalid Signature-Input timestamp")
@@ -530,7 +559,7 @@ def _has_no_store_directive(cache_control: str | None) -> bool:
     if not cache_control:
         return False
     return any(
-        part.strip().split(";", 1)[0].strip().lower() == "no-store"
+        _token_eq(part.strip().split(";", 1)[0].strip().lower(), "no-store")
         for part in cache_control.split(",")
     )
 
@@ -573,13 +602,13 @@ def _build_v2_signature_base(
         name = item["name"]
         req = bool(item["req"])
         suffix = ";req" if req else ""
-        if name == "@method":
+        if _token_eq(name, "@method"):
             lines.append(f'"@method"{suffix}: {method}')
-        elif name == "@target-uri":
+        elif _token_eq(name, "@target-uri"):
             lines.append(f'"@target-uri"{suffix}: {target_uri}')
-        elif name == "@authority":
+        elif _token_eq(name, "@authority"):
             lines.append(f'"@authority"{suffix}: {authority}')
-        elif name == "@status":
+        elif _token_eq(name, "@status"):
             lines.append(f'"@status"{suffix}: {status}')
         else:
             raise AidError("ERR_SECURITY", f"Unsupported covered field: {name}")

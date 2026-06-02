@@ -48,6 +48,9 @@ function ExampleItem({ example }: { example: Example }) {
 }
 
 export function ExamplePicker({ variant, onSelect, disabled }: ExamplePickerProps) {
+  const findExample = (examples: Example[], title: string) =>
+    examples.find((example) => example.title === title);
+
   if (variant === 'toggle') {
     return (
       <div className="w-full">
@@ -135,13 +138,13 @@ export function ExamplePicker({ variant, onSelect, disabled }: ExamplePickerProp
   const [expanded, setExpanded] = useState(false);
 
   const curated = [
-    TUTORIAL_EXAMPLES[0], // Simple (basic MCP)
-    TUTORIAL_EXAMPLES[1], // Local Docker
-    REAL_WORLD_EXAMPLES[0], // Supabase
-    PROTOCOL_EXAMPLES[1], // UCP Showcase
-    REFERENCE_EXAMPLES[1], // Secure (auth-required)
-    OTHER_CHAT_EXAMPLES[0], // No Server (error case)
-  ].filter(Boolean);
+    findExample(TUTORIAL_EXAMPLES, 'V2 Simple'),
+    findExample(TUTORIAL_EXAMPLES, 'V2 Local Docker'),
+    findExample(REAL_WORLD_EXAMPLES, 'V2 Supabase'),
+    findExample(PROTOCOL_EXAMPLES, 'V2 Ucp Showcase'),
+    findExample(REFERENCE_EXAMPLES, 'V2 Secure'),
+    findExample(OTHER_CHAT_EXAMPLES, 'V2 No Server'),
+  ].filter((example): example is Example => example !== undefined);
 
   const allGroups: Array<{ label: string; examples: Example[] }> = [
     { label: 'Tutorials', examples: TUTORIAL_EXAMPLES },
@@ -150,6 +153,7 @@ export function ExamplePicker({ variant, onSelect, disabled }: ExamplePickerProp
     { label: 'Reference', examples: REFERENCE_EXAMPLES },
     { label: 'Edge Cases', examples: OTHER_CHAT_EXAMPLES },
   ];
+  const expandedExampleCount = allGroups.reduce((count, group) => count + group.examples.length, 0);
 
   const renderButton = (ex: Example) => (
     <Button
@@ -186,7 +190,7 @@ export function ExamplePicker({ variant, onSelect, disabled }: ExamplePickerProp
           disabled={disabled}
           className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
         >
-          {expanded ? 'Show less' : 'Show all 17 examples'}
+          {expanded ? 'Show less' : `Show all ${expandedExampleCount} examples`}
           <ChevronDown
             className={`w-3 h-3 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
           />

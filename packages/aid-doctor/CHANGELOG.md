@@ -1,5 +1,19 @@
 # @agentcommunity/aid-doctor
 
+## 2.0.0
+
+### Major Changes
+
+- Align the CLI with the v2 AID contract, including `aid2` record generation, v2 PKA diagnostics, and legacy `aid1` compatibility handling.
+- Add deeper action-path tests for check, generate, PKA, cache, security-state, and fallback flows.
+- Improve validation output for v2 endpoint proof, downgrade state, DNSSEC policy, and `.well-known` fallback behavior.
+
+### Patch Changes
+
+- Updated dependencies
+  - @agentcommunity/aid@2.0.0
+  - @agentcommunity/aid-engine@2.0.0
+
 ## 1.2.0
 
 ### Minor Changes

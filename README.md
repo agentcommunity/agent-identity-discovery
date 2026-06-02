@@ -33,7 +33,7 @@ It uses a single DNS `TXT` record to make any agent service—whether it speaks 
 
 **Built by the team at [agentcommunity.org](https://agentcommunity.org)**
 
-### v2 Defaults
+### v2.0 Release Status
 
 AID v2 is the current normative protocol surface in `packages/docs/specification.md`. `packages/docs/specification_v2_explained.md` remains as non-normative design history.
 
@@ -44,7 +44,7 @@ AID v2 is the current normative protocol surface in `packages/docs/specification
 - **Freshness:** v2 PKA requires `created`, `expires`, exact nonce echo, and response `Cache-Control: no-store`.
 - **No v1 defaults in v2:** no signed HTTP `Date`, no `AID-Challenge`, no base58 `z...` key, and no DNS `kid`/`i`.
 
-### v2 Highlights
+### v2.0 Highlights
 
 - ✅ **DNS-first discovery** with canonical base lookup at `_agent.<domain>`
 - ✅ **Well-known fallback** (HTTPS-only, JSON, ≤64KB, ~2s timeout, no redirects; TTL=300 on success)

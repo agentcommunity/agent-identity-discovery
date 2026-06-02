@@ -1,6 +1,6 @@
 [package]
 name = "aid-rs"
-version = "0.1.0"
+version = "2.0.0"
 edition = "2021"
 description = "Agent Identity & Discovery (AID) – parser and generated constants for Rust"
 license = "MIT"

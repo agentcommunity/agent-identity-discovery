@@ -80,7 +80,7 @@ console.log(result.security.mode);
 console.log(result.security.warnings);
 ```
 
-## v2 PKA Default
+## v2.0 Notes
 
 - New records default to `aid2`.
 - `pka` (`k`) is the unpadded base64url Ed25519 JWK `x` value.

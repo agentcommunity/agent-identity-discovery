@@ -1,7 +1,7 @@
 Metadata-Version: 2.4
 Name: aid-discovery
-Version: 1.2.0
-Summary: Python library for Agent Identity & Discovery (AID) - v1.2.0 release
+Version: 2.0.0
+Summary: Python library for Agent Identity & Discovery (AID) - v2.0.0 release
 Author-email: Agent Community <maintainers@agentcommunity.org>
 License: MIT
 Project-URL: Homepage, https://github.com/agentcommunity/agent-identity-discovery

@@ -1,5 +1,18 @@
 # @agentcommunity/aid-engine
 
+## 2.0.0
+
+### Major Changes
+
+- Generate `aid2` records by default and keep legacy `aid1` generation/validation behavior explicit.
+- Add v2-aware checker output, PKA key generation guidance, canonical short-key emission, and enterprise security policy handling.
+- Update validation messages and protocol-probing helpers for base-first v2 discovery.
+
+### Patch Changes
+
+- Updated dependencies
+  - @agentcommunity/aid@2.0.0
+
 ## 0.2.2
 
 ### Patch Changes

@@ -1,5 +1,14 @@
 # @agentcommunity/aid
 
+## 2.0.0
+
+### Major Changes
+
+- Make `aid2` the current default record version while preserving legacy `aid1` compatibility.
+- Add v2 PKA endpoint proof using RFC 9421 response signatures, Ed25519 JWK `x` keys, derived RFC 7638 `keyid`, nonce freshness, `created`, `expires`, and `Cache-Control: no-store`.
+- Add version-aware parser, discovery, security policy, `.well-known`, and downgrade handling for the v2 contract.
+- Regenerate constants and parity fixtures from the v2 protocol contract.
+
 ## 1.2.0
 
 ### Minor Changes

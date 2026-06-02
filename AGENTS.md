@@ -101,7 +101,7 @@ LOCAL_URI_SCHEMES
 RawAidRecord
 ```
 
-### v2 notes (Current)
+### v2.0 notes (Final)
 
 - Release baseline: `packages/docs/specification.md` is v2.0.0.
 - Contract baseline: `protocol/constants.yml` schemaVersion is 2.0.0 and specVersion is `aid2`.

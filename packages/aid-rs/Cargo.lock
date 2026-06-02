@@ -28,7 +28,7 @@ dependencies = [
 
 [[package]]
 name = "aid-rs"
-version = "0.1.0"
+version = "2.0.0"
 dependencies = [
  "base64 0.22.1",
  "bs58",
