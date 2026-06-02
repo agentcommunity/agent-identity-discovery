@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { AID_SPEC_VERSION } from '@/generated/version';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -48,16 +49,14 @@ export function timeAgo(date: Date): string {
 }
 
 /**
- * Get the current version of the AID package
- * Returns "0.0.0" as fallback when package.json is not available
+ * Get the current AID protocol specification version.
  */
 export function getAidVersion(): string {
-  // Default optimistic value while the async fetch resolves in the background
-  return '1.0.0';
+  return AID_SPEC_VERSION;
 }
 
 /**
- * Fetch the current version from the API route
+ * Fetch the current AID protocol specification version from the API route.
  * This is async and should be used in components that can handle loading states
  */
 export async function fetchAidVersion(): Promise<string> {

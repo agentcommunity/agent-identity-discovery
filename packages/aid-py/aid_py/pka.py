@@ -1,7 +1,8 @@
-"""PKA handshake (Python) for AID v1.1
+"""PKA endpoint-proof handshakes for AID.
 
-Performs an HTTP Message Signatures (RFC 9421) verification using Ed25519 when
-the TXT record includes a Public Key for Agent (pka) and key id (kid).
+AID v1 records use the legacy Public Key for Agent (pka) plus key id (kid)
+flow. AID v2 records derive the RFC 9421 keyid from pka/k and verify the
+nonce-bound Ed25519 endpoint proof without a DNS kid/i field.
 """
 from __future__ import annotations
 
