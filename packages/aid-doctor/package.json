@@ -14,7 +14,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/agentcommunity/agent-identity-discovery.git",
+    "url": "git+https://github.com/agentcommunity/agent-identity-discovery.git",
     "directory": "packages/aid-doctor"
   },
   "homepage": "https://aid.agentcommunity.org",
@@ -33,7 +33,7 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "aid-doctor": "./dist/cli.js"
+    "aid-doctor": "dist/cli.js"
   },
   "files": [
     "dist/**/*",
