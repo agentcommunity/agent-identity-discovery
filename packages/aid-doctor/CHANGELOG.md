@@ -1,5 +1,11 @@
 # @agentcommunity/aid-doctor
 
+## 2.0.1
+
+### Patch Changes
+
+- Fix the installed `aid-doctor` bin so symlinked package-manager shims execute the CLI instead of no-oping.
+
 ## 2.0.0
 
 ### Major Changes
