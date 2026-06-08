@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-import { readFile, writeFile } from 'fs/promises';
-import { promises as fs } from 'node:fs';
+import { writeFile } from 'fs/promises';
+import { promises as fs, readFileSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -23,6 +23,17 @@ import clipboardy from 'clipboardy';
 import { formatCheckResult } from './output';
 import { loadCache, saveCache } from './cache';
 import { applySecurityState } from './security-state';
+
+function readPackageVersion(): string {
+  try {
+    const pkgUrl = new URL('../package.json', import.meta.url);
+    const fileContents = readFileSync(pkgUrl, 'utf8');
+    const pkg = JSON.parse(fileContents) as { version?: string };
+    return pkg.version ?? '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+}
 
 /**
  * CLI-specific function that generates Ed25519 keys and saves them to disk.
@@ -54,7 +65,7 @@ export function createCliProgram(): Command {
   program
     .name('aid-doctor')
     .description('CLI tool for Agent Identity & Discovery (AID)')
-    .version('0.1.0');
+    .version(readPackageVersion());
 
   /**
    * Format an error for human-readable output
@@ -513,17 +524,7 @@ export function createCliProgram(): Command {
     .command('version')
     .description('Show version information')
     .action(async () => {
-      let version = '0.0.0';
-      try {
-        const pkgUrl = new URL('../package.json', import.meta.url);
-        const fileContents = await readFile(pkgUrl, 'utf8');
-        const pkg = JSON.parse(fileContents) as { version?: string };
-        version = pkg.version ?? version;
-      } catch (error) {
-        if (error instanceof Error) {
-          // ignore - fallback stays 0.0.0
-        }
-      }
+      const version = readPackageVersion();
       console.log(
         [
           chalk.bold('aid-doctor') + ' - Agent Identity & Discovery CLI',
@@ -541,8 +542,23 @@ export function createCliProgram(): Command {
   return program;
 }
 
-const isDirectCliRun =
-  process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
+export function isDirectCliInvocation(
+  argvPath: string | undefined,
+  modulePath = fileURLToPath(import.meta.url),
+): boolean {
+  if (!argvPath) {
+    return false;
+  }
+
+  const resolvedArgvPath = path.resolve(argvPath);
+  try {
+    return realpathSync(modulePath) === realpathSync(resolvedArgvPath);
+  } catch {
+    return modulePath === resolvedArgvPath;
+  }
+}
+
+const isDirectCliRun = isDirectCliInvocation(process.argv[1]);
 
 if (isDirectCliRun) {
   createCliProgram().parse();

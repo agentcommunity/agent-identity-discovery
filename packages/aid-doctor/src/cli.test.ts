@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { readFileSync } from 'fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import path from 'path';
+import os from 'os';
 import { fileURLToPath } from 'url';
 import { formatCheckResult } from './output';
 import type { DoctorReport } from '@agentcommunity/aid-engine';
@@ -230,6 +231,28 @@ describe('AID Doctor CLI', () => {
   });
 
   describe('Package integrity', () => {
+    it('detects installed bin symlink invocations as direct CLI runs', async () => {
+      const { isDirectCliInvocation } = await importCliWithMocks();
+      const tmpDir = mkdtempSync(path.join(os.tmpdir(), 'aid-doctor-cli-'));
+
+      try {
+        const distDir = path.join(tmpDir, 'node_modules/@agentcommunity/aid-doctor/dist');
+        const binDir = path.join(tmpDir, 'node_modules/.bin');
+        mkdirSync(distDir, { recursive: true });
+        mkdirSync(binDir, { recursive: true });
+
+        const realCliPath = path.join(distDir, 'cli.js');
+        const binPath = path.join(binDir, 'aid-doctor');
+        writeFileSync(realCliPath, '#!/usr/bin/env node\n', 'utf8');
+        symlinkSync(realCliPath, binPath);
+
+        expect(isDirectCliInvocation(binPath, realCliPath)).toBe(true);
+        expect(isDirectCliInvocation(path.join(binDir, 'other'), realCliPath)).toBe(false);
+      } finally {
+        rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
     it('should have a valid package.json', () => {
       const packagePath = path.resolve(__dirname, '../package.json');
       const packageContent = readFileSync(packagePath, 'utf8');
@@ -238,6 +261,15 @@ describe('AID Doctor CLI', () => {
       expect(packageJson.name).toBe('@agentcommunity/aid-doctor');
       expect(packageJson.bin).toBeDefined();
       expect(packageJson.bin['aid-doctor']).toBe('./dist/cli.js');
+    });
+
+    it('uses package.json as the commander version source', async () => {
+      const { createCliProgram } = await importCliWithMocks();
+      const packagePath = path.resolve(__dirname, '../package.json');
+      const packageContent = readFileSync(packagePath, 'utf8');
+      const packageJson = JSON.parse(packageContent);
+
+      expect(createCliProgram().version()).toBe(packageJson.version);
     });
 
     it('should have CLI entry point file', () => {

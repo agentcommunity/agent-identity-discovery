@@ -293,23 +293,23 @@ const verifyVersionAlignment = async (repoRoot) => {
     );
   }
 
-  const sdkReleaseMatchesSpec = aidPackage.version === specVersion;
+  const sdkReleaseMatchesSpec = minorOf(aidPackage.version) === minorOf(specVersion);
 
-  if (!sdkReleaseMatchesSpec && aidPackage.version.split('.')[0] === specMajor) {
+  if (!sdkReleaseMatchesSpec) {
     mismatches.push(
-      `Version mismatch: packages/aid/package.json version=${aidPackage.version} but specification.md=${specVersion}`,
+      `Version mismatch: packages/aid/package.json version=${aidPackage.version} but specification.md=${specVersion}; package and spec major.minor must match`,
     );
   }
 
-  if (doctorPackage.version !== aidPackage.version) {
+  if (minorOf(doctorPackage.version) !== minorOf(aidPackage.version)) {
     mismatches.push(
-      `Version mismatch: packages/aid-doctor/package.json version=${doctorPackage.version} but packages/aid/package.json=${aidPackage.version}`,
+      `Version mismatch: packages/aid-doctor/package.json version=${doctorPackage.version} but packages/aid/package.json=${aidPackage.version}; package major.minor values must match`,
     );
   }
 
-  if (conformancePackage.version !== aidPackage.version) {
+  if (minorOf(conformancePackage.version) !== minorOf(aidPackage.version)) {
     mismatches.push(
-      `Version mismatch: packages/aid-conformance/package.json version=${conformancePackage.version} but packages/aid/package.json=${aidPackage.version}`,
+      `Version mismatch: packages/aid-conformance/package.json version=${conformancePackage.version} but packages/aid/package.json=${aidPackage.version}; package major.minor values must match`,
     );
   }
 
