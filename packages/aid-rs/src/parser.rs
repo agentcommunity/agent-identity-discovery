@@ -3,10 +3,12 @@ use std::collections::HashSet;
 use crate::constants_gen::{
     AUTH_APIKEY, AUTH_BASIC, AUTH_CUSTOM, AUTH_MTLS, AUTH_NONE, AUTH_OAUTH2_CODE, AUTH_OAUTH2_DEVICE,
     AUTH_PAT, PROTO_A2A, PROTO_GRAPHQL, PROTO_GRPC, PROTO_LOCAL, PROTO_MCP, PROTO_OPENAPI,
-    PROTO_UCP, PROTO_WEBSOCKET, PROTO_ZEROCONF, SPEC_VERSION, LOCAL_URI_SCHEMES,
+    PROTO_UCP, PROTO_WEBSOCKET, PROTO_ZEROCONF, SPEC_VERSION_V1, SPEC_VERSION_V2,
+    SUPPORTED_SPEC_VERSIONS, LOCAL_URI_SCHEMES,
 };
 use crate::errors::AidError;
 use crate::record::AidRecord;
+use base64::Engine as _;
 
 fn is_supported_proto(token: &str) -> bool {
     matches!(
@@ -20,6 +22,31 @@ fn is_supported_auth(token: &str) -> bool {
         token,
         AUTH_NONE | AUTH_PAT | AUTH_APIKEY | AUTH_BASIC | AUTH_OAUTH2_DEVICE | AUTH_OAUTH2_CODE | AUTH_MTLS | AUTH_CUSTOM
     )
+}
+
+fn is_supported_version(version: &str) -> bool {
+    SUPPORTED_SPEC_VERSIONS.iter().any(|v| *v == version)
+}
+
+fn decode_base64url_no_pad(value: &str) -> Result<Vec<u8>, AidError> {
+    if value.is_empty()
+        || value.contains('=')
+        || value.len() % 4 == 1
+        || !value.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    {
+        return Err(AidError::invalid_txt("aid2 pka must be unpadded base64url"));
+    }
+    base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(value)
+        .map_err(|_| AidError::invalid_txt("aid2 pka must be valid base64url"))
+}
+
+fn validate_aid2_pka(value: &str) -> Result<(), AidError> {
+    let decoded = decode_base64url_no_pad(value)?;
+    if decoded.len() != 32 {
+        return Err(AidError::invalid_txt("aid2 pka must decode to exactly 32 bytes"));
+    }
+    Ok(())
 }
 
 pub fn parse(txt: &str) -> Result<AidRecord, AidError> {
@@ -84,8 +111,12 @@ pub fn parse(txt: &str) -> Result<AidRecord, AidError> {
     }
 
     let v = v.ok_or_else(|| AidError::invalid_txt("Missing required field: v"))?;
-    if v != SPEC_VERSION {
-        return Err(AidError::invalid_txt(format!("Unsupported version: {}. Expected: {}", v, SPEC_VERSION)));
+    if !is_supported_version(&v) {
+        return Err(AidError::invalid_txt(format!(
+            "Unsupported version: {}. Expected one of: {}",
+            v,
+            SUPPORTED_SPEC_VERSIONS.join(", ")
+        )));
     }
 
     let uri = uri.ok_or_else(|| AidError::invalid_txt("Missing required field: uri"))?;
@@ -168,10 +199,65 @@ pub fn parse(txt: &str) -> Result<AidRecord, AidError> {
         if !uri.starts_with("https://") { return Err(AidError::invalid_txt(format!("Invalid URI scheme for remote protocol '{}'. MUST be 'https:'", proto_value))); }
     }
 
-    // If PKA is present, kid is required
-    if pka.is_some() && kid.is_none() {
+    if v == SPEC_VERSION_V1 && pka.is_some() && kid.is_none() {
         return Err(AidError::invalid_txt("kid is required when pka is present"));
+    }
+    if v == SPEC_VERSION_V2 {
+        if kid.is_some() {
+            return Err(AidError::invalid_txt("kid/i is not allowed in aid2 records"));
+        }
+        if let Some(ref pka_value) = pka {
+            validate_aid2_pka(pka_value)?;
+        }
     }
 
     Ok(AidRecord { v, uri, proto: proto_value, auth, desc, docs, dep, pka, kid })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const V2_PKA: &str = "ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ";
+
+    #[test]
+    fn parses_aid1_and_aid2_pka_shapes() {
+        let aid1 = parse("v=aid1;u=https://example.com/mcp;p=mcp;k=z6Mkf9;i=g1").expect("aid1 parses");
+        assert_eq!(aid1.v, SPEC_VERSION_V1);
+        assert_eq!(aid1.pka.as_deref(), Some("z6Mkf9"));
+        assert_eq!(aid1.kid.as_deref(), Some("g1"));
+
+        let aid2 = parse(&format!("v=aid2;u=https://example.com/mcp;p=mcp;k={}", V2_PKA)).expect("aid2 parses");
+        assert_eq!(aid2.v, SPEC_VERSION_V2);
+        assert_eq!(aid2.pka.as_deref(), Some(V2_PKA));
+        assert_eq!(aid2.kid, None);
+    }
+
+    #[test]
+    fn aid2_rejects_legacy_or_malformed_pka_values() {
+        let cases = [
+            format!("v=aid2;u=https://example.com/mcp;p=mcp;k={}=", V2_PKA),
+            "v=aid2;u=https://example.com/mcp;p=mcp;k=abc$".to_string(),
+            "v=aid2;u=https://example.com/mcp;p=mcp;k=abc".to_string(),
+            "v=aid2;u=https://example.com/mcp;p=mcp;k=z6Mkf9".to_string(),
+        ];
+
+        for raw in cases {
+            let err = parse(&raw).expect_err("aid2 malformed pka must fail");
+            assert_eq!(err.error_code, "ERR_INVALID_TXT");
+        }
+    }
+
+    #[test]
+    fn aid2_rejects_kid_aliases_while_aid1_requires_kid() {
+        for key in ["kid", "i"] {
+            let raw = format!("v=aid2;u=https://example.com/mcp;p=mcp;k={};{}=g1", V2_PKA, key);
+            let err = parse(&raw).expect_err("aid2 kid alias must fail");
+            assert_eq!(err.error_code, "ERR_INVALID_TXT");
+        }
+
+        let err = parse("v=aid1;u=https://example.com/mcp;p=mcp;k=z6Mkf9")
+            .expect_err("aid1 pka without kid must fail");
+        assert_eq!(err.error_code, "ERR_INVALID_TXT");
+    }
 }

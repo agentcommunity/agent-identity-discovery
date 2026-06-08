@@ -38,7 +38,9 @@ aid-doctor json example.com
 
 ### Options
 
-- `--protocol <proto>`: try a protocol-specific subdomain (e.g., `mcp` tries `_agent._mcp.<domain>` first)
+- `--protocol <proto>`: record a protocol hint for diagnostics. Checks remain base-first at `_agent.<domain>`.
+- `--probe-proto-subdomain` (check): if base TXT lookup fails and `--protocol` is set, probe `_agent._<proto>.<domain>` for diagnostics.
+- `--probe-proto-even-if-base` (check): if base TXT lookup succeeds and `--protocol` is set, also probe `_agent._<proto>.<domain>` for drift diagnostics.
 - `--timeout <ms>`: DNS query timeout (default: 5000)
 - `--no-fallback`: disable `.well-known` fallback on DNS miss
 - `--fallback-timeout <ms>`: HTTP timeout for `.well-known` (default: 2000)
@@ -71,13 +73,16 @@ Interactive prompts help you craft a valid TXT value for `_agent.<domain>`.
 ## Examples
 
 ```bash
-# Check with protocol hint (underscore-first fallback)
+# Check with protocol hint, still base-first
 aid-doctor check example.com --protocol mcp
+
+# Probe the protocol-specific underscore name for diagnostics
+aid-doctor check example.com --protocol mcp --probe-proto-subdomain
 
 # JSON for CI
 aid-doctor json example.com > result.json
 
-# Show PKA/fallback details (v1.1)
+# Show PKA/fallback details (v2-aware)
 aid-doctor check example.com --show-details
 
 # Enterprise preset with downgrade cache
@@ -90,11 +95,11 @@ AID_ALLOW_INSECURE_WELL_KNOWN=1 aid-doctor check localhost:19081 --show-details 
 
 ### PKA handshake expectations
 
-- Required covered fields: `"AID-Challenge" "@method" "@target-uri" "host" "date"`
+- AID v2 `k`/`pka` is the unpadded base64url JWK `x` value for the raw 32-byte Ed25519 public key
+- v2 reports derive the HTTP Message Signature `keyid` as the RFC 7638 JWK SHA-256 thumbprint
 - `alg` must be `ed25519`
-- `created` and HTTP `Date` must both be within ±300s of the current time
-- `keyid` must match the record `kid` (quotes allowed in header, compare normalized)
-- Public key is multibase base58btc (`z...`) for the raw 32‑byte Ed25519 key
+- v2 PKA uses a nonce-bound HTTP Message Signature response and requires `Cache-Control: no-store`
+- Legacy `aid1` records can still be checked during the compatibility window, including their legacy `kid`
 
 ### Loopback HTTP (dev‑only)
 

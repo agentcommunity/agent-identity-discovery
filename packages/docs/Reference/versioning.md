@@ -14,21 +14,39 @@ The Agent Identity & Discovery (AID) standard is designed to be a stable, living
 
 ## The `v` Key in the TXT Record
 
-The `v` key within an AID `TXT` record (e.g., `v=aid1`) signifies the **major version** of the specification that the record conforms to.
+The `v` key within an AID `TXT` record (for example, `v=aid2`) signifies the **major version** of the specification that the record conforms to.
 
-- **`v=aid1`**: This corresponds to the entire v1.x.x series of the specification defined in this documentation.
-- **Breaking Changes:** Any change that is not backward-compatible with the `v=aid1` rules (e.g., adding a new required key, changing the record name structure, or moving to SRV records) will result in a new major version, `v=aid2`.
-- **Client Behavior:** A client that only understands `aid1` **MUST** ignore any record that does not have `v=aid1`.
+- **`v=aid2`**: This is the current v2 default and preferred profile for new records.
+- **`v=aid1`**: This is the legacy v1.x.x compatibility profile. Clients may continue to read it for backward compatibility.
+- **Breaking Changes:** Any future change that is not backward-compatible with the `v=aid2` rules will result in a new major version.
+- **Client Behavior:** A client that only understands `aid1` **MUST** ignore records that do not have `v=aid1`. Current clients should prefer `aid2` and use `aid1` only as legacy compatibility input.
 
 ## Specification Updates and Releases
 
 The AID specification and its surrounding tooling (libraries, validators) are versioned using Git tags in the official repository.
 
 - **Major Versions (e.g., v2.0.0):** Reserved for breaking changes to the protocol, requiring a new `v` key (e.g., `v=aid2`). These will be accompanied by a major update to the documentation.
-- **Minor Versions (e.g., v1.2.0):** Reserved for new, non-breaking features that are backward-compatible. For example, adding a new _optional_ key to the `TXT` record would be a minor release. Implementers can adopt these features at their own pace.
+- **Minor Versions (e.g., v2.1.0):** Reserved for new, non-breaking features that are backward-compatible with the current major version. For example, adding a new optional metadata key to the `TXT` record would be a minor release. Implementers can adopt these features at their own pace.
 - **Patch Versions (e.g., v1.0.1):** Used for clarifications, typo fixes, and documentation improvements that do not change the protocol's behavior. These are backward-compatible by definition.
 
 ## Version History
+
+### v2.0.0 — June 2026
+
+- **Current record profile:** `v=aid2` is the preferred profile for new records.
+- **Base-first discovery:** `_agent.<domain>` is the canonical lookup. Protocol-prefixed names are legacy, diagnostic, or explicitly configured base-failure probing.
+- **PKA key cleanup:** `k` is the unpadded base64url Ed25519 JWK `x` value.
+- **Derived key identity:** HTTP signature `keyid` is the RFC 7638 JWK thumbprint derived from `k`.
+- **No DNS `kid` in v2:** `kid`/`i` remains valid only for legacy `aid1` PKA.
+- **RFC 9421 endpoint proof:** v2 PKA uses nonce-bound HTTP Message Signatures with `created`, `expires`, and `Cache-Control: no-store`.
+- **Trust source:** Discovery results distinguish DNS-rooted records from `.well-known` records with `trustSource=dns` or `trustSource=well-known-tls`.
+
+### v1.2.0 — Compatibility Baseline
+
+- Finalized the `aid1` compatibility baseline used during the v2 migration window.
+- Added `docs`/`d`, `dep`/`e`, `pka`/`k`, and `kid`/`i` as legacy v1-compatible fields.
+- Preserved single-letter aliases for compact TXT records.
+- Kept legacy PKA behavior available for existing `aid1` clients.
 
 ### v1.1.0 — August 2025
 
@@ -62,4 +80,4 @@ We believe a discovery protocol must be exceptionally stable. Our commitment to 
 
 1.  **Breaking Changes are Rare:** Major version bumps will be infrequent and will only be made when there is a significant, community-vetted reason to do so.
 2.  **Clarity Through Communication:** Any upcoming minor or major changes will be discussed openly in the community repository before being finalized.
-3.  **The v1 Standard is a Long-Term Foundation:** The `aid1` specification is designed to be a durable, long-term solution. You can build on it with confidence.
+3.  **v2 is the Current Foundation:** New deployments should publish `aid2` records. The `aid1` profile remains supported only for legacy and backward-compatibility clients.

@@ -189,6 +189,13 @@ function buildNavigation(docsByRouteSlug: Record<string, DocPage>): Navigation {
   return { rootPages, groups };
 }
 
+function aliasRouteSlug(routeSlug: string): string | null {
+  const alias = routeSlug.replace(/^(Understand|Reference|Tooling)(?=\/|$)/, (section) =>
+    section.toLowerCase(),
+  );
+  return alias === routeSlug ? null : alias;
+}
+
 function main(): void {
   if (!fs.existsSync(DOCS_DIR)) {
     console.error(`[generate-docs-index] FATAL: docs dir not found at ${DOCS_DIR}`);
@@ -200,7 +207,11 @@ function main(): void {
 
   for (const fileSlug of fileSlugs) {
     const doc = readDoc(fileSlug);
-    if (doc) docsByRouteSlug[doc.slug] = doc;
+    if (doc) {
+      docsByRouteSlug[doc.slug] = doc;
+      const alias = aliasRouteSlug(doc.slug);
+      if (alias) docsByRouteSlug[alias] = doc;
+    }
   }
 
   const navigation = buildNavigation(docsByRouteSlug);

@@ -21,7 +21,7 @@ Exposes the shared fixture packs via typed exports:
 - `golden.json` for parser parity across languages
 - `enterprise.json` for enterprise discovery and security vectors used by the reference implementation
 
-It also provides a simple Node runner to execute the parser fixtures against a parser.
+It also provides a simple Node runner to execute parser fixtures and validate conformance fixture semantics.
 
 ## Install
 
@@ -65,11 +65,11 @@ npx aid-conformance ./some-fixture.json
 
 Exit code is non-zero if any case fails. Output includes a concise summary.
 
-### v1.1 Notes
+### aid1 Compatibility and v2 Notes
 
-- Fixtures now contain records exercising v1.1 additions:
-  - `docs` (https URL), `dep` (ISO 8601 Z)
-  - `pka`/`kid` presence (parsing only — handshake is out of scope for fixtures)
+- Fixtures contain records exercising `docs`, `dep`, PKA, and version-aware `aid1`/`aid2` selection.
+- The runner validates fixture shape and required PKA proof material, including Ed25519 verification for AID v2 PKA response signatures.
+- Negative PKA vectors must include structured proof-material defects or explicit override fields; `id` and `desc` wording is metadata only.
 
 ## Development
 

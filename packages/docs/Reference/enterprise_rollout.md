@@ -24,7 +24,7 @@ Split responsibilities clearly before the first rollout.
 ### Application team
 
 - Own the agent endpoint, TLS certificate, and protocol behavior.
-- Own `pka` and `kid` generation, storage, and rotation.
+- Own PKA key generation, private-key storage, derived v2 keyid tracking, and legacy `kid` handling where `aid1` compatibility is still required.
 - Own `.well-known` only when that fallback is intentionally allowed.
 - Own post-change verification with `aid-doctor` and SDK smoke tests.
 
@@ -50,7 +50,7 @@ AID discovery is exact-host only. Do not rely on parent-domain walking.
 Use this when the domain itself should resolve directly.
 
 ```dns
-_agent.example.com. 300 IN TXT "v=aid1;u=https://api.example.com/mcp;p=mcp;i=g1;k=z6Mk..."
+_agent.example.com. 300 IN TXT "v=aid2;u=https://api.example.com/mcp;p=mcp;k=JrQLj5P_89iXES9-vFgrIy29clF9CC_oPPsw3c5D0bs"
 ```
 
 Use this for:
@@ -73,7 +73,7 @@ _agent.team.example.com. 300 IN NS ns2.team-dns.example.net.
 Delegated zone:
 
 ```dns
-_agent.app.team.example.com. 300 IN TXT "v=aid1;u=https://app.team.example.com/mcp;p=mcp;i=g1;k=z6Mk..."
+_agent.app.team.example.com. 300 IN TXT "v=aid2;u=https://app.team.example.com/mcp;p=mcp;k=JrQLj5P_89iXES9-vFgrIy29clF9CC_oPPsw3c5D0bs"
 ```
 
 Use this when:
@@ -92,7 +92,7 @@ Use a controlled change window.
 
 - Lower TTL to `60-120` seconds if you expect a near-term cutover.
 - Confirm the endpoint is live before DNS changes.
-- Generate `pka` and `kid` if the environment will use `balanced` or `strict` with identity proof.
+- Generate `pka`/`k` if the environment will use `balanced` or `strict` with identity proof. For v2, record the derived RFC 7638 keyid in rollout notes. For legacy `aid1`, also generate `kid`.
 - Decide whether `.well-known` fallback is allowed. In `strict`, it is not.
 
 ### 2. Validate before publish
@@ -194,7 +194,7 @@ Treat rollback as part of the rollout plan.
 ### PKA rollback
 
 - restore the previous private key only if it is still trusted and available
-- otherwise publish a new `pka` with a new `kid`
+- otherwise publish a new `pka`/`k`; for legacy `aid1`, also publish a new `kid`
 - do not remove `pka` silently if clients may have downgrade memory enabled
 
 ### DNSSEC rollback
@@ -204,7 +204,7 @@ Treat rollback as part of the rollout plan.
 
 ## Incident Runbooks
 
-### Downgrade alert: `pka` missing or `kid` changed
+### Downgrade alert: `pka` missing or key identity changed
 
 1. Confirm whether a planned rotation or rollback happened.
 2. Compare the current DNS answer with the last known good value.

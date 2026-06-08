@@ -38,8 +38,8 @@ Applies to: `packages/aid` (TS), `packages/aid-py` (Python), `packages/aid-go` (
 - DNS-first lookup: Query `_agent.<domain>` by default.
 - Protocol-specific lookup when requested: If options specify a protocol, query in order:
   1) `_agent._<proto>.<domain>`  
-  2) `_agent.<proto>.<domain>` (compat)  
-  3) `_agent.<domain>`
+  2) `_agent.<domain>`
+- Historical note: an earlier compatibility lookup at `_agent.<proto>.<domain>` was removed. Clients must not query that name.
 - TXT parsing and validation: Enforce v1.1 rules. Support single-letter aliases. Enforce schemes per protocol. Validate metadata.
 - PKA handshake: When `pka`/`kid` present, perform HTTP Message Signatures (RFC 9421) with Ed25519.
   - Covered fields set equality: {`AID-Challenge`, `@method`, `@target-uri`, `host`, `date`}.
@@ -188,7 +188,7 @@ Internals: compose DNS-first + `WellKnown.fetch(...)` and run PKA when present.
 ## Testing Strategy
 
 - Unit/Integration:
-  - Options coverage: protocol-specific subdomain, well-known toggles, timeouts.
+  - Options coverage: protocol-specific underscore subdomain, base fallback, well-known toggles, timeouts.
   - PKA vectors unchanged. Ensure `host` includes port in covered fields.
 - Parity tests: Conformance suite passes unchanged across SDKs.
 - E2E: Doctor e2e remains green. Verify loopback relax behavior.
@@ -231,4 +231,3 @@ References:
 - Canonical constants and error messages: `protocol/spec.ts`  
 - Spec and PKA details: `packages/docs/specification.md` (Appendix D)  
 - Proposed changes log: `tracking/SPEC_1.1_extension.md.md`
-

@@ -4,7 +4,6 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
 import java.security.MessageDigest;
@@ -47,6 +46,30 @@ public final class Handshake {
     String alg;
     byte[] signature;
     String responseDate;
+  }
+
+  private static class V2CoveredItem {
+    final String raw;
+    final String name;
+    final boolean req;
+
+    V2CoveredItem(String raw, String name, boolean req) {
+      this.raw = raw;
+      this.name = name;
+      this.req = req;
+    }
+  }
+
+  private static class V2SigData {
+    List<V2CoveredItem> covered;
+    String signatureParamsRaw;
+    long created;
+    long expires;
+    String keyid;
+    String alg;
+    String nonce;
+    String tag;
+    byte[] signature;
   }
 
   private static SigData parseSignatureHeaders(HttpResponse<byte[]> res) {
@@ -176,6 +199,14 @@ public final class Handshake {
   }
 
   public static void performHandshake(String uri, String pka, String kid, Duration timeout) {
+    if (kid == null || kid.isEmpty()) {
+      performV2Handshake(uri, pka, timeout);
+      return;
+    }
+    performV1Handshake(uri, pka, kid, timeout);
+  }
+
+  private static void performV1Handshake(String uri, String pka, String kid, Duration timeout) {
     if (kid == null || kid.isEmpty()) throw new AidError("ERR_SECURITY", "Missing kid for PKA");
     URI u = URI.create(uri);
     HttpClient http = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).connectTimeout(timeout).build();
@@ -223,5 +254,514 @@ public final class Handshake {
       throw new AidError("ERR_SECURITY", "PKA verification unavailable: " + e.getMessage());
     }
   }
-}
 
+  private static void performV2Handshake(String uri, String pka, Duration timeout) {
+    String expectedKeyid = deriveAid2Keyid(pka);
+    byte[] nonceBytes = new byte[32];
+    SECURE_RANDOM.nextBytes(nonceBytes);
+    String nonce = base64UrlEncode(nonceBytes);
+    String requestUri = normalizeRequestUri(uri);
+    HttpClient http = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).connectTimeout(timeout).build();
+    HttpRequest req =
+        HttpRequest.newBuilder(URI.create(requestUri))
+            .timeout(timeout)
+            .header("Accept-Signature", buildAcceptSignatureV2(expectedKeyid, nonce))
+            .header("Cache-Control", "no-store")
+            .GET()
+            .build();
+    HttpResponse<byte[]> res;
+    try {
+      res = http.send(req, HttpResponse.BodyHandlers.ofByteArray());
+    } catch (Exception e) {
+      throw new AidError("ERR_SECURITY", e.getMessage());
+    }
+    if (res.statusCode() >= 300 && res.statusCode() < 400) {
+      throw new AidError("ERR_SECURITY", "PKA redirects are not allowed");
+    }
+    verifyV2ResponseHeaders(requestUri, pka, nonce, res.statusCode(), res.headers().map(), System.currentTimeMillis() / 1000L);
+  }
+
+  static String buildAcceptSignatureV2(String keyid, String nonce) {
+    return "aid-pka=(\"@method\";req \"@target-uri\";req \"@authority\";req \"@status\");created;expires;keyid=\""
+        + keyid
+        + "\";alg=\"ed25519\";nonce=\""
+        + nonce
+        + "\";tag=\"aid-pka-v2\"";
+  }
+
+  static void verifyV2Response(
+      String uri,
+      String pka,
+      String expectedNonce,
+      int status,
+      Map<String, String> headers,
+      long nowEpochSeconds) {
+    verifyV2ResponseHeaders(uri, pka, expectedNonce, status, singletonHeaderValues(headers), nowEpochSeconds);
+  }
+
+  private static void verifyV2ResponseHeaders(
+      String uri,
+      String pka,
+      String expectedNonce,
+      int status,
+      Map<String, List<String>> headers,
+      long nowEpochSeconds) {
+    if (status >= 300 && status < 400) {
+      throw new AidError("ERR_SECURITY", "PKA redirects are not allowed");
+    }
+    if (!hasNoStoreDirective(getHeader(headers, "Cache-Control"))) {
+      throw new AidError("ERR_SECURITY", "PKA response must include Cache-Control: no-store");
+    }
+
+    byte[] publicKey = decodeAid2PublicKey(pka);
+    String expectedKeyid = deriveAid2Keyid(pka);
+    V2SigData parsed = parseV2SignatureHeaders(headers);
+    if (parsed.expires <= parsed.created || parsed.expires - parsed.created > 300) {
+      throw new AidError("ERR_SECURITY", "Invalid signature freshness window");
+    }
+    long skewSeconds = 30;
+    if (parsed.created - nowEpochSeconds > skewSeconds || nowEpochSeconds - parsed.expires > skewSeconds) {
+      throw new AidError("ERR_SECURITY", "Signature timestamp outside acceptance window");
+    }
+    if (!MessageDigest.isEqual(parsed.keyid.getBytes(StandardCharsets.UTF_8), expectedKeyid.getBytes(StandardCharsets.UTF_8))) {
+      throw new AidError("ERR_SECURITY", "Signature keyid mismatch");
+    }
+    if (!MessageDigest.isEqual(asciiToLower(parsed.alg).getBytes(StandardCharsets.UTF_8), "ed25519".getBytes(StandardCharsets.UTF_8))) {
+      throw new AidError("ERR_SECURITY", "Unsupported signature algorithm");
+    }
+    if (!MessageDigest.isEqual(parsed.nonce.getBytes(StandardCharsets.UTF_8), expectedNonce.getBytes(StandardCharsets.UTF_8))) {
+      throw new AidError("ERR_SECURITY", "Signature nonce mismatch");
+    }
+    if (!MessageDigest.isEqual(parsed.tag.getBytes(StandardCharsets.UTF_8), "aid-pka-v2".getBytes(StandardCharsets.UTF_8))) {
+      throw new AidError("ERR_SECURITY", "Invalid signature tag");
+    }
+
+    byte[] base =
+        buildV2SignatureBase(
+            parsed.covered,
+            parsed.signatureParamsRaw,
+            "GET",
+            normalizeRequestUri(uri),
+            requestAuthority(uri),
+            status);
+    PublicKey pk = publicKeyFromRawEd25519(publicKey);
+    try {
+      Signature verifier = Signature.getInstance("Ed25519");
+      verifier.initVerify(pk);
+      verifier.update(base);
+      if (!verifier.verify(parsed.signature)) throw new AidError("ERR_SECURITY", "PKA signature verification failed");
+    } catch (AidError e) {
+      throw e;
+    } catch (Exception e) {
+      throw new AidError("ERR_SECURITY", "PKA verification unavailable: " + e.getMessage());
+    }
+  }
+
+  private static V2SigData parseV2SignatureHeaders(Map<String, List<String>> headers) {
+    String sigInput = getHeader(headers, "Signature-Input");
+    String sig = getHeader(headers, "Signature");
+    if (sigInput == null || sig == null) throw new AidError("ERR_SECURITY", "Missing signature headers");
+
+    String signatureParamsRaw = extractDictionaryMember(sigInput, "aid-pka");
+    if (!signatureParamsRaw.startsWith("(")) throw new AidError("ERR_SECURITY", "Invalid Signature-Input");
+    int closeIndex = signatureParamsRaw.indexOf(')');
+    if (closeIndex < 0) throw new AidError("ERR_SECURITY", "Invalid Signature-Input");
+
+    String coveredRaw = signatureParamsRaw.substring(1, closeIndex).trim();
+    String paramsRaw = signatureParamsRaw.substring(closeIndex + 1);
+    List<V2CoveredItem> covered = new ArrayList<>();
+    for (String item : splitInnerListItems(coveredRaw)) {
+      covered.add(parseV2CoveredItem(item));
+    }
+    validateV2CoveredSet(covered);
+
+    Map<String, String> params = parseSignatureParams(paramsRaw);
+    String createdRaw = requiredSignatureParam(params, "created");
+    String expiresRaw = requiredSignatureParam(params, "expires");
+    String keyid = unquoteSfString(requiredSignatureParam(params, "keyid"));
+    String alg = unquoteSfString(requiredSignatureParam(params, "alg"));
+    String nonce = unquoteSfString(requiredSignatureParam(params, "nonce"));
+    String tag = unquoteSfString(requiredSignatureParam(params, "tag"));
+    if (!createdRaw.matches("\\d+") || !expiresRaw.matches("\\d+")) {
+      throw new AidError("ERR_SECURITY", "Invalid Signature-Input timestamp");
+    }
+
+    String signatureRaw = extractDictionaryMember(sig, "aid-pka");
+    Matcher sigMatch = Pattern.compile("^:\\s*([^:]+?)\\s*:$").matcher(signatureRaw);
+    if (!sigMatch.find()) throw new AidError("ERR_SECURITY", "Invalid Signature header");
+
+    long created;
+    long expires;
+    try {
+      created = Long.parseLong(createdRaw);
+      expires = Long.parseLong(expiresRaw);
+    } catch (NumberFormatException e) {
+      throw new AidError("ERR_SECURITY", "Invalid Signature-Input timestamp");
+    }
+
+    byte[] signature;
+    try {
+      signature = Base64.getDecoder().decode(sigMatch.group(1));
+    } catch (IllegalArgumentException e) {
+      throw new AidError("ERR_SECURITY", "Invalid Signature header");
+    }
+
+    V2SigData data = new V2SigData();
+    data.covered = covered;
+    data.signatureParamsRaw = signatureParamsRaw;
+    data.created = created;
+    data.expires = expires;
+    data.keyid = keyid;
+    data.alg = alg;
+    data.nonce = nonce;
+    data.tag = tag;
+    data.signature = signature;
+    return data;
+  }
+
+  private static Map<String, List<String>> singletonHeaderValues(Map<String, String> headers) {
+    Map<String, List<String>> values = new HashMap<>();
+    for (Map.Entry<String, String> entry : headers.entrySet()) {
+      values.put(entry.getKey(), List.of(entry.getValue()));
+    }
+    return values;
+  }
+
+  private static String getHeader(Map<String, List<String>> headers, String name) {
+    for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
+      if (entry.getKey().equalsIgnoreCase(name)) {
+        if (entry.getValue().isEmpty()) return null;
+        return String.join(", ", entry.getValue());
+      }
+    }
+    return null;
+  }
+
+  private static String extractDictionaryMember(String input, String label) {
+    String found = null;
+    String foldedLabel = asciiToLower(label);
+    for (String part : splitDictionaryMembers(input)) {
+      int idx = part.indexOf('=');
+      if (idx <= 0) continue;
+      String memberLabel = part.substring(0, idx).trim();
+      if (asciiToLower(memberLabel).equals(foldedLabel)) {
+        if (found != null || !memberLabel.equals(label)) {
+          throw new AidError("ERR_SECURITY", "Duplicate " + label + " signature member");
+        }
+        found = part.substring(idx + 1).trim();
+      }
+    }
+    if (found != null) return found;
+    throw new AidError("ERR_SECURITY", "Missing " + label + " signature member");
+  }
+
+  private static List<String> splitDictionaryMembers(String input) {
+    List<String> parts = new ArrayList<>();
+    int start = 0;
+    boolean inString = false;
+    boolean escaped = false;
+    int depth = 0;
+    for (int i = 0; i < input.length(); i++) {
+      char c = input.charAt(i);
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (c == '\\') {
+          escaped = true;
+        } else if (c == '"') {
+          inString = false;
+        }
+        continue;
+      }
+      if (c == '"') {
+        inString = true;
+      } else if (c == '(') {
+        depth++;
+      } else if (c == ')') {
+        depth--;
+      } else if (c == ',' && depth == 0) {
+        parts.add(input.substring(start, i).trim());
+        start = i + 1;
+      }
+    }
+    String tail = input.substring(start).trim();
+    if (!tail.isEmpty()) parts.add(tail);
+    return parts;
+  }
+
+  private static List<String> splitInnerListItems(String input) {
+    List<String> items = new ArrayList<>();
+    int start = 0;
+    boolean inString = false;
+    boolean escaped = false;
+    for (int i = 0; i < input.length(); i++) {
+      char c = input.charAt(i);
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (c == '\\') {
+          escaped = true;
+        } else if (c == '"') {
+          inString = false;
+        }
+        continue;
+      }
+      if (c == '"') {
+        inString = true;
+      } else if (Character.isWhitespace(c)) {
+        String item = input.substring(start, i).trim();
+        if (!item.isEmpty()) items.add(item);
+        start = i + 1;
+      }
+    }
+    String tail = input.substring(start).trim();
+    if (!tail.isEmpty()) items.add(tail);
+    return items;
+  }
+
+  private static V2CoveredItem parseV2CoveredItem(String raw) {
+    Matcher match = Pattern.compile("^\"([^\"]+)\"((?:;[A-Za-z0-9_*.-]+)*)$").matcher(raw);
+    if (!match.find()) throw new AidError("ERR_SECURITY", "Invalid Signature-Input covered item");
+    String name = match.group(1);
+    String paramsRaw = match.group(2);
+    boolean req = false;
+    if (paramsRaw != null && !paramsRaw.isEmpty()) {
+      for (String param : paramsRaw.split(";")) {
+        if (param.isEmpty()) continue;
+        if (!"req".equals(param)) {
+          throw new AidError("ERR_SECURITY", "Unsupported Signature-Input covered item parameter");
+        }
+        if (req) {
+          throw new AidError("ERR_SECURITY", "Duplicate Signature-Input covered item parameter");
+        }
+        req = true;
+      }
+    }
+    return new V2CoveredItem(raw, name, req);
+  }
+
+  private static void validateV2CoveredSet(List<V2CoveredItem> covered) {
+    if (covered.size() != 4) {
+      throw new AidError("ERR_SECURITY", "Signature-Input must cover required fields");
+    }
+    Map<String, Boolean> expected = new HashMap<>();
+    expected.put("@method", true);
+    expected.put("@target-uri", true);
+    expected.put("@authority", true);
+    expected.put("@status", false);
+    Set<String> seen = new HashSet<>();
+    for (V2CoveredItem item : covered) {
+      Boolean expectedReq = expected.get(item.name);
+      if (expectedReq == null || seen.contains(item.name) || expectedReq.booleanValue() != item.req) {
+        throw new AidError("ERR_SECURITY", "Signature-Input must cover required fields");
+      }
+      seen.add(item.name);
+    }
+    if (seen.size() != expected.size()) {
+      throw new AidError("ERR_SECURITY", "Signature-Input must cover required fields");
+    }
+  }
+
+  private static Map<String, String> parseSignatureParams(String raw) {
+    Map<String, String> params = new HashMap<>();
+    int index = 0;
+    while (index < raw.length()) {
+      while (index < raw.length() && Character.isWhitespace(raw.charAt(index))) index++;
+      if (index >= raw.length()) break;
+      if (raw.charAt(index) != ';') {
+        throw new AidError("ERR_SECURITY", "Invalid Signature-Input parameters");
+      }
+      index++;
+      while (index < raw.length() && Character.isWhitespace(raw.charAt(index))) index++;
+
+      int nameStart = index;
+      while (index < raw.length() && isSignatureParamNameChar(raw.charAt(index))) index++;
+      String name = raw.substring(nameStart, index);
+      if (name.isEmpty()) {
+        throw new AidError("ERR_SECURITY", "Invalid Signature-Input parameter");
+      }
+      if (!isAllowedSignatureParam(name)) {
+        throw new AidError("ERR_SECURITY", "Unsupported Signature-Input parameter: " + name);
+      }
+      if (params.containsKey(name)) {
+        throw new AidError("ERR_SECURITY", "Duplicate Signature-Input parameter: " + name);
+      }
+
+      while (index < raw.length() && Character.isWhitespace(raw.charAt(index))) index++;
+      if (index >= raw.length() || raw.charAt(index) != '=') {
+        params.put(name, "");
+        continue;
+      }
+      index++;
+      while (index < raw.length() && Character.isWhitespace(raw.charAt(index))) index++;
+
+      int valueStart = index;
+      if (index < raw.length() && raw.charAt(index) == '"') {
+        index++;
+        boolean escaped = false;
+        while (index < raw.length()) {
+          char c = raw.charAt(index);
+          if (escaped) {
+            escaped = false;
+          } else if (c == '\\') {
+            escaped = true;
+          } else if (c == '"') {
+            index++;
+            break;
+          }
+          index++;
+        }
+      } else {
+        while (index < raw.length() && raw.charAt(index) != ';') index++;
+      }
+      params.put(name, raw.substring(valueStart, index).trim());
+    }
+    return params;
+  }
+
+  private static String requiredSignatureParam(Map<String, String> params, String name) {
+    String value = params.get(name);
+    if (value == null) throw new AidError("ERR_SECURITY", "Invalid Signature-Input");
+    return value;
+  }
+
+  private static boolean isAllowedSignatureParam(String name) {
+    return "nonce".equals(name)
+        || "keyid".equals(name)
+        || "alg".equals(name)
+        || "created".equals(name)
+        || "expires".equals(name)
+        || "tag".equals(name);
+  }
+
+  private static boolean isSignatureParamNameChar(char c) {
+    return (c >= 'A' && c <= 'Z')
+        || (c >= 'a' && c <= 'z')
+        || (c >= '0' && c <= '9')
+        || c == '_'
+        || c == '*'
+        || c == '.'
+        || c == '-';
+  }
+
+  private static String unquoteSfString(String value) {
+    if (!value.startsWith("\"") || !value.endsWith("\"")) return value;
+    StringBuilder out = new StringBuilder();
+    boolean escaped = false;
+    for (int i = 1; i < value.length() - 1; i++) {
+      char c = value.charAt(i);
+      if (escaped) {
+        out.append(c);
+        escaped = false;
+      } else if (c == '\\') {
+        escaped = true;
+      } else {
+        out.append(c);
+      }
+    }
+    return out.toString();
+  }
+
+  private static boolean hasNoStoreDirective(String cacheControl) {
+    if (cacheControl == null) return false;
+    for (String part : cacheControl.split(",")) {
+      String directive = part.trim().split(";", 2)[0].trim();
+      if ("no-store".equalsIgnoreCase(directive)) return true;
+    }
+    return false;
+  }
+
+  private static byte[] buildV2SignatureBase(
+      List<V2CoveredItem> covered,
+      String signatureParamsRaw,
+      String method,
+      String targetUri,
+      String authority,
+      int status) {
+    StringBuilder sb = new StringBuilder();
+    for (V2CoveredItem item : covered) {
+      if ("@method".equals(item.name)) {
+        sb.append("\"@method\";req: ").append(method).append('\n');
+      } else if ("@target-uri".equals(item.name)) {
+        sb.append("\"@target-uri\";req: ").append(targetUri).append('\n');
+      } else if ("@authority".equals(item.name)) {
+        sb.append("\"@authority\";req: ").append(authority).append('\n');
+      } else if ("@status".equals(item.name)) {
+        sb.append("\"@status\": ").append(status).append('\n');
+      } else {
+        throw new AidError("ERR_SECURITY", "Unsupported covered field: " + item.name);
+      }
+    }
+    sb.append("\"@signature-params\": ").append(signatureParamsRaw);
+    return sb.toString().getBytes(StandardCharsets.UTF_8);
+  }
+
+  private static String normalizeRequestUri(String uri) {
+    try {
+      URI u = URI.create(uri);
+      String scheme = u.getScheme();
+      if (scheme == null || u.getAuthority() == null) {
+        throw new AidError("ERR_SECURITY", "Invalid URI format: " + uri);
+      }
+      StringBuilder canonical = new StringBuilder();
+      canonical.append(asciiToLower(scheme)).append("://").append(requestAuthority(uri));
+      String rawPath = u.getRawPath();
+      if (rawPath != null) canonical.append(rawPath);
+      String rawQuery = u.getRawQuery();
+      if (rawQuery != null) canonical.append('?').append(rawQuery);
+      return canonical.toString();
+    } catch (AidError e) {
+      throw e;
+    } catch (Exception e) {
+      throw new AidError("ERR_SECURITY", "Invalid URI format: " + uri);
+    }
+  }
+
+  static String requestAuthority(String uri) {
+    URI u = URI.create(uri);
+    String host = u.getHost();
+    if (host == null) host = u.getAuthority();
+    host = host == null ? "" : host.toLowerCase(Locale.ROOT);
+    if (host.indexOf(':') >= 0 && !host.startsWith("[") && !host.endsWith("]")) {
+      host = "[" + host + "]";
+    }
+    int port = u.getPort();
+    boolean defaultPort = ("https".equalsIgnoreCase(u.getScheme()) && (port == -1 || port == 443))
+        || ("http".equalsIgnoreCase(u.getScheme()) && (port == -1 || port == 80));
+    return port == -1 || defaultPort ? host : host + ":" + port;
+  }
+
+  private static String deriveAid2Keyid(String pka) {
+    decodeAid2PublicKey(pka);
+    String jwkThumbprintInput = "{\"crv\":\"Ed25519\",\"kty\":\"OKP\",\"x\":\"" + pka + "\"}";
+    try {
+      byte[] digest = MessageDigest.getInstance("SHA-256").digest(jwkThumbprintInput.getBytes(StandardCharsets.UTF_8));
+      return base64UrlEncode(digest);
+    } catch (Exception e) {
+      throw new AidError("ERR_SECURITY", "PKA keyid derivation unavailable");
+    }
+  }
+
+  private static byte[] decodeAid2PublicKey(String pka) {
+    if (pka == null || pka.isEmpty() || pka.contains("=") || !pka.matches("^[A-Za-z0-9_-]+$")) {
+      throw new AidError("ERR_SECURITY", "Invalid aid2 PKA encoding");
+    }
+    int remainder = pka.length() % 4;
+    if (remainder == 1) {
+      throw new AidError("ERR_SECURITY", "Invalid aid2 PKA encoding");
+    }
+    String padded = pka + "=".repeat((4 - remainder) % 4);
+    byte[] decoded;
+    try {
+      decoded = Base64.getUrlDecoder().decode(padded);
+    } catch (IllegalArgumentException e) {
+      throw new AidError("ERR_SECURITY", "Invalid aid2 PKA encoding");
+    }
+    if (decoded.length != 32) throw new AidError("ERR_SECURITY", "Invalid PKA length");
+    return decoded;
+  }
+
+  private static String base64UrlEncode(byte[] data) {
+    return Base64.getUrlEncoder().withoutPadding().encodeToString(data);
+  }
+}

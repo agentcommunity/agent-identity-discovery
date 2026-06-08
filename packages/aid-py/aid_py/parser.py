@@ -8,13 +8,17 @@ Mirrors the TypeScript reference implementation in `packages/aid/src/parser.ts`.
 """
 from __future__ import annotations
 
+import base64
+import binascii
 import re
-from typing import Dict, Tuple, TypedDict
+from typing import Dict, Literal, TypedDict
 from urllib.parse import urlparse
 import datetime as _dt
 
 from .constants import (
-    SPEC_VERSION,
+    SPEC_VERSION_V1,
+    SPEC_VERSION_V2,
+    SUPPORTED_SPEC_VERSIONS,
     PROTOCOL_TOKENS,
     AUTH_TOKENS,
     ERROR_MESSAGES,
@@ -59,6 +63,29 @@ class AidRecord(TypedDict, total=False):
     kid: str
 
 
+class AidRecordV1(TypedDict, total=False):
+    v: Literal["aid1"]
+    uri: str
+    proto: str
+    auth: str
+    desc: str
+    docs: str
+    dep: str
+    pka: str
+    kid: str
+
+
+class AidRecordV2(TypedDict, total=False):
+    v: Literal["aid2"]
+    uri: str
+    proto: str
+    auth: str
+    desc: str
+    docs: str
+    dep: str
+    pka: str
+
+
 RawAidRecord = Dict[str, str]
 
 # ---------------------------------------------------------------------------
@@ -94,6 +121,19 @@ def _is_valid_local_uri(uri: str) -> bool:
     return scheme in LOCAL_URI_SCHEMES
 
 
+def _validate_aid2_pka(value: str) -> None:
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", value) or "=" in value:
+        raise AidError("ERR_INVALID_TXT", "aid2 pka must be unpadded base64url")
+    if len(value) % 4 == 1:
+        raise AidError("ERR_INVALID_TXT", "aid2 pka must be valid base64url")
+    try:
+        decoded = base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
+    except (binascii.Error, ValueError):
+        raise AidError("ERR_INVALID_TXT", "aid2 pka must be valid base64url") from None
+    if len(decoded) != 32:
+        raise AidError("ERR_INVALID_TXT", "aid2 pka must decode to exactly 32 bytes")
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -125,11 +165,12 @@ def validate_record(raw: RawAidRecord) -> AidRecord:
         raise AidError("ERR_INVALID_TXT", "Missing required field: proto (or p)")
 
     # Version check
-    if raw["v"] != SPEC_VERSION:
+    if raw["v"] not in SUPPORTED_SPEC_VERSIONS:
         raise AidError(
             "ERR_INVALID_TXT",
-            f"Unsupported version: {raw['v']}. Expected: {SPEC_VERSION}",
+            f"Unsupported version: {raw['v']}. Expected one of: {', '.join(SUPPORTED_SPEC_VERSIONS)}",
         )
+    version = raw["v"]
 
     proto_value = raw.get("proto") or raw.get("p")  # already ensured exists
     if proto_value not in PROTOCOL_TOKENS:
@@ -168,6 +209,16 @@ def validate_record(raw: RawAidRecord) -> AidRecord:
         except Exception:
             raise AidError("ERR_INVALID_TXT", "dep MUST be an ISO 8601 UTC timestamp (e.g., 2026-01-01T00:00:00Z)")
 
+    pka_val = raw.get("pka") or raw.get("k")
+    kid_val = raw.get("kid") or raw.get("i")
+    if version == SPEC_VERSION_V1 and pka_val and not kid_val:
+        raise AidError("ERR_INVALID_TXT", "kid is required when pka is present")
+    if version == SPEC_VERSION_V2:
+        if kid_val:
+            raise AidError("ERR_INVALID_TXT", "kid/i is not allowed in aid2 records")
+        if pka_val:
+            _validate_aid2_pka(pka_val)
+
     # URI validation
     uri = uri_val
     if proto_value == "local":
@@ -205,7 +256,7 @@ def validate_record(raw: RawAidRecord) -> AidRecord:
 
     # Build typed record
     record: AidRecord = {
-        "v": "aid1",
+        "v": version,
         "uri": uri,
         "proto": proto_value,  # type: ignore[assignment]
     }
@@ -217,13 +268,9 @@ def validate_record(raw: RawAidRecord) -> AidRecord:
         record["docs"] = docs_val
     if dep_val:
         record["dep"] = dep_val
-    pka_val = raw.get("pka") or raw.get("k")
-    kid_val = raw.get("kid") or raw.get("i")
-    if pka_val and not kid_val:
-        raise AidError("ERR_INVALID_TXT", "kid is required when pka is present")
     if pka_val:
         record["pka"] = pka_val
-    if kid_val:
+    if version == SPEC_VERSION_V1 and kid_val:
         record["kid"] = kid_val
     return record
 
@@ -235,6 +282,22 @@ def parse(txt_record: str) -> AidRecord:
     return validate_record(raw)
 
 
+def as_v1(record: AidRecord) -> AidRecordV1 | None:
+    """Project a compatibility record into the aid1-specific contract."""
+
+    if record.get("v") != SPEC_VERSION_V1:
+        return None
+    return AidRecordV1(record)
+
+
+def as_v2(record: AidRecord) -> AidRecordV2 | None:
+    """Project a compatibility record into the aid2-specific contract."""
+
+    if record.get("v") != SPEC_VERSION_V2 or "kid" in record:
+        return None
+    return AidRecordV2(record)
+
+
 def is_valid_proto(token: str) -> bool:
     return token in PROTOCOL_TOKENS
 
@@ -242,6 +305,12 @@ def is_valid_proto(token: str) -> bool:
 # Expose main helpers for import convenience
 __all__ = [
     "AidError",
+    "AidRecord",
+    "AidRecordV1",
+    "AidRecordV2",
+    "RawAidRecord",
+    "as_v1",
+    "as_v2",
     "parse",
     "validate_record",
     "is_valid_proto",

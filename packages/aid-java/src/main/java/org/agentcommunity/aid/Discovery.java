@@ -12,8 +12,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
 
 public final class Discovery {
   private Discovery() {}
@@ -58,10 +56,37 @@ public final class Discovery {
     public int ttl;
   }
 
-  private static class ParsedRecordWithTtl {
+  static final class RawTxtAnswer {
+    final String data;
+    final int ttl;
+    RawTxtAnswer(String data, int ttl) {
+      this.data = data;
+      this.ttl = ttl;
+    }
+  }
+
+  static final class ParsedRecordWithTtl {
     final AidRecord record;
     final int ttl;
     ParsedRecordWithTtl(AidRecord record, int ttl) { this.record = record; this.ttl = ttl; }
+  }
+
+  @FunctionalInterface
+  interface WellKnownFetcher {
+    AidRecord fetch(String domain, Duration timeout);
+  }
+
+  static List<String> queryNames(String alabel, String protocol) {
+    List<String> names = new ArrayList<>();
+    if (protocol != null && !protocol.isEmpty()) {
+      names.add(Constants.DNS_SUBDOMAIN + "._" + protocol + "." + alabel);
+    }
+    names.add(Constants.DNS_SUBDOMAIN + "." + alabel);
+    return names;
+  }
+
+  static boolean isNoRecordDohStatus(int status) {
+    return status == 3;
   }
 
   private static DoHResponse queryTxtDoH(String fqdn, Duration timeout) {
@@ -73,7 +98,10 @@ public final class Discovery {
       if (res.statusCode() / 100 != 2) throw new AidError("ERR_DNS_LOOKUP_FAILED", "DoH HTTP "+res.statusCode());
       ObjectMapper mapper = new ObjectMapper();
       DoHResponse doh = mapper.readValue(res.body(), DoHResponse.class);
-      if (doh.status != 0) throw new AidError("ERR_DNS_LOOKUP_FAILED", "DoH status: " + doh.status);
+      if (doh.status != 0) {
+        if (isNoRecordDohStatus(doh.status)) throw new AidError("ERR_NO_RECORD", "No TXT answers for " + fqdn);
+        throw new AidError("ERR_DNS_LOOKUP_FAILED", "DoH status: " + doh.status);
+      }
       if (doh.answer == null || doh.answer.isEmpty()) throw new AidError("ERR_NO_RECORD", "No TXT answers for "+fqdn);
       // Clean up quoted string data from DoH response
       for (DoHAnswer ans : doh.answer) {
@@ -85,38 +113,73 @@ public final class Discovery {
     catch (Exception e) { throw new AidError("ERR_DNS_LOOKUP_FAILED", e.getMessage()); }
   }
 
-  private static ParsedRecordWithTtl parseSingleValid(List<DoHAnswer> answers, Duration timeout, String queryName) {
+  static ParsedRecordWithTtl selectValidRecord(List<RawTxtAnswer> answers, Duration timeout, String queryName, boolean performHandshake) {
     AidError last = null;
-    ParsedRecordWithTtl valid = null;
-    int validCount = 0;
-    for (DoHAnswer answer : answers) {
+    List<ParsedRecordWithTtl> validRecords = new ArrayList<>();
+    for (RawTxtAnswer answer : answers) {
+      if (!looksLikeAidRecord(answer.data)) continue;
       try {
         AidRecord rec = Parser.parse(answer.data);
-        valid = new ParsedRecordWithTtl(rec, answer.ttl);
-        validCount += 1;
+        validRecords.add(new ParsedRecordWithTtl(rec, answer.ttl));
       } catch (AidError e) { last = e; }
     }
-    if (validCount == 1 && valid != null) {
-      if (valid.record.pka != null) Handshake.performHandshake(valid.record.uri, valid.record.pka, valid.record.kid == null ? "" : valid.record.kid, timeout);
-      return valid;
+
+    if (!validRecords.isEmpty()) {
+      String selectedVersion = Constants.SPEC_VERSION_V1;
+      for (ParsedRecordWithTtl result : validRecords) {
+        if (Constants.SPEC_VERSION_V2.equals(result.record.v)) {
+          selectedVersion = Constants.SPEC_VERSION_V2;
+          break;
+        }
+      }
+      List<ParsedRecordWithTtl> selectedRecords = new ArrayList<>();
+      for (ParsedRecordWithTtl result : validRecords) {
+        if (selectedVersion.equals(result.record.v)) {
+          selectedRecords.add(result);
+        }
+      }
+      if (selectedRecords.size() > 1) {
+        throw new AidError(
+            "ERR_INVALID_TXT",
+            "Multiple valid " + selectedVersion + " AID records found for " + queryName + "; publish exactly one valid record per queried DNS name");
+      }
+      ParsedRecordWithTtl selected = selectedRecords.get(0);
+      if (performHandshake && selected.record.pka != null) {
+        Handshake.performHandshake(selected.record.uri, selected.record.pka, selected.record.kid == null ? "" : selected.record.kid, timeout);
+      }
+      return selected;
     }
-    if (validCount > 1) {
-      throw new AidError(
-          "ERR_INVALID_TXT",
-          "Multiple valid AID records found for " + queryName + "; publish exactly one valid record per queried DNS name");
-    }
+
     throw last != null ? last : new AidError("ERR_NO_RECORD", "No valid AID record in TXT answers");
+  }
+
+  private static boolean looksLikeAidRecord(String raw) {
+    if (raw == null) return false;
+    String[] parts = raw.split(";");
+    for (String part : parts) {
+      String pair = part.trim();
+      int idx = pair.indexOf('=');
+      if (idx < 0) continue;
+      String key = pair.substring(0, idx).trim().toLowerCase(Locale.ROOT);
+      if (!"v".equals(key) && !"version".equals(key)) continue;
+      String value = pair.substring(idx + 1).trim();
+      return value.toLowerCase(Locale.ROOT).matches("aid[0-9]+");
+    }
+    return false;
+  }
+
+  private static ParsedRecordWithTtl parseSingleValid(List<DoHAnswer> answers, Duration timeout, String queryName) {
+    List<RawTxtAnswer> rawAnswers = new ArrayList<>();
+    for (DoHAnswer answer : answers) {
+      rawAnswers.add(new RawTxtAnswer(answer.data, answer.ttl));
+    }
+    return selectValidRecord(rawAnswers, timeout, queryName, true);
   }
 
   public static DiscoveryResult discover(String domain, DiscoveryOptions options) {
     if (options == null) options = new DiscoveryOptions();
     String alabel = toALabel(domain);
-    List<String> names = new ArrayList<>();
-    if (options.protocol != null && !options.protocol.isEmpty()) {
-      names.add(Constants.DNS_SUBDOMAIN + "._" + options.protocol + "." + alabel);
-      names.add(Constants.DNS_SUBDOMAIN + "." + options.protocol + "." + alabel);
-    }
-    names.add(Constants.DNS_SUBDOMAIN + "." + alabel);
+    List<String> names = queryNames(alabel, options.protocol);
 
     AidError last = null;
     for (String name : names) {
@@ -133,10 +196,26 @@ public final class Discovery {
       }
     }
 
-    if (options.wellKnownFallback && last != null && ("ERR_NO_RECORD".equals(last.errorCode) || "ERR_DNS_LOOKUP_FAILED".equals(last.errorCode))) {
-      AidRecord rec = WellKnown.fetch(alabel, options.wellKnownTimeout, false);
-      return new DiscoveryResult(rec, Constants.DNS_TTL_MIN, Constants.DNS_SUBDOMAIN+"."+alabel);
+    return resolveWellKnownFallback(alabel, options, last, (fallbackDomain, timeout) -> WellKnown.fetch(fallbackDomain, timeout, false));
+  }
+
+  static DiscoveryResult resolveWellKnownFallback(
+      String alabel, DiscoveryOptions options, AidError last, WellKnownFetcher fetcher) {
+    if (last != null && isWellKnownFallbackEligible(last)) {
+      if (options.requireDnssec) {
+        throw new AidError(
+            "ERR_SECURITY",
+            "DNSSEC is required; .well-known fallback cannot satisfy dnssec=require for " + alabel);
+      }
+      if (options.wellKnownFallback) {
+        AidRecord rec = fetcher.fetch(alabel, options.wellKnownTimeout);
+        return new DiscoveryResult(rec, Constants.DNS_TTL_MIN, Constants.DNS_SUBDOMAIN+"."+alabel);
+      }
     }
     throw last != null ? last : new AidError("ERR_DNS_LOOKUP_FAILED", "DNS query failed");
+  }
+
+  private static boolean isWellKnownFallbackEligible(AidError error) {
+    return "ERR_NO_RECORD".equals(error.errorCode) || "ERR_DNS_LOOKUP_FAILED".equals(error.errorCode);
   }
 }

@@ -15,7 +15,7 @@ Think of AID as a **phone book for AI agents**, built on DNS — the same system
 Every domain owner can publish a single TXT record at `_agent.<domain>` that says: "My agent is here, it speaks this protocol, and here's how to verify it's really me."
 
 ```
-_agent.example.com  TXT  "v=aid1;u=https://api.example.com/mcp;p=mcp;s=My Agent"
+_agent.example.com  TXT  "v=aid2;u=https://api.example.com/mcp;p=mcp;s=My Agent"
 ```
 
 That's it. No registry to sign up for. No SDK to install on the provider side. Just a DNS record.
@@ -46,22 +46,22 @@ flowchart TD
 Every AID record is a semicolon-delimited string of `key=value` pairs.
 
 ```
-v=aid1;u=https://api.example.com/mcp;p=mcp;a=pat;s=My AI Agent;d=https://docs.example.com
+v=aid2;u=https://api.example.com/mcp;p=mcp;a=pat;s=My AI Agent;d=https://docs.example.com
 ```
 
 Here's what each key means:
 
-| Key       | Alias | Required    | Purpose                                       |
-| --------- | ----- | ----------- | --------------------------------------------- |
-| `version` | `v`   | Yes         | Must be `aid1`. Identifies the spec version.  |
-| `uri`     | `u`   | Yes         | The agent's endpoint URL.                     |
-| `proto`   | `p`   | Yes         | Which protocol the endpoint speaks.           |
-| `auth`    | `a`   | Recommended | Hint for the authentication method.           |
-| `desc`    | `s`   | Optional    | Human-readable description (max 60 bytes).    |
-| `docs`    | `d`   | Optional    | Link to the agent's documentation.            |
-| `dep`     | `e`   | Optional    | Deprecation timestamp (ISO 8601 UTC).         |
-| `pka`     | `k`   | Optional    | Ed25519 public key for identity verification. |
-| `kid`     | `i`   | With `pka`  | Key rotation ID (1–6 chars).                  |
+| Key       | Alias | Required    | Purpose                                                            |
+| --------- | ----- | ----------- | ------------------------------------------------------------------ |
+| `version` | `v`   | Yes         | `aid2` for new records. `aid1` remains valid during compatibility. |
+| `uri`     | `u`   | Yes         | The agent's endpoint URL.                                          |
+| `proto`   | `p`   | Yes         | Which protocol the endpoint speaks.                                |
+| `auth`    | `a`   | Recommended | Hint for the authentication method.                                |
+| `desc`    | `s`   | Optional    | Human-readable description (max 60 bytes).                         |
+| `docs`    | `d`   | Optional    | Link to the agent's documentation.                                 |
+| `dep`     | `e`   | Optional    | Deprecation timestamp (ISO 8601 UTC).                              |
+| `pka`     | `k`   | Optional    | Ed25519 public key for endpoint proof.                             |
+| `kid`     | `i`   | v1 only     | Legacy `aid1` key id. v2 derives `keyid` from `k`.                 |
 
 **Aliases** (`v`, `u`, `p`, etc.) exist for byte efficiency in DNS TXT records, which have a 255-byte-per-string limit. Use whichever form you prefer — clients understand both.
 
@@ -78,7 +78,7 @@ flowchart TD
     E -->|No| F["Error: no agent found"]
     C -->|Yes| G["Parse key=value pairs"]
     E -->|Yes| G
-    G --> H{Valid? v=aid1 + uri + proto}
+    G --> H{Valid? version + uri + proto}
     H -->|No| I["Error: invalid record"]
     H -->|Yes| J{PKA key present?}
     J -->|Yes| K["Perform PKA handshake\n(verify server identity)"]
@@ -94,7 +94,7 @@ flowchart TD
 **Key points:**
 
 - DNS is always tried first. The `.well-known` fallback is only used if DNS fails.
-- A record is invalid without all three required keys: `v=aid1`, `uri`, and `proto`.
+- A record is invalid without all three required keys: `v`, `uri`, and `proto`.
 - PKA verification happens before the client trusts the connection.
 
 ## Choosing a Protocol

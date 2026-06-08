@@ -1,5 +1,14 @@
-import { type AidRecord } from './constants.js';
+import { type AidRecord, type AidSpecVersion } from './constants.js';
 import { AidError } from './parser.js';
+
+let nodeWebcrypto: unknown;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const nodeCrypto = require('node:crypto');
+  nodeWebcrypto = nodeCrypto.webcrypto;
+} catch {
+  // Browser runtime.
+}
 
 export type SecurityMode = 'balanced' | 'strict';
 export type DnssecPolicy = 'off' | 'prefer' | 'require';
@@ -8,7 +17,18 @@ export type DowngradePolicy = 'off' | 'warn' | 'fail';
 export type WellKnownPolicy = 'auto' | 'disable';
 
 export interface PreviousSecurityState {
+  domain?: string;
+  queriedName?: string;
+  proto?: string;
+  version?: AidSpecVersion;
+  uri?: string;
+  keyThumbprints?: string[];
+  trustSource?: 'dns' | 'well-known-tls';
+  dnssecValidated?: boolean | null;
+  observedAt?: string;
+  /** Legacy cache shape retained for read-old/write-new migration. */
   pka?: string | null;
+  /** Legacy aid1 DNS kid retained only for migration. */
   kid?: string | null;
 }
 
@@ -169,43 +189,157 @@ export function enforcePkaPolicy(
   if (security.pka.policy === 'require' && !record.pka) {
     throw new AidError(
       'ERR_SECURITY',
-      `PKA is required by security policy for ${queryName}; publish pka and kid before using this endpoint`,
+      `PKA is required by security policy for ${queryName}; publish pka before using this endpoint`,
     );
   }
 }
 
-export function enforceDowngradePolicy(
+const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+const B58_MAP = new Map<string, number>(Array.from(B58).map((c, i) => [c, i]));
+
+function uint8ToBase64Url(bytes: Uint8Array): string {
+  const binary = Array.from(bytes, (b) => String.fromCharCode(b)).join('');
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function base64ToUint8(b64: string): Uint8Array {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+function base64UrlToUint8(value: string): Uint8Array {
+  if (!/^[A-Za-z0-9_-]+$/.test(value) || value.includes('=')) {
+    throw new AidError('ERR_SECURITY', 'Invalid aid2 PKA encoding');
+  }
+  const remainder = value.length % 4;
+  if (remainder === 1) {
+    throw new AidError('ERR_SECURITY', 'Invalid aid2 PKA encoding');
+  }
+  const padded = value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - remainder) % 4);
+  return base64ToUint8(padded);
+}
+
+function base58Decode(value: string): Uint8Array {
+  if (!value) return new Uint8Array();
+  let zeros = 0;
+  while (zeros < value.length && value[zeros] === '1') zeros++;
+  const size = (((value.length - zeros) * Math.log(58)) / Math.log(256) + 1) | 0;
+  const bytes = new Uint8Array(size);
+  for (let i = zeros; i < value.length; i++) {
+    const digit = B58_MAP.get(value[i]);
+    if (digit === undefined) throw new AidError('ERR_SECURITY', 'Invalid base58 character');
+    let carry = digit;
+    for (let j = size - 1; j >= 0; j--) {
+      carry += 58 * bytes[j];
+      bytes[j] = carry & 0xff;
+      carry >>= 8;
+    }
+  }
+  let start = 0;
+  while (start < bytes.length && bytes[start] === 0) start++;
+  const out = new Uint8Array(zeros + (bytes.length - start));
+  out.fill(0, 0, zeros);
+  out.set(bytes.subarray(start), zeros);
+  return out;
+}
+
+function decodePkaToJwkX(pka: string, version?: AidSpecVersion): string {
+  if (version === 'aid1' || pka.startsWith('z')) {
+    if (!pka.startsWith('z')) throw new AidError('ERR_SECURITY', 'Unsupported multibase prefix');
+    const publicKey = base58Decode(pka.slice(1));
+    if (publicKey.length !== 32) throw new AidError('ERR_SECURITY', 'Invalid PKA length');
+    return uint8ToBase64Url(publicKey);
+  }
+
+  const publicKey = base64UrlToUint8(pka);
+  if (publicKey.length !== 32) throw new AidError('ERR_SECURITY', 'Invalid PKA length');
+  return pka;
+}
+
+async function sha256Base64Url(input: string): Promise<string> {
+  const cryptoImpl =
+    (globalThis as unknown as { crypto?: Crypto }).crypto ?? (nodeWebcrypto as Crypto | undefined);
+  if (!cryptoImpl?.subtle) {
+    throw new AidError('ERR_SECURITY', 'crypto.subtle is not available in this environment');
+  }
+  const digest = await cryptoImpl.subtle.digest('SHA-256', new TextEncoder().encode(input));
+  return uint8ToBase64Url(new Uint8Array(digest));
+}
+
+async function derivePkaThumbprint(
+  pka: string | null | undefined,
+  version?: AidSpecVersion,
+): Promise<string | null> {
+  if (!pka) return null;
+  const jwkX = decodePkaToJwkX(pka, version);
+  return sha256Base64Url(`{"crv":"Ed25519","kty":"OKP","x":"${jwkX}"}`);
+}
+
+async function collectPreviousThumbprints(state: PreviousSecurityState): Promise<string[]> {
+  if (state.keyThumbprints?.length) {
+    return state.keyThumbprints;
+  }
+  try {
+    const thumbprint = await derivePkaThumbprint(state.pka, state.version);
+    return thumbprint ? [thumbprint] : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function enforceDowngradePolicy(
   record: AidRecord,
   queryName: string,
   policy: ResolvedSecurityPolicy,
   security: DiscoverySecurity,
-): void {
+): Promise<void> {
   if (policy.downgradePolicy === 'off' || !policy.previousSecurity) {
     return;
   }
 
-  const previousPka = policy.previousSecurity.pka ?? null;
-  const previousKid = policy.previousSecurity.kid ?? null;
+  const previousState = policy.previousSecurity;
+  const previousPka = previousState.pka ?? null;
   const currentPka = record.pka ?? null;
-  const currentKid = record.kid ?? null;
+  const previousThumbprints = await collectPreviousThumbprints(previousState);
+  let currentThumbprint: string | null = null;
+  try {
+    currentThumbprint = await derivePkaThumbprint(currentPka, record.v);
+  } catch {
+    currentThumbprint = null;
+  }
 
-  const isRemoval = Boolean(previousPka && !currentPka);
-  const isKeyChange =
-    Boolean(previousPka && currentPka && previousPka !== currentPka) ||
-    Boolean(previousKid && currentKid && previousKid !== currentKid);
+  const previousHadPka = previousThumbprints.length > 0 || Boolean(previousPka);
+  const currentHasPka = Boolean(currentThumbprint || currentPka);
+  const isRemoval = previousHadPka && !currentHasPka;
+  const sameDerivedKey = Boolean(
+    currentThumbprint && previousThumbprints.some((thumbprint) => thumbprint === currentThumbprint),
+  );
+  const sameLegacyRawKey = Boolean(
+    !currentThumbprint && previousPka && currentPka && previousPka === currentPka,
+  );
+  const isKeyChange = previousHadPka && currentHasPka && !sameDerivedKey && !sameLegacyRawKey;
+  const isVersionDowngrade = previousState.version === 'aid2' && record.v === 'aid1';
+  const isFallbackTrustDowngrade =
+    previousState.trustSource === 'dns' && security.wellKnown.used === true;
 
-  if (!isRemoval && !isKeyChange) {
+  if (!isRemoval && !isKeyChange && !isVersionDowngrade && !isFallbackTrustDowngrade) {
     return;
   }
 
-  const reason = isRemoval
-    ? 'previously present pka was removed'
-    : 'pka/kid value changed (key rotation)';
+  const reason = isVersionDowngrade
+    ? 'version downgraded from aid2 to aid1'
+    : isFallbackTrustDowngrade
+      ? 'DNS record unavailable; using well-known-tls trust'
+      : isRemoval
+        ? 'previously present pka was removed'
+        : 'pka key thumbprint changed';
 
   security.downgrade.detected = true;
   security.downgrade.reason = reason;
 
-  if (isRemoval && policy.downgradePolicy === 'fail') {
+  if (policy.downgradePolicy === 'fail') {
     throw new AidError('ERR_SECURITY', `Security downgrade detected for ${queryName}: ${reason}`);
   }
   addSecurityWarning(security, {

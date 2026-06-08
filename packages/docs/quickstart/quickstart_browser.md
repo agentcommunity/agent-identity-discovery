@@ -26,7 +26,8 @@ console.log(record.proto, record.uri, ttl);
 ## Options
 
 ```ts
-// Hint protocol-specific subdomain first
+// Query _agent.<domain> first. Protocol-prefixed probing is legacy, diagnostic,
+// or base-failure-only where supported and configured.
 await discover('example.com', { protocol: 'mcp' });
 
 // Custom DoH endpoint (defaults to Cloudflare)
@@ -37,7 +38,7 @@ await discover('example.com', { dohProvider: 'https://dns.google/dns-query' });
 
 ```ts
 import { parse } from '@agentcommunity/aid';
-console.log(parse('v=aid1;u=https://api.example.com/mcp;p=mcp').uri);
+console.log(parse('v=aid2;u=https://api.example.com/mcp;p=mcp').uri);
 ```
 
 Security

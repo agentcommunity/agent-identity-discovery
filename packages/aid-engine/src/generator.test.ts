@@ -14,7 +14,7 @@ describe('AID Engine Generator', () => {
   describe('buildTxtRecordVariant', () => {
     it('should emit canonical short keys even when legacy full-key mode is requested', () => {
       const record = buildTxtRecordVariant(sampleData, false);
-      expect(record).toContain('v=aid1'); // Version always uses alias
+      expect(record).toContain('v=aid2'); // Version always uses alias
       expect(record).toContain('u=https://api.example.com/agent');
       expect(record).toContain('p=mcp');
       expect(record).toContain('a=pat');
@@ -23,7 +23,7 @@ describe('AID Engine Generator', () => {
 
     it('should emit canonical short keys when alias mode is requested', () => {
       const record = buildTxtRecordVariant(sampleData, true);
-      expect(record).toContain('v=aid1');
+      expect(record).toContain('v=aid2');
       expect(record).toContain('u=https://api.example.com/agent');
       expect(record).toContain('p=mcp');
       expect(record).toContain('a=pat');
@@ -37,7 +37,7 @@ describe('AID Engine Generator', () => {
         proto: 'mcp',
       };
       const record = buildTxtRecordVariant(minimalData, false);
-      expect(record).toContain('v=aid1'); // Version always uses alias
+      expect(record).toContain('v=aid2'); // Version always uses alias
       expect(record).toContain('u=https://test.com/api');
       expect(record).toContain('p=mcp');
       expect(record).not.toContain('auth=');
@@ -53,7 +53,7 @@ describe('AID Engine Generator', () => {
         desc: '',
       };
       const record = buildTxtRecordVariant(dataWithEmptyOptionals, false);
-      expect(record).toContain('v=aid1'); // Version always uses alias
+      expect(record).toContain('v=aid2'); // Version always uses alias
       expect(record).toContain('u=https://test.com/api');
       expect(record).toContain('p=mcp');
       expect(record).not.toContain('auth=');
@@ -63,7 +63,7 @@ describe('AID Engine Generator', () => {
 
   describe('validateTxtRecord', () => {
     it('should validate correct AID record', () => {
-      const validRecord = 'v=aid1;u=https://api.example.com/agent;p=mcp';
+      const validRecord = 'v=aid2;u=https://api.example.com/agent;p=mcp';
       const result = validateTxtRecord(validRecord);
       expect(result.isValid).toBe(true);
       expect(result.error).toBeUndefined();
@@ -77,28 +77,28 @@ describe('AID Engine Generator', () => {
     });
 
     it('should reject record without uri', () => {
-      const invalidRecord = 'v=aid1;p=mcp';
+      const invalidRecord = 'v=aid2;p=mcp';
       const result = validateTxtRecord(invalidRecord);
       expect(result.isValid).toBe(false);
       expect(result.error).toContain('uri');
     });
 
     it('should reject record without proto', () => {
-      const invalidRecord = 'v=aid1;u=https://api.example.com/agent';
+      const invalidRecord = 'v=aid2;u=https://api.example.com/agent';
       const result = validateTxtRecord(invalidRecord);
       expect(result.isValid).toBe(false);
       expect(result.error).toContain('proto');
     });
 
     it('should reject record with wrong version', () => {
-      const invalidRecord = 'v=aid2;u=https://api.example.com/agent;p=mcp';
+      const invalidRecord = 'v=aid3;u=https://api.example.com/agent;p=mcp';
       const result = validateTxtRecord(invalidRecord);
       expect(result.isValid).toBe(false);
       expect(result.error).toContain('version');
     });
 
     it('should validate record with aliases', () => {
-      const validRecord = 'v=aid1;u=https://api.example.com/agent;p=mcp';
+      const validRecord = 'v=aid2;u=https://api.example.com/agent;p=mcp';
       const result = validateTxtRecord(validRecord);
       expect(result.isValid).toBe(true);
     });
@@ -112,9 +112,9 @@ describe('AID Engine Generator', () => {
     it('should handle malformed records', () => {
       const malformedRecords = [
         'not a record',
-        'v=aid1;u;p=mcp', // empty uri
-        'v=aid1;u=invalid;p=mcp', // invalid uri
-        'v=aid1;u=https://test.com;p=invalid', // invalid proto
+        'v=aid2;u;p=mcp', // empty uri
+        'v=aid2;u=invalid;p=mcp', // invalid uri
+        'v=aid2;u=https://test.com;p=invalid', // invalid proto
       ];
 
       malformedRecords.forEach((record) => {
@@ -128,14 +128,14 @@ describe('AID Engine Generator', () => {
   describe('findLongKeyNames', () => {
     it('finds compatibility-only long keys in a TXT record', () => {
       const longKeys = findLongKeyNames(
-        'version=aid1;uri=https://api.example.com/agent;proto=mcp;auth=pat;desc=Example Agent',
+        'version=aid2;uri=https://api.example.com/agent;proto=mcp;auth=pat;desc=Example Agent',
       );
 
       expect(longKeys).toEqual(['version', 'uri', 'proto', 'auth', 'desc']);
     });
 
     it('ignores canonical short-key records', () => {
-      expect(findLongKeyNames('v=aid1;u=https://api.example.com/agent;p=mcp')).toEqual([]);
+      expect(findLongKeyNames('v=aid2;u=https://api.example.com/agent;p=mcp')).toEqual([]);
     });
   });
 });

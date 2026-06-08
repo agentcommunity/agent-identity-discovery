@@ -3,7 +3,19 @@
 // Auto-generated from protocol/constants.yml by scripts/generate-constants.ts
 // Run 'pnpm gen' to regenerate.
 
-pub const SPEC_VERSION: &str = "aid1";
+pub const SPEC_VERSION_V1: &str = "aid1";
+pub const SPEC_VERSION_V2: &str = "aid2";
+pub const SPEC_VERSION: &str = "aid2";
+pub const SUPPORTED_SPEC_VERSIONS: &[&str] = &["aid1", "aid2"];
+
+// Version-specific raw record metadata. AidRecordV2 excludes legacy DNS kid/i.
+pub const AID_RECORD_V1_CANONICAL_FIELDS: &[&str] = &[
+    "v", "uri", "proto", "auth", "desc", "docs", "dep", "pka", "kid",
+];
+pub const AID_RECORD_V1_ALIAS_FIELDS: &[&str] = &["p", "u", "a", "s", "d", "e", "k", "i"];
+pub const AID_RECORD_V2_CANONICAL_FIELDS: &[&str] =
+    &["v", "uri", "proto", "auth", "desc", "docs", "dep", "pka"];
+pub const AID_RECORD_V2_ALIAS_FIELDS: &[&str] = &["p", "u", "a", "s", "d", "e", "k"];
 
 // Protocol tokens
 pub const PROTO_A2A: &str = "a2a";

@@ -15,6 +15,12 @@ interface PageProps {
   params: Promise<{ slug?: string[] }>;
 }
 
+function docsRouteHref(slug: string): string {
+  return slug.replace(/^(Understand|Reference|Tooling)(?=\/|$)/, (section) =>
+    section.toLowerCase(),
+  );
+}
+
 // Required for CF Workers: next-mdx-remote/rsc is marked as a Turbopack external
 // and fails at runtime on Workers with `Context.externalImport`. Forcing static-only
 // rendering means unknown slugs return a clean 404 instead of invoking the dynamic
@@ -36,13 +42,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (!doc) return {};
 
   const canonicalSlug = doc.slug;
-  const ogSlug = canonicalSlug === 'index' ? '' : canonicalSlug;
+  const ogSlug = canonicalSlug === 'index' ? '' : docsRouteHref(canonicalSlug);
   const ogUrl = `/api/og/docs?title=${encodeURIComponent(doc.title)}&description=${encodeURIComponent(doc.description)}&slug=${encodeURIComponent(ogSlug)}`;
 
   return {
     title: doc.title,
     description: doc.description,
-    alternates: { canonical: `/docs${canonicalSlug === 'index' ? '' : `/${canonicalSlug}`}` },
+    alternates: { canonical: `/docs${canonicalSlug === 'index' ? '' : `/${ogSlug}`}` },
     openGraph: {
       title: doc.title,
       description: doc.description,

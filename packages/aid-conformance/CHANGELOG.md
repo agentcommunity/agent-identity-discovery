@@ -1,5 +1,18 @@
 # @agentcommunity/aid-conformance
 
+## 2.0.0
+
+### Major Changes
+
+- Expand conformance coverage for `aid2` parser selection, v2 PKA vectors, enterprise policy fixtures, and structured expected-failure evidence.
+- Harden the runner so v2 PKA pass vectors must include verifiable request, response, signature base, nonce, and expiry material.
+- Publish v2-aligned golden and enterprise fixtures for downstream SDK parity tests.
+
+### Patch Changes
+
+- Updated dependencies
+  - @agentcommunity/aid@2.0.0
+
 ## 1.2.0
 
 ### Minor Changes

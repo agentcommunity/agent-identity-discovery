@@ -15,7 +15,7 @@ export const ERROR_MESSAGES = {
 
   // Record validation
   INVALID_TXT_FORMAT:
-    'The AID TXT record has an invalid format. Ensure it follows v=aid1;key=value;... structure.',
+    'The AID TXT record has an invalid format. Ensure it follows v=aid2;key=value;... structure.',
   UNSUPPORTED_PROTOCOL:
     'The specified protocol is not supported. See the official protocol registry for valid tokens.',
   DEPRECATED_RECORD:
@@ -40,9 +40,9 @@ export const ERROR_MESSAGES = {
   DNSSEC_NOT_DETECTED: 'DNSSEC not detected. Enable for better integrity.',
   PKA_NOT_PRESENT: 'Endpoint proof (PKA) not present. Consider adding for security.',
   LONG_KEY_COMPAT:
-    'Long TXT keys are compatibility-only in v1.x. Publish short keys (v,u,p,a,s,d,e,k,i) as the canonical wire format.',
+    'Long TXT keys are compatibility-only. Publish short keys (v,u,p,a,s,d,e,k) as the canonical v2 wire format.',
   DOWNGRADE_DETECTED: 'Security downgrade detected: a previously present PKA has been removed.',
-  KEY_ROTATION_DETECTED: 'Key rotation detected: PKA or KID value has changed.',
+  KEY_ROTATION_DETECTED: 'Key replacement detected: PKA key material has changed.',
 
   // Recommendations
   ENABLE_DNSSEC: 'Enable DNSSEC at your domain registrar to improve DNS integrity.',

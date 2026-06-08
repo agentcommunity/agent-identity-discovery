@@ -60,10 +60,64 @@ describe('Browser client', () => {
       expect(record.proto).toBe('mcp');
       expect(record.uri).toBe('https://api.example.com/mcp');
     });
+
+    it('does not fall back to well-known after DNS-selected PKA security failure', async () => {
+      g.fetch = vi.fn(async (url: string) => {
+        const target = url.toString();
+        if (target.startsWith('https://cloudflare-dns.com')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              Status: 0,
+              Answer: [
+                {
+                  name: '_agent.example.com',
+                  type: 16,
+                  TTL: 300,
+                  data: '"v=aid1;u=https://api.example.com/mcp;p=mcp;k=z11111111111111111111111111111111;i=key-1"',
+                },
+              ],
+            }),
+          };
+        }
+        if (target === 'https://api.example.com/mcp') {
+          return {
+            ok: true,
+            status: 200,
+            headers: { get: () => null },
+            text: async () => '',
+          };
+        }
+        if (target.includes('/.well-known/agent')) {
+          return {
+            ok: true,
+            status: 200,
+            headers: {
+              get: (name: string) =>
+                name.toLowerCase() === 'content-type' ? 'application/json' : null,
+            },
+            text: async () =>
+              JSON.stringify({ v: 'aid1', u: 'https://fallback.example.com/mcp', p: 'mcp' }),
+          };
+        }
+        return { ok: false, status: 404, text: async () => 'Not Found' };
+      });
+
+      await expect(
+        browser.discover('example.com', {
+          wellKnownFallback: true,
+        }),
+      ).rejects.toMatchObject({ errorCode: 'ERR_SECURITY' });
+      expect(g.fetch).not.toHaveBeenCalledWith(
+        'https://example.com/.well-known/agent',
+        expect.any(Object),
+      );
+    });
   });
 
   describe('protocol resolution', () => {
-    it('queries underscore and then base when protocol is specified', async () => {
+    it('queries underscore protocol name and then base when protocol is specified', async () => {
       const dohResponses: Record<string, unknown> = {
         'https://cloudflare-dns.com/dns-query?name=_agent._mcp.example.com&type=TXT': {
           Status: 2 /* NXDOMAIN */,
@@ -95,17 +149,12 @@ describe('Browser client', () => {
 
       const { record, queryName } = await browser.discover('example.com', { protocol: 'mcp' });
 
-      expect(g.fetch).toHaveBeenCalledWith(
+      expect((g.fetch as any).mock.calls.map(([url]: [string]) => url)).toEqual([
         'https://cloudflare-dns.com/dns-query?name=_agent._mcp.example.com&type=TXT',
-        expect.any(Object),
-      );
-      expect(g.fetch).toHaveBeenCalledWith(
         'https://cloudflare-dns.com/dns-query?name=_agent.example.com&type=TXT',
-        expect.any(Object),
-      );
-      expect(g.fetch).not.toHaveBeenCalledWith(
+      ]);
+      expect((g.fetch as any).mock.calls.map(([url]: [string]) => url)).not.toContain(
         'https://cloudflare-dns.com/dns-query?name=_agent.mcp.example.com&type=TXT',
-        expect.any(Object),
       );
 
       expect(record.uri).toBe('https://fallback.example.com');
@@ -154,6 +203,9 @@ describe('Browser client', () => {
         'https://cloudflare-dns.com/dns-query?name=_agent._mcp.app.team.example.com&type=TXT',
         'https://cloudflare-dns.com/dns-query?name=_agent.app.team.example.com&type=TXT',
       ]);
+      expect(calls).not.toContain(
+        'https://cloudflare-dns.com/dns-query?name=_agent.mcp.app.team.example.com&type=TXT',
+      );
       expect(calls).not.toContain(
         'https://cloudflare-dns.com/dns-query?name=_agent._mcp.team.example.com&type=TXT',
       );
@@ -232,6 +284,82 @@ describe('Browser client', () => {
 
       const { record } = await browser.discover('example.com');
       expect(record.uri).toBe('https://good.example.com');
+    });
+
+    it('selects one valid aid2 TXT answer when another aid2 answer is malformed', async () => {
+      g.fetch = vi.fn(async (url: string) => {
+        if (
+          url.toString() === 'https://cloudflare-dns.com/dns-query?name=_agent.example.com&type=TXT'
+        ) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              Status: 0,
+              Answer: [
+                {
+                  name: '_agent.example.com',
+                  type: 16,
+                  TTL: 300,
+                  data: '"v=aid2;u=http://bad.example.com;p=mcp"',
+                },
+                {
+                  name: '_agent.example.com',
+                  type: 16,
+                  TTL: 300,
+                  data: '"v=aid2;u=https://good.example.com;p=mcp"',
+                },
+              ],
+            }),
+          };
+        }
+        return { ok: false, status: 404, json: async () => ({}) };
+      });
+
+      const { record } = await browser.discover('example.com');
+      expect(record.v).toBe('aid2');
+      expect(record.uri).toBe('https://good.example.com');
+    });
+
+    it('does not fall back to well-known when DNS only has malformed AID-like TXT', async () => {
+      g.fetch = vi.fn(async (url: string) => {
+        const target = url.toString();
+        if (target === 'https://cloudflare-dns.com/dns-query?name=_agent.example.com&type=TXT') {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              Status: 0,
+              Answer: [
+                {
+                  name: '_agent.example.com',
+                  type: 16,
+                  TTL: 300,
+                  data: '"v=aid3;u=https://future.example.com;p=mcp"',
+                },
+              ],
+            }),
+          };
+        }
+        if (target.includes('/.well-known/agent')) {
+          return {
+            ok: true,
+            status: 200,
+            headers: { get: () => 'application/json' },
+            text: async () =>
+              JSON.stringify({ v: 'aid2', u: 'https://fallback.example.com/mcp', p: 'mcp' }),
+          };
+        }
+        return { ok: false, status: 404, json: async () => ({}) };
+      });
+
+      await expect(
+        browser.discover('example.com', { wellKnownFallback: true }),
+      ).rejects.toMatchObject({ errorCode: 'ERR_INVALID_TXT' });
+      expect(g.fetch).not.toHaveBeenCalledWith(
+        'https://example.com/.well-known/agent',
+        expect.any(Object),
+      );
     });
   });
 });

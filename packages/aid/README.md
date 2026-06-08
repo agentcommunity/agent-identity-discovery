@@ -56,7 +56,7 @@ console.log('Agent:', record.proto, record.uri);
 
 - `discover(domain: string, options?)` → `{ record, ttl, queryName }`
   - Node uses DNS; Browser uses DNS-over-HTTPS.
-  - Canonical query is `_agent.<exact-host>`. Clients do not implicitly walk to parent hosts. When a specific protocol is requested, clients may query `_agent._<proto>.<exact-host>` as an optimization.
+  - Canonical query is `_agent.<exact-host>`. Clients do not implicitly walk to parent hosts. Protocol-specific `_agent._<proto>.<exact-host>` probing is legacy, diagnostic, or base-failure-only behavior where explicitly supported and configured.
   - Enterprise controls: `securityMode: 'balanced' | 'strict'` plus low-level policy knobs for DNSSEC, PKA, downgrade handling, and `.well-known`.
 - `parse(txt: string)` → validated AID record
 - `AidError` – error class exposing `code` (numeric) and `errorCode` (symbol)
@@ -69,22 +69,44 @@ import { discover } from '@agentcommunity/aid';
 
 const result = await discover('example.com', {
   securityMode: 'balanced',
-  previousSecurity: { pka: 'zOldKey', kid: 'g1' },
+  previousSecurity: {
+    version: 'aid2',
+    keyThumbprints: ['WWpn_pfHui9YKR4CZtQsDGMu7_Gch2zYChfSvnxgtPk'],
+    trustSource: 'dns',
+  },
 });
 
 console.log(result.security.mode);
 console.log(result.security.warnings);
 ```
 
-## v1.2 Notes (PKA + .well-known)
+## v2.0 Notes
 
-- New fields: `pka` (`k`) and `kid` (`i`). When a record includes `pka`, the client performs a Public Key for Agent (PKA) handshake using HTTP Message Signatures (Ed25519).
-- `pka` is a multibase string using base58btc (`z...`) of the raw 32‑byte Ed25519 public key.
-- Handshake coverage: required fields are `"AID-Challenge" "@method" "@target-uri" "host" "date"`.
-- Time window: both `created` and HTTP `Date` must be within ±300 seconds of now.
+- New records default to `aid2`.
+- `pka` (`k`) is the unpadded base64url Ed25519 JWK `x` value.
+- DNS `kid` (`i`) is invalid for `aid2`; clients derive the RFC 7638 JWK thumbprint and use it as the HTTP signature `keyid`.
+- The client sends `Accept-Signature` with an RFC 9421 nonce. The server returns `Signature-Input` and `Signature`.
+- `created` and `expires` are mandatory. The response must include `Cache-Control: no-store`.
+- v2 PKA does not sign HTTP `Date` and does not use `AID-Challenge`.
+
+### v2 PKA handshake expectations (summary)
+
+- Covered fields set: `"@method";req`, `"@target-uri";req`, `"@authority";req`, and `"@status"`.
+- `alg="ed25519"`, compared case-insensitively while preserving the received signature parameters.
+- `keyid` equals the RFC 7638 thumbprint derived from `k`.
+- `nonce` exactly matches the value sent in `Accept-Signature`.
+- `expires` is after `created` and the validity window is short.
+- `pka` is unpadded base64url for a 32-byte Ed25519 public key.
+
+## Legacy aid1 Notes (PKA + .well-known)
+
+- Legacy `aid1` fields: `pka` (`k`) and `kid` (`i`). When an `aid1` record includes `pka`, the client performs a Public Key for Agent (PKA) handshake using HTTP Message Signatures (Ed25519).
+- Legacy `aid1` `pka` is a multibase string using base58btc (`z...`) of the raw 32-byte Ed25519 public key.
+- Legacy `aid1` handshake coverage: required fields are `"AID-Challenge" "@method" "@target-uri" "host" "date"`.
+- Legacy `aid1` time window: both `created` and HTTP `Date` must be within ±300 seconds of now.
 - Fallback: when DNS has `ERR_NO_RECORD` or `ERR_DNS_LOOKUP_FAILED`, discovery may fetch `https://<domain>/.well-known/agent` (TLS‑anchored) and validate the same data model; if the JSON contains `pka`, the handshake runs.
 
-### PKA handshake expectations (summary)
+### Legacy v1 PKA handshake expectations (summary)
 
 - Covered fields set (exact): `"AID-Challenge" "@method" "@target-uri" "host" "date"`
 - `alg="ed25519"`
@@ -140,7 +162,7 @@ Clients do not automatically follow cross‑origin redirects from the discovered
 
 ### More on PKA
 
-See the documentation “Quick Start → PKA handshake expectations” for the exact header coverage, algorithm, timestamps, and key format.
+See the Identity & PKA reference for the exact v2 header coverage, algorithm, timestamps, key format, and legacy v1 compatibility behavior.
 
 ## License
 

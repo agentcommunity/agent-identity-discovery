@@ -3,7 +3,7 @@ import type { DiscoveryData, DiscoveryResult } from '@/hooks/use-discovery';
 import type { HandshakeResult } from '@/hooks/use-connection';
 
 const record: DiscoveryData = {
-  v: 'aid1',
+  v: 'aid2',
   uri: 'docker:my-agent:latest',
   proto: 'local',
   host: 'local-docker.agentcommunity.org',
@@ -20,7 +20,7 @@ const discoveryOk: DiscoveryResult = {
       lookupTime: 8,
       recordType: 'TXT',
       source: 'DNS',
-      txtRecord: 'v=aid1;u=docker:my-agent:latest;p=local;s=Local Docker Agent',
+      txtRecord: 'v=aid2;u=docker:my-agent:latest;p=local;s=Local Docker Agent',
     },
   },
 };

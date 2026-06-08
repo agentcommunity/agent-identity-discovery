@@ -2,12 +2,13 @@
 
 Minimal Java library for parsing and discovering Agent Identity & Discovery (AID) records and using generated spec constants.
 
-## v1.1 Notes (PKA + .well-known)
+## v2 PKA Default
 
-This library supports `pka`/`kid` and the v1.1 PKA handshake (Ed25519 HTTP Message Signatures), plus a guarded `.well-known` fallback helper.
+This library supports `aid2` records and the v2 PKA handshake (Ed25519 HTTP Message Signatures), plus a guarded `.well-known` fallback helper.
 
-- `pka` is multibase base58btc (`z...`).
-- Handshake enforces required covered fields, `created` ±300s, HTTP `Date` ±300s, `alg="ed25519"`, and `keyid` match.
+- v2 `pka`/`k` is the unpadded base64url Ed25519 JWK `x` value.
+- v2 HTTP signature `keyid` is the RFC 7638 JWK thumbprint derived from `k`; DNS `kid`/`i` is not used in `aid2`.
+- v2 handshake uses RFC 9421 `Accept-Signature` with a nonce, required `created` and `expires`, exact nonce echo, and response `Cache-Control: no-store`.
 - Requires a JDK with Ed25519 (Java 15+ typically includes it). If not available, handshake throws `ERR_SECURITY` with guidance.
 
 ### Example: .well-known fallback + handshake
@@ -29,8 +30,8 @@ import org.agentcommunity.aid.Handshake;
 import org.agentcommunity.aid.Parser;
 import java.time.Duration;
 
-var rec = Parser.parse("v=aid1;uri=https://api.example.com/mcp;p=mcp;k=zBase58Key;i=g1");
-Handshake.performHandshake(rec.uri, rec.pka, rec.kid, Duration.ofSeconds(2));
+var rec = Parser.parse("v=aid2;uri=https://api.example.com/mcp;p=mcp;k=ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ");
+Handshake.performHandshake(rec.uri, rec.pka, null, Duration.ofSeconds(2));
 ```
 
 ### Example: DNS-first discovery with options
@@ -40,7 +41,7 @@ import org.agentcommunity.aid.Discovery;
 import org.agentcommunity.aid.Discovery.DiscoveryOptions;
 
 var opts = new DiscoveryOptions();
-opts.protocol = "mcp";               // Try protocol-specific names for the same exact host, then the exact-host base
+opts.protocol = "mcp";               // Query exact-host base first; protocol-specific probing is diagnostic/base-failure-only where configured
 opts.timeout = java.time.Duration.ofSeconds(5);
 opts.wellKnownFallback = true;        // Only on ERR_NO_RECORD / ERR_DNS_LOOKUP_FAILED
 opts.wellKnownTimeout = java.time.Duration.ofSeconds(2);
@@ -57,7 +58,7 @@ Discovery is exact-host only. Passing `app.team.example.com` does not cause impl
 import org.agentcommunity.aid.Parser;
 import org.agentcommunity.aid.AidRecord;
 
-AidRecord rec = Parser.parse("v=aid1;uri=https://api.example.com/mcp;proto=mcp;auth=pat;desc=Example");
+AidRecord rec = Parser.parse("v=aid2;uri=https://api.example.com/mcp;proto=mcp;auth=pat;desc=Example");
 System.out.println(rec.uri);  // https://api.example.com/mcp
 ```
 
@@ -70,7 +71,7 @@ System.out.println(rec.uri);  // https://api.example.com/mcp
 
 ```java
 try {
-  Parser.parse("v=aid1;uri=http://x;proto=mcp");
+  Parser.parse("v=aid2;uri=http://x;proto=mcp");
 } catch (AidError e) {
   System.out.println(e.errorCode + " (" + e.code + ")");
 }
@@ -91,4 +92,8 @@ Clients should not automatically follow cross‑origin redirects from the discov
 
 ## More on PKA
 
-See the documentation “Quick Start → PKA handshake expectations” for the exact coverage fields, algorithm, timestamp windows, and key format.
+See the Identity & PKA reference for exact v2 coverage fields, algorithm, timestamp windows, key format, and legacy v1 compatibility behavior.
+
+## v1 compatibility
+
+Legacy `aid1` records may still use `k=z...` base58btc plus `i`/`kid`. In that mode, clients send `AID-Challenge` and signed HTTP `Date`, and signature `keyid` must match DNS `kid`.

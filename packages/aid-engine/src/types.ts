@@ -10,8 +10,12 @@ import type {
 
 export interface CacheEntry {
   lastSeen: string;
+  version?: string | null;
+  trustSource?: 'dns' | 'well-known-tls';
   pka: string | null;
   kid: string | null;
+  keyid?: string | null;
+  jwkX?: string | null;
   hash?: string | null;
 }
 
@@ -86,8 +90,26 @@ export interface PkaBlock {
 
 export interface DowngradeBlock {
   checked: boolean;
-  previous: { pka: string | null; kid: string | null } | null;
-  status: 'no_change' | 'downgrade' | 'key_rotation' | 'first_seen' | null;
+  previous: {
+    pka: string | null;
+    kid: string | null;
+    keyid?: string | null;
+    version?: string | null;
+    trustSource?: 'dns' | 'well-known-tls' | null;
+  } | null;
+  status:
+    | 'no_change'
+    // Legacy aliases retained for public API compatibility with older reports.
+    // Current runCheck output uses pka_removed/key_replaced or more specific statuses.
+    | 'downgrade'
+    | 'key_rotation'
+    | 'first_seen'
+    | 'pka_added'
+    | 'pka_removed'
+    | 'key_replaced'
+    | 'version_downgrade'
+    | 'fallback_well_known_tls'
+    | null;
 }
 
 export interface DoctorReport {

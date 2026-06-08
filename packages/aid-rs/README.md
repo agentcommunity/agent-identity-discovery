@@ -75,15 +75,15 @@ Discovery stays on the exact host you pass in. If you call `discover_with_option
 use aid_rs::parse;
 
 fn main() -> Result<(), aid_rs::AidError> {
-    let rec = parse("v=aid1;uri=https://api.example.com/mcp;p=mcp")?;
+    let rec = parse("v=aid2;uri=https://api.example.com/mcp;p=mcp")?;
     assert_eq!(rec.proto, "mcp");
     Ok(())
 }
 ```
 
-### v1.1 (PKA) – optional handshake
+### v2 PKA - optional handshake
 
-Enable the `handshake` feature to verify endpoint control when a record includes `pka`/`kid`.
+Enable the `handshake` feature to verify endpoint control when an `aid2` record includes `pka`/`k`.
 
 ```toml
 [dependencies]
@@ -97,19 +97,25 @@ use aid_rs::perform_pka_handshake;
 #[cfg(feature = "handshake")]
 #[tokio::main]
 async fn main() -> Result<(), aid_rs::AidError> {
-    let rec = aid_rs::parse("v=aid1;uri=https://api.example.com/mcp;p=mcp;k=zBase58;i=g1")?;
-    perform_pka_handshake(&rec.uri, rec.pka.as_deref().unwrap(), rec.kid.as_deref().unwrap(), std::time::Duration::from_secs(2)).await?;
+    let rec = aid_rs::parse("v=aid2;uri=https://api.example.com/mcp;p=mcp;k=ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ")?;
+    perform_pka_handshake(&rec.uri, rec.pka.as_deref().unwrap(), "", std::time::Duration::from_secs(2)).await?;
     Ok(())
 }
 ```
 
-#### Handshake expectations (summary)
+#### v2 handshake expectations (summary)
 
-- Covered fields (exact set): `"AID-Challenge" "@method" "@target-uri" "host" "date"`
+- Covered fields set: `"@method";req`, `"@target-uri";req`, `"@authority";req`, and `"@status"`
 - `alg="ed25519"`
-- `keyid` equals record `kid` (compare normalized; keep raw in signature base)
-- `created` ± 300s and HTTP `Date` ± 300s of now
-- `pka` is `z...` (base58btc) for a 32‑byte Ed25519 public key
+- `keyid` equals the RFC 7638 thumbprint derived from `k`
+- `created` and `expires` define a short validity window
+- `nonce` exactly matches the value sent in `Accept-Signature`
+- Response includes `Cache-Control: no-store`
+- `pka` is unpadded base64url for a 32-byte Ed25519 public key
+
+### v1 compatibility
+
+Legacy `aid1` records may still use `k=z...` base58btc plus `i`/`kid`. In that mode, clients send `AID-Challenge` and signed HTTP `Date`, and signature `keyid` must match DNS `kid`.
 
 ## Redirect Security
 
@@ -117,7 +123,7 @@ Discovered URIs that return a 301/302/307/308 to a different origin (hostname or
 
 ## More on PKA
 
-See the documentation “Quick Start → PKA handshake expectations” for the exact requirements.
+See the Identity & PKA reference for exact v2 requirements and legacy v1 compatibility behavior.
 
 ## Errors
 

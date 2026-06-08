@@ -3,30 +3,29 @@ import { verifyPka, generateEd25519KeyPair } from './keys';
 
 describe('AID Engine Keys', () => {
   describe('verifyPka', () => {
-    it('should accept valid z-prefixed multibase Ed25519 public key', () => {
-      // This is a real test key that should pass
-      const validKey = 'zAbRwF269wzcmKEQpZTXXCvLXi7KN5v6QJmhsMbb8T56k';
+    it('should accept valid base64url Ed25519 public key', () => {
+      const validKey = 'ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ';
       const result = verifyPka(validKey);
       expect(result.valid).toBe(true);
       expect(result.reason).toBeUndefined();
     });
 
-    it('should reject keys without z prefix', () => {
-      const invalidKey = 'AbRwF269wzcmKEQpZTXXCvLXi7KN5v6QJmhsMbb8T56k';
+    it('should reject padded keys', () => {
+      const invalidKey = 'ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=';
       const result = verifyPka(invalidKey);
       expect(result.valid).toBe(false);
-      expect(result.reason).toContain('z multibase prefix');
+      expect(result.reason).toContain('base64url');
     });
 
-    it('should reject keys with invalid base58 characters', () => {
-      const invalidKey = 'zAbRwF269wzcmKEQpZTXXCvLXi7KN5v6QJmhsMbb8T5@k';
+    it('should reject keys with invalid base64url characters', () => {
+      const invalidKey = 'ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ+';
       const result = verifyPka(invalidKey);
       expect(result.valid).toBe(false);
-      expect(result.reason).toContain('Invalid base58 character');
+      expect(result.reason).toContain('base64url');
     });
 
     it('should reject keys with wrong length', () => {
-      const shortKey = 'zAbRwF269wzcmKEQpZTXXCvLXi7KN5v6QJmhsMbb8T5';
+      const shortKey = 'AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHw';
       const result = verifyPka(shortKey);
       expect(result.valid).toBe(false);
       expect(result.reason).toContain('Unexpected key length');
@@ -35,7 +34,7 @@ describe('AID Engine Keys', () => {
     it('should handle empty input', () => {
       const result = verifyPka('');
       expect(result.valid).toBe(false);
-      expect(result.reason).toContain('z multibase prefix');
+      expect(result.reason).toContain('Missing PKA key');
     });
 
     it('should handle null/undefined input', () => {
@@ -55,9 +54,9 @@ describe('AID Engine Keys', () => {
       expect(keyPair).toHaveProperty('privateKeyPem');
       expect(keyPair).toHaveProperty('privateKeyBytes');
 
-      // Public key should be z-prefixed multibase
-      expect(keyPair.publicKey.startsWith('z')).toBe(true);
-      expect(keyPair.publicKey.length).toBeGreaterThan(40);
+      // Public key should be unpadded base64url JWK x for aid2.
+      expect(keyPair.publicKey).toMatch(/^[A-Za-z0-9_-]+$/);
+      expect(keyPair.publicKey).toHaveLength(43);
 
       // Private key should be PEM format
       expect(keyPair.privateKeyPem).toContain('-----BEGIN PRIVATE KEY-----');

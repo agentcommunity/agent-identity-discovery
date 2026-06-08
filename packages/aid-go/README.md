@@ -66,7 +66,7 @@ rec, ttl, err := aid.DiscoverWithOptions(
     "example.com",
     5*time.Second,
     aid.DiscoveryOptions{
-        Protocol:          "mcp",      // queries exact-host protocol names first, then exact-host base
+        Protocol:          "mcp",      // queries exact-host base first; protocol-specific probing is diagnostic/base-failure-only where configured
         WellKnownFallback: true,        // only on ERR_NO_RECORD / ERR_DNS_LOOKUP_FAILED
         WellKnownTimeout:  2*time.Second,
     },
@@ -79,7 +79,7 @@ Parses and validates a raw TXT record string.
 
 **Parameters:**
 
-- `txt` (string): Raw TXT record content (e.g., "v=aid1;uri=https://...")
+- `txt` (string): Raw TXT record content (e.g., "v=aid2;uri=https://...")
 
 **Returns:**
 
@@ -107,7 +107,7 @@ Represents a parsed AID record:
 
 ```go
 type AidRecord struct {
-    V     string `json:"v"`               // Protocol version (always "aid1")
+    V     string `json:"v"`               // Protocol version ("aid2" by default, "aid1" for legacy compatibility)
     URI   string `json:"uri"`             // Agent endpoint URI
     Proto string `json:"proto"`           // Protocol identifier
     Auth  string `json:"auth,omitempty"`  // Authentication method (optional)
@@ -196,7 +196,7 @@ import (
 )
 
 func main() {
-    txtRecord := "v=aid1;uri=https://api.example.com/agent;proto=mcp;desc=Example Agent"
+    txtRecord := "v=aid2;uri=https://api.example.com/agent;proto=mcp;desc=Example Agent"
 
     record, err := aid.Parse(txtRecord)
     if err != nil {
@@ -286,19 +286,26 @@ go test -v ./...
 
 MIT - see [LICENSE](https://github.com/agentcommunity/agent-identity-discovery/blob/main/LICENSE) for details.
 
-## v1.1 Notes (PKA + Fallback)
+## v2 PKA Default
 
-- PKA handshake: When a record includes `pka` (`k`) and `kid` (`i`), the client verifies endpoint control using HTTP Message Signatures (RFC 9421) with Ed25519. This package uses Go's `crypto/ed25519` for verification and triggers the handshake automatically during discovery.
+- PKA handshake: when an `aid2` record includes `pka` (`k`), the client verifies endpoint control using HTTP Message Signatures (RFC 9421) with Ed25519. This package uses Go's `crypto/ed25519` for verification and triggers the handshake automatically during discovery.
+- Key format: `k` is the unpadded base64url Ed25519 JWK `x` value.
+- Key identity: the HTTP signature `keyid` is the RFC 7638 JWK thumbprint derived from `k`. `aid2` records do not use DNS `kid`/`i`.
+- Challenge and freshness: v2 uses `Accept-Signature` with a nonce, mandatory `created` and `expires`, exact nonce echo, and response `Cache-Control: no-store`.
 
 - `.well-known` fallback: When DNS lookup fails (`ERR_NO_RECORD` or `ERR_DNS_LOOKUP_FAILED`), the client fetches `https://<domain>/.well-known/agent` (TLS-anchored) and validates the JSON document (accepts aliases). TTL defaults to `DnsTtlMin` (300s) for this path.
 
-### Handshake expectations (summary)
+### v2 handshake expectations (summary)
 
-- Covered fields set (exact): `"AID-Challenge" "@method" "@target-uri" "host" "date"`
+- Covered fields set: `"@method";req`, `"@target-uri";req`, `"@authority";req`, and `"@status"`
 - `alg` must be `ed25519`
-- `created` and HTTP `Date` within ±300 seconds of now
-- `keyid` equals record `kid` (normalize quotes for compare)
-- `pka` is multibase base58btc (`z...`) of a 32‑byte Ed25519 public key
+- `created` and `expires` define a short validity window
+- `keyid` equals the RFC 7638 thumbprint derived from `k`
+- `pka` is unpadded base64url for a 32-byte Ed25519 public key
+
+### v1 compatibility
+
+Legacy `aid1` records may still use `k=z...` base58btc with `i`/`kid`. In that mode, the client sends `AID-Challenge` and `Date`, signs the legacy covered fields, and requires signature `keyid` to match DNS `kid`.
 
 ## Redirect Security
 
@@ -306,4 +313,4 @@ AID clients do not auto‑follow cross‑origin redirects (different hostname or
 
 ## More on PKA
 
-See the documentation “Quick Start → PKA handshake expectations” for exact coverage fields, algorithm, timestamps, and key format.
+See the Identity & PKA reference for exact v2 coverage fields, algorithm, timestamps, key format, and legacy v1 compatibility behavior.

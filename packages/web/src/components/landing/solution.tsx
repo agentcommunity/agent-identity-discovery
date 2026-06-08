@@ -34,8 +34,8 @@ const solutions: SolutionItem[] = [
     description:
       'Any client resolves the _agent subdomain to your endpoint. Falls back to .well-known/agent when DNS is restricted.',
     links: [
-      { label: 'Discovery API', href: '/docs/Reference/discovery_api' },
-      { label: 'Troubleshooting', href: '/docs/Reference/troubleshooting' },
+      { label: 'Discovery API', href: '/docs/reference/discovery_api' },
+      { label: 'Troubleshooting', href: '/docs/reference/troubleshooting' },
     ],
   },
   {
@@ -47,7 +47,7 @@ const solutions: SolutionItem[] = [
     links: [
       { label: 'MCP Guide', href: '/docs/quickstart/quickstart_mcp' },
       { label: 'A2A Guide', href: '/docs/quickstart/quickstart_a2a' },
-      { label: 'Protocols', href: '/docs/Reference/protocols' },
+      { label: 'Protocols', href: '/docs/reference/protocols' },
     ],
   },
   {
@@ -58,8 +58,8 @@ const solutions: SolutionItem[] = [
       'Publish a public key (PKA) and let clients verify your endpoint with HTTP Message Signatures (Ed25519).',
     accent: true,
     links: [
-      { label: 'Identity & PKA', href: '/docs/Reference/identity_pka' },
-      { label: 'Security', href: '/docs/Reference/security' },
+      { label: 'Identity & PKA', href: '/docs/reference/identity_pka' },
+      { label: 'Security', href: '/docs/reference/security' },
     ],
   },
 ];

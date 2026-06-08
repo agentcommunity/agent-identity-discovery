@@ -8,6 +8,10 @@ namespace AidDiscovery;
 
 public static class Pka
 {
+    internal static Action<byte[]> FillRandomBytesForTesting { get; set; } = bytes => RandomNumberGenerator.Fill(bytes);
+    internal static Func<long> NowUnixForTesting { get; set; } = () => DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+    internal static Func<HttpRequestMessage, TimeSpan, Task<HttpResponseMessage>> SendAsyncForTesting { get; set; } = SendWithDefaultClientAsync;
+
     private static string AsciiToLower(string s)
     {
         return string.Create(s.Length, s, (span, state) =>
@@ -15,16 +19,15 @@ public static class Pka
             for (int i = 0; i < span.Length; i++)
             {
                 char c = state[i];
-                if (c >= 'A' && c <= 'Z')
-                {
-                    span[i] = (char)(c + ('a' - 'A'));
-                }
-                else
-                {
-                    span[i] = c;
-                }
+                span[i] = c >= 'A' && c <= 'Z' ? (char)(c + ('a' - 'A')) : c;
             }
         });
+    }
+
+    private static async Task<HttpResponseMessage> SendWithDefaultClientAsync(HttpRequestMessage request, TimeSpan timeout)
+    {
+        using var http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = timeout };
+        return await http.SendAsync(request).ConfigureAwait(false);
     }
 
     private static byte[] MultibaseDecode(string s)
@@ -34,13 +37,35 @@ public static class Pka
         return Base58.Decode(s.Substring(1));
     }
 
+    private static string Base64UrlEncode(byte[] data)
+    {
+        return Convert.ToBase64String(data).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+    }
+
+    private static string GetHeader(HttpResponseMessage res, string name)
+    {
+        if (res.Headers.TryGetValues(name, out var values))
+        {
+            return string.Join(", ", values);
+        }
+        if (res.Content is not null && res.Content.Headers.TryGetValues(name, out var contentValues))
+        {
+            return string.Join(", ", contentValues);
+        }
+        return string.Empty;
+    }
+
+    private static bool TimingSafeEqualString(string a, string b)
+    {
+        return a.Length == b.Length &&
+            CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(a), Encoding.UTF8.GetBytes(b));
+    }
+
     private static (string[] covered, long created, string keyidRaw, string keyid, string alg, byte[] signature, string? responseDate) ParseSignatureHeaders(HttpResponseMessage res)
     {
-        string? sigInput = res.Headers.TryGetValues("Signature-Input", out var si) ? si.FirstOrDefault() : null;
-        sigInput ??= res.Headers.TryGetValues("signature-input", out var si2) ? si2.FirstOrDefault() : null;
-        string? sig = res.Headers.TryGetValues("Signature", out var s) ? s.FirstOrDefault() : null;
-        sig ??= res.Headers.TryGetValues("signature", out var s2) ? s2.FirstOrDefault() : null;
-        if (sigInput is null || sig is null) throw new AidError(nameof(Constants.ERR_SECURITY), "Missing signature headers");
+        var sigInput = GetHeader(res, "Signature-Input");
+        var sig = GetHeader(res, "Signature");
+        if (string.IsNullOrEmpty(sigInput) || string.IsNullOrEmpty(sig)) throw new AidError(nameof(Constants.ERR_SECURITY), "Missing signature headers");
 
         var mInside = Regex.Match(sigInput, "sig=\\(\\s*([^)]+?)\\s*\\)", RegexOptions.IgnoreCase);
         if (!mInside.Success) throw new AidError(nameof(Constants.ERR_SECURITY), "Invalid Signature-Input");
@@ -59,15 +84,12 @@ public static class Pka
         lower.Sort(StringComparer.Ordinal);
         required.Sort(StringComparer.Ordinal);
 
-        bool areEqual = true;
+        var areEqual = true;
         for (int i = 0; i < required.Count; i++)
         {
-            if (!CryptographicOperations.FixedTimeEquals(
-                Encoding.UTF8.GetBytes(lower[i]),
-                Encoding.UTF8.GetBytes(required[i])))
+            if (!TimingSafeEqualString(lower[i], required[i]))
             {
                 areEqual = false;
-                // Do not break early
             }
         }
         if (!areEqual)
@@ -79,17 +101,19 @@ public static class Pka
         var mKeyid = Regex.Match(sigInput, @"(?:^|;)\s*keyid=([^;\s]+)");
         var mAlg = Regex.Match(sigInput, @"(?:^|;)\s*alg=""([^\""]+)""");
         if (!mCreated.Success || !mKeyid.Success || !mAlg.Success)
+        {
             throw new AidError(nameof(Constants.ERR_SECURITY), "Invalid Signature-Input");
-        long created = long.Parse(mCreated.Groups[1].Value);
-        string keyidRaw = mKeyid.Groups[1].Value;
-        string keyid = keyidRaw.Trim('"');
-        string alg = AsciiToLower(mAlg.Groups[1].Value);
+        }
+        var created = long.Parse(mCreated.Groups[1].Value);
+        var keyidRaw = mKeyid.Groups[1].Value;
+        var keyid = keyidRaw.Trim('"');
+        var alg = AsciiToLower(mAlg.Groups[1].Value);
 
         var mSig = Regex.Match(sig, @"sig\s*=\s*:\s*([^:]+)\s*:", RegexOptions.IgnoreCase);
         if (!mSig.Success) throw new AidError(nameof(Constants.ERR_SECURITY), "Invalid Signature header");
-        byte[] signature = Convert.FromBase64String(mSig.Groups[1].Value);
-        string? responseDate = res.Headers.TryGetValues("Date", out var dh) ? dh.FirstOrDefault() : (res.Headers.TryGetValues("date", out var dh2) ? dh2.FirstOrDefault() : null);
-        return (items.ToArray(), created, keyidRaw, keyid, alg, signature, responseDate);
+        var signature = Convert.FromBase64String(mSig.Groups[1].Value);
+        var responseDate = GetHeader(res, "Date");
+        return (items.ToArray(), created, keyidRaw, keyid, alg, signature, string.IsNullOrEmpty(responseDate) ? null : responseDate);
     }
 
     private static byte[] BuildSignatureBase(string[] covered, long created, string keyidRaw, string alg, string method, string targetUri, string host, string date, string challenge)
@@ -99,27 +123,27 @@ public static class Pka
         {
             var lower = AsciiToLower(item);
             var appended = false;
-            if (CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(lower), Encoding.UTF8.GetBytes("aid-challenge")))
+            if (TimingSafeEqualString(lower, "aid-challenge"))
             {
                 lines.Add($"\"AID-Challenge\": {challenge}");
                 appended = true;
             }
-            if (CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(lower), Encoding.UTF8.GetBytes("@method")))
+            if (TimingSafeEqualString(lower, "@method"))
             {
                 lines.Add($"\"@method\": {method}");
                 appended = true;
             }
-            if (CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(lower), Encoding.UTF8.GetBytes("@target-uri")))
+            if (TimingSafeEqualString(lower, "@target-uri"))
             {
                 lines.Add($"\"@target-uri\": {targetUri}");
                 appended = true;
             }
-            if (CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(lower), Encoding.UTF8.GetBytes("host")))
+            if (TimingSafeEqualString(lower, "host"))
             {
                 lines.Add($"\"host\": {host}");
                 appended = true;
             }
-            if (CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(lower), Encoding.UTF8.GetBytes("date")))
+            if (TimingSafeEqualString(lower, "date"))
             {
                 lines.Add($"\"date\": {date}");
                 appended = true;
@@ -137,21 +161,29 @@ public static class Pka
 
     public static async Task PerformHandshakeAsync(string uri, string pka, string kid, TimeSpan timeout)
     {
-        if (string.IsNullOrEmpty(kid)) throw new AidError(nameof(Constants.ERR_SECURITY), "Missing kid for PKA");
+        if (string.IsNullOrEmpty(kid))
+        {
+            await PerformV2HandshakeAsync(uri, pka, timeout).ConfigureAwait(false);
+            return;
+        }
+        await PerformV1HandshakeAsync(uri, pka, kid, timeout).ConfigureAwait(false);
+    }
+
+    private static async Task PerformV1HandshakeAsync(string uri, string pka, string kid, TimeSpan timeout)
+    {
         var u = new Uri(uri);
-        using var http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = timeout };
         var challengeBytes = new byte[32];
-        System.Security.Cryptography.RandomNumberGenerator.Fill(challengeBytes);
-        var challenge = Convert.ToBase64String(challengeBytes).TrimEnd('=');
+        FillRandomBytesForTesting(challengeBytes);
+        var challenge = Base64UrlEncode(challengeBytes);
         var date = DateTimeOffset.UtcNow.ToString("r");
         using var req = new HttpRequestMessage(HttpMethod.Get, uri);
         req.Headers.TryAddWithoutValidation("AID-Challenge", challenge);
-        req.Headers.Date = DateTimeOffset.Parse(date);
-        using var res = await http.SendAsync(req).ConfigureAwait(false);
+        req.Headers.TryAddWithoutValidation("Date", date);
+        using var res = await SendAsyncForTesting(req, timeout).ConfigureAwait(false);
         if (!res.IsSuccessStatusCode) throw new AidError(nameof(Constants.ERR_SECURITY), $"Handshake HTTP {(int)res.StatusCode}");
 
         var (covered, created, keyidRaw, keyidNorm, alg, signature, respDate) = ParseSignatureHeaders(res);
-        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var now = NowUnixForTesting();
         if (Math.Abs(now - created) > 300) throw new AidError(nameof(Constants.ERR_SECURITY), "Signature created timestamp outside acceptance window");
         if (respDate is not null)
         {
@@ -159,27 +191,526 @@ public static class Pka
             var epoch = dt.ToUnixTimeSeconds();
             if (Math.Abs(now - epoch) > 300) throw new AidError(nameof(Constants.ERR_SECURITY), "HTTP Date header outside acceptance window");
         }
-        if (!CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(keyidNorm), Encoding.UTF8.GetBytes(kid)))
+        if (!TimingSafeEqualString(keyidNorm, kid))
         {
             throw new AidError(nameof(Constants.ERR_SECURITY), "Signature keyid mismatch");
         }
-        if (!CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(alg), Encoding.UTF8.GetBytes("ed25519")))
+        if (!TimingSafeEqualString(alg, "ed25519"))
         {
             throw new AidError(nameof(Constants.ERR_SECURITY), "Unsupported signature algorithm");
         }
 
-        var host = u.Authority;
-        var baseBytes = BuildSignatureBase(covered, created, keyidRaw, alg, "GET", uri, host, respDate ?? date, challenge);
+        var baseBytes = BuildSignatureBase(covered, created, keyidRaw, alg, "GET", uri, u.Authority, respDate ?? date, challenge);
         var pub = MultibaseDecode(pka);
         if (pub.Length != 32) throw new AidError(nameof(Constants.ERR_SECURITY), "Invalid PKA length");
+        VerifyEd25519(pub, baseBytes, signature);
+    }
 
-        // Use NSec for Ed25519 verification
+    private static async Task PerformV2HandshakeAsync(string uri, string pka, TimeSpan timeout)
+    {
+        var (pub, expectedKeyid) = DeriveAid2KeyMaterial(pka);
+        var requestUri = NormalizeRequestUri(uri);
+        var authority = RequestAuthority(requestUri);
+        var nonceBytes = new byte[32];
+        FillRandomBytesForTesting(nonceBytes);
+        var nonce = Base64UrlEncode(nonceBytes);
+
+        using var req = new HttpRequestMessage(HttpMethod.Get, requestUri);
+        req.Headers.TryAddWithoutValidation("Accept-Signature", BuildAcceptSignatureV2(expectedKeyid, nonce));
+        req.Headers.CacheControl = new CacheControlHeaderValue { NoStore = true };
+        using var res = await SendAsyncForTesting(req, timeout).ConfigureAwait(false);
+
+        var status = (int)res.StatusCode;
+        if (status >= 300 && status < 400)
+        {
+            throw new AidError(nameof(Constants.ERR_SECURITY), "PKA redirects are not allowed");
+        }
+        if (!HasNoStoreDirective(GetHeader(res, "Cache-Control")))
+        {
+            throw new AidError(nameof(Constants.ERR_SECURITY), "PKA response must include Cache-Control: no-store");
+        }
+
+        var parsed = ParseV2SignatureHeaders(res);
+        var now = NowUnixForTesting();
+        if (parsed.Expires <= parsed.Created || parsed.Expires - parsed.Created > 300)
+        {
+            throw new AidError(nameof(Constants.ERR_SECURITY), "Invalid signature freshness window");
+        }
+        const long skewSeconds = 30;
+        if (parsed.Created - now > skewSeconds || now - parsed.Expires > skewSeconds)
+        {
+            throw new AidError(nameof(Constants.ERR_SECURITY), "Signature timestamp outside acceptance window");
+        }
+        if (!TimingSafeEqualString(parsed.Keyid, expectedKeyid))
+        {
+            throw new AidError(nameof(Constants.ERR_SECURITY), "Signature keyid mismatch");
+        }
+        if (!TimingSafeEqualString(AsciiToLower(parsed.Alg), "ed25519"))
+        {
+            throw new AidError(nameof(Constants.ERR_SECURITY), "Unsupported signature algorithm");
+        }
+        if (!TimingSafeEqualString(parsed.Nonce, nonce))
+        {
+            throw new AidError(nameof(Constants.ERR_SECURITY), "Signature nonce mismatch");
+        }
+        if (!TimingSafeEqualString(parsed.Tag, "aid-pka-v2"))
+        {
+            throw new AidError(nameof(Constants.ERR_SECURITY), "Invalid signature tag");
+        }
+
+        var baseBytes = BuildV2SignatureBase(parsed.Covered, parsed.SignatureParamsRaw, "GET", requestUri, authority, status);
+        VerifyEd25519(pub, baseBytes, parsed.Signature);
+    }
+
+    private static (byte[] PublicKey, string Keyid) DeriveAid2KeyMaterial(string pka)
+    {
+        var publicKey = Aid.DecodeUnpaddedBase64Url(pka, nameof(Constants.ERR_SECURITY));
+        if (publicKey.Length != 32)
+        {
+            throw new AidError(nameof(Constants.ERR_SECURITY), "Invalid PKA length");
+        }
+        var thumbprintInput = Encoding.UTF8.GetBytes($"{{\"crv\":\"Ed25519\",\"kty\":\"OKP\",\"x\":\"{pka}\"}}");
+        var digest = SHA256.HashData(thumbprintInput);
+        return (publicKey, Base64UrlEncode(digest));
+    }
+
+    private static string NormalizeRequestUri(string uri)
+    {
+        if (!Uri.TryCreate(uri, UriKind.Absolute, out var parsed) || string.IsNullOrEmpty(parsed.Host))
+        {
+            throw new AidError(nameof(Constants.ERR_SECURITY), "Invalid URI for handshake");
+        }
+        var pathAndQuery = parsed.PathAndQuery;
+        return $"{parsed.Scheme.ToLowerInvariant()}://{RequestAuthority(uri)}{pathAndQuery}";
+    }
+
+    private static string RequestAuthority(string uri)
+    {
+        var parsed = new Uri(uri);
+        var host = parsed.Host;
+        if (host.StartsWith("[", StringComparison.Ordinal) && host.EndsWith("]", StringComparison.Ordinal))
+        {
+            host = host[1..^1];
+        }
+        host = host.ToLowerInvariant();
+        if (host.Contains(':'))
+        {
+            host = $"[{host}]";
+        }
+        if (parsed.IsDefaultPort)
+        {
+            return host;
+        }
+        return $"{host}:{parsed.Port}";
+    }
+
+    private static string BuildAcceptSignatureV2(string keyid, string nonce)
+    {
+        return $"aid-pka=(\"@method\";req \"@target-uri\";req \"@authority\";req \"@status\");created;expires;keyid=\"{keyid}\";alg=\"ed25519\";nonce=\"{nonce}\";tag=\"aid-pka-v2\"";
+    }
+
+    private static bool HasNoStoreDirective(string cacheControl)
+    {
+        if (string.IsNullOrWhiteSpace(cacheControl))
+        {
+            return false;
+        }
+        return cacheControl
+            .Split(',')
+            .Select(part => part.Trim().Split(';', 2)[0].Trim())
+            .Any(part => string.Equals(part, "no-store", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private sealed record V2CoveredItem(string Raw, string Name, bool Req);
+
+    private sealed record V2SignatureHeaders(
+        List<V2CoveredItem> Covered,
+        string SignatureParamsRaw,
+        long Created,
+        long Expires,
+        string Keyid,
+        string Alg,
+        string Nonce,
+        string Tag,
+        byte[] Signature
+    );
+
+    private static V2SignatureHeaders ParseV2SignatureHeaders(HttpResponseMessage res)
+    {
+        var sigInput = GetHeader(res, "Signature-Input");
+        var sig = GetHeader(res, "Signature");
+        if (string.IsNullOrEmpty(sigInput) || string.IsNullOrEmpty(sig))
+        {
+            throw new AidError(nameof(Constants.ERR_SECURITY), "Missing signature headers");
+        }
+
+        var signatureParamsRaw = ExtractDictionaryMember(sigInput, "aid-pka");
+        if (!signatureParamsRaw.StartsWith("(", StringComparison.Ordinal))
+        {
+            throw new AidError(nameof(Constants.ERR_SECURITY), "Invalid Signature-Input");
+        }
+        var closeIndex = signatureParamsRaw.IndexOf(')');
+        if (closeIndex < 0)
+        {
+            throw new AidError(nameof(Constants.ERR_SECURITY), "Invalid Signature-Input");
+        }
+
+        var coveredRaw = signatureParamsRaw[1..closeIndex].Trim();
+        var paramsRaw = signatureParamsRaw[(closeIndex + 1)..];
+        var covered = SplitInnerListItems(coveredRaw).Select(ParseV2CoveredItem).ToList();
+        ValidateV2CoveredSet(covered);
+
+        var parameters = ParseSignatureParams(paramsRaw);
+        foreach (var required in new[] { "created", "expires", "keyid", "alg", "nonce", "tag" })
+        {
+            if (!parameters.ContainsKey(required))
+            {
+                throw new AidError(nameof(Constants.ERR_SECURITY), "Invalid Signature-Input");
+            }
+        }
+        if (!long.TryParse(parameters["created"], out var created) || !long.TryParse(parameters["expires"], out var expires))
+        {
+            throw new AidError(nameof(Constants.ERR_SECURITY), "Invalid Signature-Input timestamp");
+        }
+
+        var signatureRaw = ExtractDictionaryMember(sig, "aid-pka");
+        if (!signatureRaw.StartsWith(":", StringComparison.Ordinal) || !signatureRaw.EndsWith(":", StringComparison.Ordinal) || signatureRaw.Length < 3)
+        {
+            throw new AidError(nameof(Constants.ERR_SECURITY), "Invalid Signature header");
+        }
+        byte[] signature;
+        try
+        {
+            signature = Convert.FromBase64String(signatureRaw[1..^1].Trim());
+        }
+        catch (FormatException)
+        {
+            throw new AidError(nameof(Constants.ERR_SECURITY), "Invalid Signature header");
+        }
+
+        return new V2SignatureHeaders(
+            covered,
+            signatureParamsRaw,
+            created,
+            expires,
+            parameters["keyid"],
+            parameters["alg"],
+            parameters["nonce"],
+            parameters["tag"],
+            signature
+        );
+    }
+
+    private static List<string> SplitDictionaryMembers(string input)
+    {
+        var parts = new List<string>();
+        var start = 0;
+        var depth = 0;
+        var inString = false;
+        var inBytes = false;
+        var escaped = false;
+        for (int i = 0; i < input.Length; i++)
+        {
+            var c = input[i];
+            if (escaped)
+            {
+                escaped = false;
+                continue;
+            }
+            if (inString)
+            {
+                if (c == '\\') escaped = true;
+                else if (c == '"') inString = false;
+                continue;
+            }
+            if (c == '"')
+            {
+                inString = true;
+                continue;
+            }
+            if (c == ':')
+            {
+                inBytes = !inBytes;
+                continue;
+            }
+            if (inBytes)
+            {
+                continue;
+            }
+            if (c == '(') depth++;
+            else if (c == ')' && depth > 0) depth--;
+            else if (c == ',' && depth == 0)
+            {
+                var part = input[start..i].Trim();
+                if (part.Length > 0) parts.Add(part);
+                start = i + 1;
+            }
+        }
+        var tail = input[start..].Trim();
+        if (tail.Length > 0) parts.Add(tail);
+        return parts;
+    }
+
+    private static string ExtractDictionaryMember(string input, string label)
+    {
+        string? value = null;
+        var sawCaseConfusedLabel = false;
+        foreach (var part in SplitDictionaryMembers(input))
+        {
+            var eq = part.IndexOf('=');
+            if (eq <= 0)
+            {
+                continue;
+            }
+            var memberLabel = part[..eq].Trim();
+            if (string.Equals(memberLabel, label, StringComparison.Ordinal))
+            {
+                if (value is not null)
+                {
+                    throw new AidError(nameof(Constants.ERR_SECURITY), $"Duplicate {label} signature member");
+                }
+                value = part[(eq + 1)..].Trim();
+            }
+            else if (string.Equals(memberLabel, label, StringComparison.OrdinalIgnoreCase))
+            {
+                sawCaseConfusedLabel = true;
+            }
+        }
+        if (value is not null)
+        {
+            if (sawCaseConfusedLabel)
+            {
+                throw new AidError(nameof(Constants.ERR_SECURITY), $"Invalid {label} signature member casing");
+            }
+            return value;
+        }
+        throw new AidError(nameof(Constants.ERR_SECURITY), $"Missing {label} signature member");
+    }
+
+    private static List<string> SplitInnerListItems(string input)
+    {
+        var items = new List<string>();
+        var start = 0;
+        var inString = false;
+        var escaped = false;
+        for (int i = 0; i < input.Length; i++)
+        {
+            var c = input[i];
+            if (escaped)
+            {
+                escaped = false;
+                continue;
+            }
+            if (inString)
+            {
+                if (c == '\\') escaped = true;
+                else if (c == '"') inString = false;
+                continue;
+            }
+            if (c == '"')
+            {
+                inString = true;
+                continue;
+            }
+            if (char.IsWhiteSpace(c))
+            {
+                var item = input[start..i].Trim();
+                if (item.Length > 0) items.Add(item);
+                start = i + 1;
+            }
+        }
+        var tail = input[start..].Trim();
+        if (tail.Length > 0) items.Add(tail);
+        return items;
+    }
+
+    private static V2CoveredItem ParseV2CoveredItem(string raw)
+    {
+        var match = Regex.Match(raw, "^\"([^\"]+)\"((?:;[A-Za-z0-9_*.-]+)*)$");
+        if (!match.Success)
+        {
+            throw new AidError(nameof(Constants.ERR_SECURITY), "Invalid Signature-Input covered item");
+        }
+        var name = match.Groups[1].Value;
+        var req = false;
+        var paramRaw = match.Groups[2].Value;
+        if (paramRaw.Length > 0)
+        {
+            foreach (var parameter in paramRaw.Split(';', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var param = parameter.Trim();
+                if (param != "req")
+                {
+                    throw new AidError(nameof(Constants.ERR_SECURITY), "Unsupported Signature-Input covered item parameter");
+                }
+                if (req)
+                {
+                    throw new AidError(nameof(Constants.ERR_SECURITY), "Duplicate Signature-Input covered item parameter");
+                }
+                req = true;
+            }
+        }
+        if (name is not ("@method" or "@target-uri" or "@authority" or "@status"))
+        {
+            throw new AidError(nameof(Constants.ERR_SECURITY), $"Unsupported covered field: {name}");
+        }
+        return new V2CoveredItem(raw, name, req);
+    }
+
+    private static void ValidateV2CoveredSet(List<V2CoveredItem> covered)
+    {
+        var expected = new Dictionary<string, bool>(StringComparer.Ordinal)
+        {
+            ["@method"] = true,
+            ["@target-uri"] = true,
+            ["@authority"] = true,
+            ["@status"] = false,
+        };
+        if (covered.Count != expected.Count)
+        {
+            throw new AidError(nameof(Constants.ERR_SECURITY), "Signature-Input must cover required fields");
+        }
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var item in covered)
+        {
+            if (!expected.TryGetValue(item.Name, out var req) || req != item.Req || !seen.Add(item.Name))
+            {
+                throw new AidError(nameof(Constants.ERR_SECURITY), "Signature-Input must cover required fields");
+            }
+        }
+    }
+
+    private static string UnquoteSfString(string value)
+    {
+        if (!value.StartsWith("\"", StringComparison.Ordinal) || !value.EndsWith("\"", StringComparison.Ordinal) || value.Length < 2)
+        {
+            return value;
+        }
+        var sb = new StringBuilder();
+        for (int i = 1; i < value.Length - 1; i++)
+        {
+            if (value[i] == '\\' && i + 1 < value.Length - 1)
+            {
+                i++;
+            }
+            sb.Append(value[i]);
+        }
+        return sb.ToString();
+    }
+
+    private static Dictionary<string, string> ParseSignatureParams(string raw)
+    {
+        var parameters = new Dictionary<string, string>(StringComparer.Ordinal);
+        var allowedParameters = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "nonce",
+            "keyid",
+            "alg",
+            "created",
+            "expires",
+            "tag",
+        };
+        var i = 0;
+        while (i < raw.Length)
+        {
+            while (i < raw.Length && char.IsWhiteSpace(raw[i])) i++;
+            if (i >= raw.Length) break;
+            if (raw[i] != ';') throw new AidError(nameof(Constants.ERR_SECURITY), "Invalid Signature-Input parameters");
+            i++;
+            while (i < raw.Length && char.IsWhiteSpace(raw[i])) i++;
+            var nameStart = i;
+            while (i < raw.Length && IsParamNameChar(raw[i])) i++;
+            var name = raw[nameStart..i];
+            if (name.Length == 0) throw new AidError(nameof(Constants.ERR_SECURITY), "Invalid Signature-Input parameter");
+            if (!allowedParameters.Contains(name))
+            {
+                throw new AidError(nameof(Constants.ERR_SECURITY), $"Unsupported Signature-Input parameter: {name}");
+            }
+            if (parameters.ContainsKey(name))
+            {
+                throw new AidError(nameof(Constants.ERR_SECURITY), $"Duplicate Signature-Input parameter: {name}");
+            }
+            while (i < raw.Length && char.IsWhiteSpace(raw[i])) i++;
+            if (i >= raw.Length || raw[i] != '=')
+            {
+                parameters[name] = string.Empty;
+                continue;
+            }
+            i++;
+            while (i < raw.Length && char.IsWhiteSpace(raw[i])) i++;
+            var valueStart = i;
+            if (i < raw.Length && raw[i] == '"')
+            {
+                i++;
+                var escaped = false;
+                while (i < raw.Length)
+                {
+                    var c = raw[i];
+                    if (escaped) escaped = false;
+                    else if (c == '\\') escaped = true;
+                    else if (c == '"')
+                    {
+                        i++;
+                        break;
+                    }
+                    i++;
+                }
+            }
+            else
+            {
+                while (i < raw.Length && raw[i] != ';') i++;
+            }
+            var rawValue = raw[valueStart..i].Trim();
+            parameters[name] = name is "created" or "expires" ? rawValue : UnquoteSfString(rawValue);
+        }
+        return parameters;
+    }
+
+    private static bool IsParamNameChar(char c)
+    {
+        return (c >= 'A' && c <= 'Z') ||
+               (c >= 'a' && c <= 'z') ||
+               (c >= '0' && c <= '9') ||
+               c == '_' ||
+               c == '*' ||
+               c == '.' ||
+               c == '-';
+    }
+
+    private static byte[] BuildV2SignatureBase(List<V2CoveredItem> covered, string signatureParamsRaw, string method, string targetUri, string authority, int status)
+    {
+        var lines = new List<string>();
+        foreach (var item in covered)
+        {
+            switch (item.Name)
+            {
+                case "@method":
+                    lines.Add($"{item.Raw}: {method}");
+                    break;
+                case "@target-uri":
+                    lines.Add($"{item.Raw}: {targetUri}");
+                    break;
+                case "@authority":
+                    lines.Add($"{item.Raw}: {authority}");
+                    break;
+                case "@status":
+                    lines.Add($"{item.Raw}: {status}");
+                    break;
+                default:
+                    throw new AidError(nameof(Constants.ERR_SECURITY), $"Unsupported covered field: {item.Name}");
+            }
+        }
+        lines.Add($"\"@signature-params\": {signatureParamsRaw}");
+        return Encoding.UTF8.GetBytes(string.Join('\n', lines));
+    }
+
+    private static void VerifyEd25519(byte[] publicKeyBytes, byte[] baseBytes, byte[] signature)
+    {
         var algorithm = SignatureAlgorithm.Ed25519;
-        var publicKey = PublicKey.Import(algorithm, pub, KeyBlobFormat.RawPublicKey);
+        var publicKey = PublicKey.Import(algorithm, publicKeyBytes, KeyBlobFormat.RawPublicKey);
         if (!algorithm.Verify(publicKey, baseBytes, signature))
         {
             throw new AidError(nameof(Constants.ERR_SECURITY), "PKA signature verification failed");
         }
     }
 }
-

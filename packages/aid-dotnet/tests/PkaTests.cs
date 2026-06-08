@@ -1,6 +1,8 @@
 using System.Net;
+using System.Net.Http;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using NSec.Cryptography;
 
 namespace AidDiscovery.Tests;
@@ -10,11 +12,32 @@ public class PkaTests
     private static string RepoRoot()
     {
         var d = new DirectoryInfo(Directory.GetCurrentDirectory());
-        while (d != null && d.Name != "agent-identity-discovery") d = d.Parent;
-        return d?.FullName ?? Directory.GetCurrentDirectory();
+        while (d != null)
+        {
+            if (File.Exists(Path.Combine(d.FullName, "protocol", "pka_vectors.json")))
+            {
+                return d.FullName;
+            }
+            d = d.Parent;
+        }
+        return Directory.GetCurrentDirectory();
     }
 
     private static byte[] SeedFromVector(JsonElement v) => Convert.FromBase64String(v.GetProperty("key").GetProperty("seed_b64").GetString()!);
+
+    private static JsonElement V2Vector(string id = "v2-rfc9421-response-signature")
+    {
+        var vectorsPath = Path.Combine(RepoRoot(), "protocol", "pka_vectors.json");
+        using var doc = JsonDocument.Parse(File.ReadAllText(vectorsPath));
+        foreach (var v in doc.RootElement.GetProperty("vectors").EnumerateArray())
+        {
+            if (v.GetProperty("id").GetString() == id)
+            {
+                return v.Clone();
+            }
+        }
+        throw new InvalidOperationException($"Missing v2 PKA vector {id}");
+    }
 
     private static string PkaFromPub(byte[] pub)
     {
@@ -155,6 +178,10 @@ public class PkaTests
         var doc = JsonDocument.Parse(await File.ReadAllTextAsync(vectorsPath));
         foreach (var v in doc.RootElement.GetProperty("vectors").EnumerateArray())
         {
+            if (v.GetProperty("record").GetProperty("v").GetString() != "aid1")
+            {
+                continue;
+            }
             using var server = new MiniServer(v);
             var domain = $"127.0.0.1:{server.Port}";
             var expect = v.GetProperty("expect").GetString();
@@ -178,5 +205,676 @@ public class PkaTests
             }
         }
     }
-}
 
+    [Fact]
+    public async Task V2CanonicalRfc9421VectorRunsAgainstHandshake()
+    {
+        var vector = V2Vector();
+        var nonce = Base64UrlDecode(vector.GetProperty("nonce").GetString()!);
+        var oldFill = Pka.FillRandomBytesForTesting;
+        var oldNow = Pka.NowUnixForTesting;
+        var oldSend = Pka.SendAsyncForTesting;
+        Pka.FillRandomBytesForTesting = bytes => Array.Copy(nonce, bytes, bytes.Length);
+        Pka.NowUnixForTesting = () => vector.GetProperty("created").GetInt64();
+        Pka.SendAsyncForTesting = (request, timeout) =>
+        {
+            var expectedRequest = vector.GetProperty("request");
+            Assert.Equal(expectedRequest.GetProperty("method").GetString(), request.Method.Method);
+            Assert.Equal(expectedRequest.GetProperty("target_uri").GetString(), request.RequestUri!.ToString());
+            Assert.Equal(expectedRequest.GetProperty("accept_signature").GetString(), request.Headers.GetValues("Accept-Signature").Single());
+            Assert.Equal(expectedRequest.GetProperty("cache_control").GetString(), request.Headers.CacheControl!.ToString());
+            Assert.False(request.Headers.Contains("AID-Challenge"));
+            Assert.False(request.Headers.Date.HasValue);
+
+            var responseVector = vector.GetProperty("response");
+            var response = new HttpResponseMessage((HttpStatusCode)responseVector.GetProperty("status").GetInt32());
+            response.Headers.TryAddWithoutValidation("Cache-Control", responseVector.GetProperty("cache_control").GetString());
+            response.Headers.TryAddWithoutValidation("Signature-Input", responseVector.GetProperty("signature_input").GetString());
+            response.Headers.TryAddWithoutValidation("Signature", responseVector.GetProperty("signature").GetString());
+            return Task.FromResult(response);
+        };
+        try
+        {
+            var record = vector.GetProperty("record");
+            await Pka.PerformHandshakeAsync(record.GetProperty("u").GetString()!, record.GetProperty("k").GetString()!, string.Empty, TimeSpan.FromSeconds(1));
+        }
+        finally
+        {
+            Pka.FillRandomBytesForTesting = oldFill;
+            Pka.NowUnixForTesting = oldNow;
+            Pka.SendAsyncForTesting = oldSend;
+        }
+    }
+
+    [Fact]
+    public async Task V2CanonicalizesUppercaseHostDefaultPortQueryAndFragment()
+    {
+        var vector = V2Vector("v2-uppercase-host-default-port-canonical-target");
+        var nonce = Base64UrlDecode(vector.GetProperty("nonce").GetString()!);
+        var oldFill = Pka.FillRandomBytesForTesting;
+        var oldNow = Pka.NowUnixForTesting;
+        var oldSend = Pka.SendAsyncForTesting;
+        Pka.FillRandomBytesForTesting = bytes => Array.Copy(nonce, bytes, bytes.Length);
+        Pka.NowUnixForTesting = () => vector.GetProperty("created").GetInt64();
+        Pka.SendAsyncForTesting = (request, timeout) =>
+        {
+            var expectedRequest = vector.GetProperty("request");
+            Assert.Equal(expectedRequest.GetProperty("method").GetString(), request.Method.Method);
+            Assert.Equal(expectedRequest.GetProperty("target_uri").GetString(), request.RequestUri!.ToString());
+            Assert.Equal(expectedRequest.GetProperty("accept_signature").GetString(), request.Headers.GetValues("Accept-Signature").Single());
+
+            var responseVector = vector.GetProperty("response");
+            var response = new HttpResponseMessage((HttpStatusCode)responseVector.GetProperty("status").GetInt32());
+            response.Headers.TryAddWithoutValidation("Cache-Control", responseVector.GetProperty("cache_control").GetString());
+            response.Headers.TryAddWithoutValidation("Signature-Input", responseVector.GetProperty("signature_input").GetString());
+            response.Headers.TryAddWithoutValidation("Signature", responseVector.GetProperty("signature").GetString());
+            return Task.FromResult(response);
+        };
+        try
+        {
+            var record = vector.GetProperty("record");
+            await Pka.PerformHandshakeAsync(record.GetProperty("u").GetString()!, record.GetProperty("k").GetString()!, string.Empty, TimeSpan.FromSeconds(1));
+        }
+        finally
+        {
+            Pka.FillRandomBytesForTesting = oldFill;
+            Pka.NowUnixForTesting = oldNow;
+            Pka.SendAsyncForTesting = oldSend;
+        }
+    }
+
+    [Fact]
+    public async Task V2RejectsRedirects()
+    {
+        var vector = V2Vector();
+        var nonce = Base64UrlDecode(vector.GetProperty("nonce").GetString()!);
+        var oldFill = Pka.FillRandomBytesForTesting;
+        var oldNow = Pka.NowUnixForTesting;
+        var oldSend = Pka.SendAsyncForTesting;
+        Pka.FillRandomBytesForTesting = bytes => Array.Copy(nonce, bytes, bytes.Length);
+        Pka.NowUnixForTesting = () => vector.GetProperty("created").GetInt64();
+        Pka.SendAsyncForTesting = (_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.Found));
+        try
+        {
+            var record = vector.GetProperty("record");
+            var ex = await Assert.ThrowsAsync<AidError>(() =>
+                Pka.PerformHandshakeAsync(record.GetProperty("u").GetString()!, record.GetProperty("k").GetString()!, string.Empty, TimeSpan.FromSeconds(1))
+            );
+            Assert.Equal(nameof(Constants.ERR_SECURITY), ex.ErrorCode);
+        }
+        finally
+        {
+            Pka.FillRandomBytesForTesting = oldFill;
+            Pka.NowUnixForTesting = oldNow;
+            Pka.SendAsyncForTesting = oldSend;
+        }
+    }
+
+    [Fact]
+    public async Task V2RejectsMissingResponseNoStore()
+    {
+        var ex = await Assert.ThrowsAsync<AidError>(() => RunV2VectorWithResponseAsync(
+            (response, _) => response.Headers.Remove("Cache-Control")
+        ));
+
+        Assert.Equal(nameof(Constants.ERR_SECURITY), ex.ErrorCode);
+    }
+
+    [Fact]
+    public async Task V2RejectsMissingExpires()
+    {
+        var ex = await Assert.ThrowsAsync<AidError>(() => RunV2VectorWithResponseAsync(
+            (response, vector) =>
+            {
+                var input = vector.GetProperty("response").GetProperty("signature_input").GetString()!;
+                response.Headers.Remove("Signature-Input");
+                response.Headers.TryAddWithoutValidation("Signature-Input", input.Replace(";expires=1767139260", string.Empty));
+            }
+        ));
+
+        Assert.Equal(nameof(Constants.ERR_SECURITY), ex.ErrorCode);
+    }
+
+    [Fact]
+    public async Task V2RejectsFreshnessWindowOver300Seconds()
+    {
+        var ex = await Assert.ThrowsAsync<AidError>(() => RunV2VectorWithResponseAsync(
+            (response, vector) =>
+            {
+                var input = vector.GetProperty("response").GetProperty("signature_input").GetString()!;
+                response.Headers.Remove("Signature-Input");
+                response.Headers.TryAddWithoutValidation("Signature-Input", input.Replace("expires=1767139260", "expires=1767139501"));
+            }
+        ));
+
+        Assert.Equal(nameof(Constants.ERR_SECURITY), ex.ErrorCode);
+    }
+
+    [Fact]
+    public async Task V2RejectsReqOnResponseStatusComponent()
+    {
+        var ex = await Assert.ThrowsAsync<AidError>(() => RunV2VectorWithResponseAsync(
+            (response, vector) =>
+            {
+                var input = vector.GetProperty("response").GetProperty("signature_input").GetString()!;
+                response.Headers.Remove("Signature-Input");
+                response.Headers.TryAddWithoutValidation("Signature-Input", input.Replace("\"@status\"", "\"@status\";req"));
+            }
+        ));
+
+        Assert.Equal(nameof(Constants.ERR_SECURITY), ex.ErrorCode);
+    }
+
+    [Theory]
+    [InlineData("\"@method\";req;req")]
+    [InlineData("\"@method\";REQ")]
+    [InlineData("\"@method\";ReQ")]
+    [InlineData("\"@method\";foo")]
+    public async Task V2RejectsInvalidCoveredItemParameters(string coveredMethod)
+    {
+        var ex = await Assert.ThrowsAsync<AidError>(() => RunV2VectorWithResponseAsync(
+            (response, vector) =>
+            {
+                var input = vector.GetProperty("response").GetProperty("signature_input").GetString()!;
+                var mutated = input.Replace("\"@method\";req", coveredMethod);
+                response.Headers.Remove("Signature-Input");
+                response.Headers.Remove("Signature");
+                response.Headers.TryAddWithoutValidation("Signature-Input", mutated);
+                response.Headers.TryAddWithoutValidation("Signature", SignV2Response(vector, mutated));
+            }
+        ));
+
+        Assert.Equal(nameof(Constants.ERR_SECURITY), ex.ErrorCode);
+        Assert.Contains("Signature-Input covered item parameter", ex.Message);
+    }
+
+    [Theory]
+    [InlineData("\"@method\";req \"@target-uri\";req \"@authority\";req \"@method\";req")]
+    [InlineData("\"@method\";req \"@target-uri\";req \"@authority\";req")]
+    [InlineData("\"@method\";req \"@target-uri\";req \"@authority\";req \"@status\" \"date\"")]
+    public async Task V2RejectsInvalidCoveredItemSet(string coveredItems)
+    {
+        var ex = await Assert.ThrowsAsync<AidError>(() => RunV2VectorWithResponseAsync(
+            (response, vector) =>
+            {
+                var input = vector.GetProperty("response").GetProperty("signature_input").GetString()!;
+                var mutated = ReplaceV2CoveredList(input, coveredItems);
+                response.Headers.Remove("Signature-Input");
+                response.Headers.Remove("Signature");
+                response.Headers.TryAddWithoutValidation("Signature-Input", mutated);
+                response.Headers.TryAddWithoutValidation("Signature", SignV2Response(vector, mutated));
+            }
+        ));
+
+        Assert.Equal(nameof(Constants.ERR_SECURITY), ex.ErrorCode);
+    }
+
+    [Fact]
+    public async Task V2RejectsMixedCaseCoveredComponentName()
+    {
+        var ex = await Assert.ThrowsAsync<AidError>(() => RunV2VectorWithResponseAsync(
+            (response, vector) =>
+            {
+                var input = vector.GetProperty("response").GetProperty("signature_input").GetString()!;
+                var mutated = input.Replace("\"@method\";req", "\"@METHOD\";req");
+                response.Headers.Remove("Signature-Input");
+                response.Headers.Remove("Signature");
+                response.Headers.TryAddWithoutValidation("Signature-Input", mutated);
+                response.Headers.TryAddWithoutValidation("Signature", SignV2Response(vector, mutated));
+            }
+        ));
+
+        Assert.Equal(nameof(Constants.ERR_SECURITY), ex.ErrorCode);
+    }
+
+    [Theory]
+    [InlineData("created")]
+    [InlineData("expires")]
+    [InlineData("keyid")]
+    [InlineData("alg")]
+    [InlineData("nonce")]
+    [InlineData("tag")]
+    public async Task V2RejectsDuplicateCriticalSignatureInputParameters(string parameter)
+    {
+        var ex = await Assert.ThrowsAsync<AidError>(() => RunV2VectorWithResponseAsync(
+            (response, vector) =>
+            {
+                var responseVector = vector.GetProperty("response");
+                var input = responseVector.GetProperty("signature_input").GetString()!;
+                var duplicate = parameter switch
+                {
+                    "created" => "created=1767139200",
+                    "expires" => "expires=1767139260",
+                    "keyid" => "keyid=\"WWpn_pfHui9YKR4CZtQsDGMu7_Gch2zYChfSvnxgtPk\"",
+                    "alg" => "alg=\"ed25519\"",
+                    "nonce" => "nonce=\"oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8\"",
+                    "tag" => "tag=\"aid-pka-v2\"",
+                    _ => throw new ArgumentOutOfRangeException(nameof(parameter), parameter, null),
+                };
+                var mutated = $"{input};{duplicate}";
+                response.Headers.Remove("Signature-Input");
+                response.Headers.Remove("Signature");
+                response.Headers.TryAddWithoutValidation("Signature-Input", mutated);
+                response.Headers.TryAddWithoutValidation("Signature", SignV2Response(vector, mutated));
+            }
+        ));
+
+        Assert.Equal(nameof(Constants.ERR_SECURITY), ex.ErrorCode);
+        Assert.Contains("Duplicate Signature-Input parameter", ex.Message);
+    }
+
+    [Fact]
+    public async Task V2RejectsUnknownTopLevelSignatureInputParameter()
+    {
+        var ex = await Assert.ThrowsAsync<AidError>(() => RunV2VectorWithResponseAsync(
+            (response, vector) =>
+            {
+                var input = vector.GetProperty("response").GetProperty("signature_input").GetString()!;
+                var mutated = $"{input};foo=\"bar\"";
+                response.Headers.Remove("Signature-Input");
+                response.Headers.Remove("Signature");
+                response.Headers.TryAddWithoutValidation("Signature-Input", mutated);
+                response.Headers.TryAddWithoutValidation("Signature", SignV2Response(vector, mutated));
+            }
+        ));
+
+        Assert.Equal(nameof(Constants.ERR_SECURITY), ex.ErrorCode);
+        Assert.Contains("Unsupported Signature-Input parameter", ex.Message);
+    }
+
+    [Theory]
+    [InlineData("created=", "Created=")]
+    [InlineData("keyid=", "KeyID=")]
+    [InlineData("alg=", "ALG=")]
+    public async Task V2RejectsMixedCaseTopLevelSignatureInputParameterNames(string original, string replacement)
+    {
+        var ex = await Assert.ThrowsAsync<AidError>(() => RunV2VectorWithResponseAsync(
+            (response, vector) =>
+            {
+                var input = vector.GetProperty("response").GetProperty("signature_input").GetString()!;
+                var mutated = input.Replace(original, replacement);
+                response.Headers.Remove("Signature-Input");
+                response.Headers.Remove("Signature");
+                response.Headers.TryAddWithoutValidation("Signature-Input", mutated);
+                response.Headers.TryAddWithoutValidation("Signature", SignV2Response(vector, mutated));
+            }
+        ));
+
+        Assert.Equal(nameof(Constants.ERR_SECURITY), ex.ErrorCode);
+        Assert.Contains("Unsupported Signature-Input parameter", ex.Message);
+    }
+
+    [Theory]
+    [InlineData("created")]
+    [InlineData("expires")]
+    public async Task V2RejectsQuotedNumericSignatureInputParameters(string parameter)
+    {
+        var ex = await Assert.ThrowsAsync<AidError>(() => RunV2VectorWithResponseAsync(
+            (response, vector) =>
+            {
+                var input = vector.GetProperty("response").GetProperty("signature_input").GetString()!;
+                var mutated = parameter switch
+                {
+                    "created" => input.Replace("created=1767139200", "created=\"1767139200\""),
+                    "expires" => input.Replace("expires=1767139260", "expires=\"1767139260\""),
+                    _ => throw new ArgumentOutOfRangeException(nameof(parameter), parameter, null),
+                };
+                response.Headers.Remove("Signature-Input");
+                response.Headers.Remove("Signature");
+                response.Headers.TryAddWithoutValidation("Signature-Input", mutated);
+                response.Headers.TryAddWithoutValidation("Signature", SignV2Response(vector, mutated));
+            }
+        ));
+
+        Assert.Equal(nameof(Constants.ERR_SECURITY), ex.ErrorCode);
+        Assert.Contains("Invalid Signature-Input timestamp", ex.Message);
+    }
+
+    [Fact]
+    public async Task V2RejectsDuplicateAidPkaSignatureInputDictionaryMember()
+    {
+        var ex = await Assert.ThrowsAsync<AidError>(() => RunV2VectorWithResponseAsync(
+            (response, vector) =>
+            {
+                var input = vector.GetProperty("response").GetProperty("signature_input").GetString()!;
+                response.Headers.Remove("Signature-Input");
+                response.Headers.TryAddWithoutValidation("Signature-Input", $"{input}, aid-pka=(\"@method\");created=1767139200");
+            }
+        ));
+
+        Assert.Equal(nameof(Constants.ERR_SECURITY), ex.ErrorCode);
+        Assert.Contains("Duplicate aid-pka signature member", ex.Message);
+    }
+
+    [Fact]
+    public async Task V2RejectsDuplicateAidPkaSignatureDictionaryMember()
+    {
+        var ex = await Assert.ThrowsAsync<AidError>(() => RunV2VectorWithResponseAsync(
+            (response, vector) =>
+            {
+                var signature = vector.GetProperty("response").GetProperty("signature").GetString()!;
+                response.Headers.Remove("Signature");
+                response.Headers.TryAddWithoutValidation("Signature", $"{signature}, aid-pka=:QUFB:");
+            }
+        ));
+
+        Assert.Equal(nameof(Constants.ERR_SECURITY), ex.ErrorCode);
+        Assert.Contains("Duplicate aid-pka signature member", ex.Message);
+    }
+
+    [Theory]
+    [InlineData("AID-PKA")]
+    [InlineData("Aid-Pka")]
+    public async Task V2RejectsMixedCaseSignatureInputDictionaryMember(string label)
+    {
+        var ex = await Assert.ThrowsAsync<AidError>(() => RunV2VectorWithResponseAsync(
+            (response, vector) =>
+            {
+                var input = vector.GetProperty("response").GetProperty("signature_input").GetString()!;
+                var mutated = input.Replace("aid-pka=", $"{label}=");
+                response.Headers.Remove("Signature-Input");
+                response.Headers.Remove("Signature");
+                response.Headers.TryAddWithoutValidation("Signature-Input", mutated);
+                response.Headers.TryAddWithoutValidation("Signature", SignV2Response(vector, mutated));
+            }
+        ));
+
+        Assert.Equal(nameof(Constants.ERR_SECURITY), ex.ErrorCode);
+        Assert.Contains("Missing aid-pka signature member", ex.Message);
+    }
+
+    [Theory]
+    [InlineData("AID-PKA")]
+    [InlineData("Aid-Pka")]
+    public async Task V2RejectsMixedCaseSignatureDictionaryMember(string label)
+    {
+        var ex = await Assert.ThrowsAsync<AidError>(() => RunV2VectorWithResponseAsync(
+            (response, vector) =>
+            {
+                var signature = vector.GetProperty("response").GetProperty("signature").GetString()!;
+                response.Headers.Remove("Signature");
+                response.Headers.TryAddWithoutValidation("Signature", signature.Replace("aid-pka=", $"{label}="));
+            }
+        ));
+
+        Assert.Equal(nameof(Constants.ERR_SECURITY), ex.ErrorCode);
+        Assert.Contains("Missing aid-pka signature member", ex.Message);
+    }
+
+    [Fact]
+    public async Task V2RejectsExactPlusMixedCaseSignatureInputDictionaryMember()
+    {
+        var ex = await Assert.ThrowsAsync<AidError>(() => RunV2VectorWithResponseAsync(
+            (response, vector) =>
+            {
+                var input = vector.GetProperty("response").GetProperty("signature_input").GetString()!;
+                response.Headers.Remove("Signature-Input");
+                response.Headers.TryAddWithoutValidation("Signature-Input", $"{input}, AID-PKA=(\"@method\");created=1767139200");
+            }
+        ));
+
+        Assert.Equal(nameof(Constants.ERR_SECURITY), ex.ErrorCode);
+        Assert.Contains("aid-pka signature member", ex.Message);
+    }
+
+    [Fact]
+    public async Task V2RejectsExactPlusMixedCaseSignatureDictionaryMember()
+    {
+        var ex = await Assert.ThrowsAsync<AidError>(() => RunV2VectorWithResponseAsync(
+            (response, vector) =>
+            {
+                var signature = vector.GetProperty("response").GetProperty("signature").GetString()!;
+                response.Headers.Remove("Signature");
+                response.Headers.TryAddWithoutValidation("Signature", $"{signature}, Aid-Pka=:QUFB:");
+            }
+        ));
+
+        Assert.Equal(nameof(Constants.ERR_SECURITY), ex.ErrorCode);
+        Assert.Contains("aid-pka signature member", ex.Message);
+    }
+
+    [Theory]
+    [InlineData("Signature-Input")]
+    [InlineData("Signature")]
+    public async Task V2RejectsDuplicateAidPkaDictionaryMemberAcrossRepeatedHeaderValues(string headerName)
+    {
+        var ex = await Assert.ThrowsAsync<AidError>(() => RunV2VectorWithResponseAsync(
+            (response, vector) =>
+            {
+                var responseVector = vector.GetProperty("response");
+                if (headerName == "Signature-Input")
+                {
+                    response.Headers.Remove("Signature-Input");
+                    response.Headers.TryAddWithoutValidation("Signature-Input", responseVector.GetProperty("signature_input").GetString());
+                    response.Headers.TryAddWithoutValidation("Signature-Input", "aid-pka=(\"@method\");created=1767139200");
+                    return;
+                }
+
+                response.Headers.Remove("Signature");
+                response.Headers.TryAddWithoutValidation("Signature", responseVector.GetProperty("signature").GetString());
+                response.Headers.TryAddWithoutValidation("Signature", "aid-pka=:QUFB:");
+            }
+        ));
+
+        Assert.Equal(nameof(Constants.ERR_SECURITY), ex.ErrorCode);
+        Assert.Contains("Duplicate aid-pka signature member", ex.Message);
+    }
+
+    [Fact]
+    public async Task V2UsesBracketedIpv6AuthorityWithNonDefaultPort()
+    {
+        var vector = V2Vector();
+        var nonce = Base64UrlDecode(vector.GetProperty("nonce").GetString()!);
+        var oldFill = Pka.FillRandomBytesForTesting;
+        var oldNow = Pka.NowUnixForTesting;
+        var oldSend = Pka.SendAsyncForTesting;
+        var targetUri = "https://[2001:db8::10]:8443/mcp?check=1";
+        var authority = "[2001:db8::10]:8443";
+
+        Pka.FillRandomBytesForTesting = bytes => Array.Copy(nonce, bytes, bytes.Length);
+        Pka.NowUnixForTesting = () => vector.GetProperty("created").GetInt64();
+        Pka.SendAsyncForTesting = (request, _) =>
+        {
+            Assert.Equal(targetUri, request.RequestUri!.ToString());
+
+            var responseVector = vector.GetProperty("response");
+            var signatureInput = responseVector.GetProperty("signature_input").GetString()!;
+            var response = new HttpResponseMessage((HttpStatusCode)responseVector.GetProperty("status").GetInt32());
+            response.Headers.TryAddWithoutValidation("Cache-Control", responseVector.GetProperty("cache_control").GetString());
+            response.Headers.TryAddWithoutValidation("Signature-Input", signatureInput);
+            response.Headers.TryAddWithoutValidation("Signature", SignV2Response(vector, signatureInput, targetUri, authority));
+            return Task.FromResult(response);
+        };
+        try
+        {
+            var record = vector.GetProperty("record");
+            await Pka.PerformHandshakeAsync(targetUri, record.GetProperty("k").GetString()!, string.Empty, TimeSpan.FromSeconds(1));
+        }
+        finally
+        {
+            Pka.FillRandomBytesForTesting = oldFill;
+            Pka.NowUnixForTesting = oldNow;
+            Pka.SendAsyncForTesting = oldSend;
+        }
+    }
+
+    private static async Task RunV2VectorWithResponseAsync(Action<HttpResponseMessage, JsonElement> mutateResponse)
+    {
+        var vector = V2Vector();
+        var nonce = Base64UrlDecode(vector.GetProperty("nonce").GetString()!);
+        var oldFill = Pka.FillRandomBytesForTesting;
+        var oldNow = Pka.NowUnixForTesting;
+        var oldSend = Pka.SendAsyncForTesting;
+        Pka.FillRandomBytesForTesting = bytes => Array.Copy(nonce, bytes, bytes.Length);
+        Pka.NowUnixForTesting = () => vector.GetProperty("created").GetInt64();
+        Pka.SendAsyncForTesting = (_, _) =>
+        {
+            var responseVector = vector.GetProperty("response");
+            var response = new HttpResponseMessage((HttpStatusCode)responseVector.GetProperty("status").GetInt32());
+            response.Headers.TryAddWithoutValidation("Cache-Control", responseVector.GetProperty("cache_control").GetString());
+            response.Headers.TryAddWithoutValidation("Signature-Input", responseVector.GetProperty("signature_input").GetString());
+            response.Headers.TryAddWithoutValidation("Signature", responseVector.GetProperty("signature").GetString());
+            mutateResponse(response, vector);
+            return Task.FromResult(response);
+        };
+        try
+        {
+            var record = vector.GetProperty("record");
+            await Pka.PerformHandshakeAsync(record.GetProperty("u").GetString()!, record.GetProperty("k").GetString()!, string.Empty, TimeSpan.FromSeconds(1));
+        }
+        finally
+        {
+            Pka.FillRandomBytesForTesting = oldFill;
+            Pka.NowUnixForTesting = oldNow;
+            Pka.SendAsyncForTesting = oldSend;
+        }
+    }
+
+    private static string SignV2Response(JsonElement vector, string signatureInput, string? targetUri = null, string? authority = null)
+    {
+        var seed = SeedFromVector(vector);
+        var algorithm = SignatureAlgorithm.Ed25519;
+        var key = Key.Import(algorithm, seed, KeyBlobFormat.RawPrivateKey);
+        var signature = algorithm.Sign(key, BuildV2Base(vector, signatureInput, targetUri, authority));
+        return $"aid-pka=:{Convert.ToBase64String(signature)}:";
+    }
+
+    private static byte[] BuildV2Base(JsonElement vector, string signatureInput, string? targetUri = null, string? authority = null)
+    {
+        var request = vector.GetProperty("request");
+        var response = vector.GetProperty("response");
+        var signatureParams = ExtractFirstAidPkaMember(signatureInput);
+        var closeIndex = signatureParams.IndexOf(')', StringComparison.Ordinal);
+        var coveredRaw = signatureParams[1..closeIndex].Trim();
+        var lines = new List<string>();
+        foreach (var item in SplitCoveredItemsForTest(coveredRaw))
+        {
+            var name = Regex.Match(item, "^\"([^\"]+)\"").Groups[1].Value.ToLowerInvariant();
+            switch (name)
+            {
+                case "@method":
+                    lines.Add($"{item}: {request.GetProperty("method").GetString()}");
+                    break;
+                case "@target-uri":
+                    lines.Add($"{item}: {targetUri ?? request.GetProperty("target_uri").GetString()}");
+                    break;
+                case "@authority":
+                    lines.Add($"{item}: {authority ?? request.GetProperty("authority").GetString()}");
+                    break;
+                case "@status":
+                    lines.Add($"{item}: {response.GetProperty("status").GetInt32()}");
+                    break;
+                case "date":
+                    lines.Add($"{item}: Tue, 30 Dec 2025 00:00:00 GMT");
+                    break;
+                default:
+                    throw new InvalidOperationException($"Unsupported covered item in test helper: {item}");
+            }
+        }
+        lines.Add($"\"@signature-params\": {signatureParams}");
+        return Encoding.UTF8.GetBytes(string.Join('\n', lines));
+    }
+
+    private static string ReplaceV2CoveredList(string signatureInput, string coveredItems)
+    {
+        const string prefix = "aid-pka=(";
+        var start = signatureInput.IndexOf(prefix, StringComparison.Ordinal) + prefix.Length;
+        var end = signatureInput.IndexOf(')', start);
+        return signatureInput[..start] + coveredItems + signatureInput[end..];
+    }
+
+    private static List<string> SplitCoveredItemsForTest(string input)
+    {
+        var items = new List<string>();
+        var start = 0;
+        var inString = false;
+        var escaped = false;
+        for (int i = 0; i < input.Length; i++)
+        {
+            var c = input[i];
+            if (escaped)
+            {
+                escaped = false;
+                continue;
+            }
+            if (inString)
+            {
+                if (c == '\\') escaped = true;
+                else if (c == '"') inString = false;
+                continue;
+            }
+            if (c == '"')
+            {
+                inString = true;
+                continue;
+            }
+            if (char.IsWhiteSpace(c))
+            {
+                var item = input[start..i].Trim();
+                if (item.Length > 0) items.Add(item);
+                start = i + 1;
+            }
+        }
+        var tail = input[start..].Trim();
+        if (tail.Length > 0) items.Add(tail);
+        return items;
+    }
+
+    private static string ExtractFirstAidPkaMember(string signatureInput)
+    {
+        const string label = "aid-pka=";
+        var start = signatureInput.IndexOf(label, StringComparison.OrdinalIgnoreCase);
+        if (start < 0)
+        {
+            throw new InvalidOperationException("Missing aid-pka member in test vector");
+        }
+        start += label.Length;
+        var depth = 0;
+        var inString = false;
+        var inBytes = false;
+        var escaped = false;
+        for (int i = start; i < signatureInput.Length; i++)
+        {
+            var c = signatureInput[i];
+            if (escaped)
+            {
+                escaped = false;
+                continue;
+            }
+            if (inString)
+            {
+                if (c == '\\') escaped = true;
+                else if (c == '"') inString = false;
+                continue;
+            }
+            if (c == '"')
+            {
+                inString = true;
+                continue;
+            }
+            if (c == ':')
+            {
+                inBytes = !inBytes;
+                continue;
+            }
+            if (inBytes)
+            {
+                continue;
+            }
+            if (c == '(') depth++;
+            else if (c == ')' && depth > 0) depth--;
+            else if (c == ',' && depth == 0)
+            {
+                return signatureInput[start..i].Trim();
+            }
+        }
+        return signatureInput[start..].Trim();
+    }
+
+    private static byte[] Base64UrlDecode(string value)
+    {
+        var padded = value.Replace('-', '+').Replace('_', '/');
+        padded = padded.PadRight(padded.Length + (4 - padded.Length % 4) % 4, '=');
+        return Convert.FromBase64String(padded);
+    }
+}

@@ -35,10 +35,10 @@ describe('AID Parser', () => {
     });
 
     it('should throw error for unsupported version', () => {
-      const txtRecord = 'v=aid2;uri=https://api.example.com/mcp;proto=mcp';
+      const txtRecord = 'v=aid3;uri=https://api.example.com/mcp;proto=mcp';
 
       expect(() => parse(txtRecord)).toThrow(AidError);
-      expect(() => parse(txtRecord)).toThrow('Unsupported version: aid2');
+      expect(() => parse(txtRecord)).toThrow('Unsupported version: aid3');
     });
 
     it('should throw error for unsupported protocol', () => {

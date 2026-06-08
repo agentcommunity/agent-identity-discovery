@@ -13,7 +13,7 @@
  * ```
  */
 
-import { type AidRecord, DNS_SUBDOMAIN } from './constants.js';
+import { type AidRecord, DNS_SUBDOMAIN, SPEC_VERSION_V1, SPEC_VERSION_V2 } from './constants.js';
 import { AidError, parse, canonicalizeRaw, AidRecordValidator } from './parser.js';
 import { performPKAHandshake } from './pka.js';
 import {
@@ -135,7 +135,29 @@ function constructQueryName(domain: string, protocol?: string, useUnderscore = f
 }
 
 function looksLikeAidRecord(raw: string): boolean {
-  return /(?:^|;)\s*(?:v|version)\s*=\s*aid1(?:\s*(?:;|$))/i.test(raw);
+  return new RegExp(String.raw`(?:^|;)\s*(?:v|version)\s*=\s*aid[0-9]+(?:\s*(?:;|$))`, 'i').test(
+    raw,
+  );
+}
+
+async function performPKAHandshakeForRecord(record: AidRecord): Promise<void> {
+  if (!record.pka) return;
+  if (record.v === SPEC_VERSION_V1) {
+    await performPKAHandshake(record.uri, record.pka, record.kid ?? '');
+    return;
+  }
+  await performPKAHandshake(record.uri, record.pka);
+}
+
+function dnsLookupSecurityError(message: string): AidError {
+  return new AidError('ERR_SECURITY', message, { discoveryPhase: 'dns_lookup' });
+}
+
+function canUseWellKnownFallback(error: AidError): boolean {
+  return (
+    error.errorCode === 'ERR_NO_RECORD' ||
+    (error.errorCode === 'ERR_SECURITY' && error.details?.discoveryPhase === 'dns_lookup')
+  );
 }
 
 async function fetchWellKnown(
@@ -200,7 +222,7 @@ async function fetchWellKnown(
     }
     if (record.pka) {
       try {
-        await performPKAHandshake(record.uri, record.pka, record.kid ?? '');
+        await performPKAHandshakeForRecord(record);
       } catch (pkaError) {
         // Preserve ERR_SECURITY errors from PKA verification
         if (pkaError instanceof AidError && pkaError.errorCode === 'ERR_SECURITY') {
@@ -210,7 +232,7 @@ async function fetchWellKnown(
       }
     }
     enforcePkaPolicy(record, url, security);
-    enforceDowngradePolicy(record, url, policy, security);
+    await enforceDowngradePolicy(record, url, policy, security);
     return { record, raw: text.trim(), queryName: url, security };
   } catch (e) {
     if (e instanceof AidError) {
@@ -258,10 +280,7 @@ async function queryTxtRecordsDoH(
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      throw new AidError(
-        'ERR_SECURITY',
-        `DoH query failed: ${response.status} ${response.statusText}`,
-      );
+      throw dnsLookupSecurityError(`DoH query failed: ${response.status} ${response.statusText}`);
     }
 
     const dnsResult: DoHResponse = await response.json();
@@ -293,13 +312,13 @@ async function queryTxtRecordsDoH(
 
     if (error instanceof Error) {
       if (error.name === 'AbortError') {
-        throw new AidError('ERR_SECURITY', `DNS query timeout for ${queryName}`);
+        throw dnsLookupSecurityError(`DNS query timeout for ${queryName}`);
       }
 
-      throw new AidError('ERR_SECURITY', `DNS query failed for ${queryName}: ${error.message}`);
+      throw dnsLookupSecurityError(`DNS query failed for ${queryName}: ${error.message}`);
     }
 
-    throw new AidError('ERR_SECURITY', `DNS query failed for ${queryName}: ${error}`);
+    throw dnsLookupSecurityError(`DNS query failed for ${queryName}: ${error}`);
   }
 }
 
@@ -358,25 +377,28 @@ export async function discover(
       }
     }
 
-    if (validRecords.length === 1) {
-      const result = validRecords[0];
-      if (result.record.pka) {
-        await performPKAHandshake(result.record.uri, result.record.pka, result.record.kid ?? '');
+    if (validRecords.length > 0) {
+      const selectedVersion = validRecords.some((result) => result.record.v === SPEC_VERSION_V2)
+        ? SPEC_VERSION_V2
+        : SPEC_VERSION_V1;
+      const selectedRecords = validRecords.filter((result) => result.record.v === selectedVersion);
+
+      if (selectedRecords.length > 1) {
+        throw new AidError(
+          'ERR_INVALID_TXT',
+          `Multiple valid ${selectedVersion} AID records found for ${name}; publish exactly one valid record per queried DNS name`,
+        );
       }
+
+      const result = selectedRecords[0];
+      await performPKAHandshakeForRecord(result.record);
       const security = createDiscoverySecurity(policy, false);
       enforcePkaPolicy(result.record, name, security);
-      enforceDowngradePolicy(result.record, name, policy, security);
+      await enforceDowngradePolicy(result.record, name, policy, security);
       if (policy.dnssecPolicy !== 'off') {
         enforceDnssecPolicy(security, name, ad);
       }
       return { ...result, security };
-    }
-
-    if (validRecords.length > 1) {
-      throw new AidError(
-        'ERR_INVALID_TXT',
-        `Multiple valid AID records found for ${name}; publish exactly one valid record per queried DNS name`,
-      );
     }
 
     if (lastAidError) throw lastAidError;
@@ -385,7 +407,7 @@ export async function discover(
   };
 
   const runDns = async (): Promise<DiscoveryResult> => {
-    // If protocol is explicitly requested, try that first, then fall back to base
+    // If protocol is explicitly requested, try _agent._<proto>.<domain> before base.
     if (protocol) {
       const underscoreName = constructQueryName(domain, protocol, true);
       try {
@@ -394,7 +416,6 @@ export async function discover(
         if (!(error instanceof AidError) || error.errorCode !== 'ERR_NO_RECORD') {
           throw error;
         }
-        // Fall through to base query
       }
     }
     // Base query
@@ -408,7 +429,7 @@ export async function discover(
       wellKnownFallback &&
       policy.wellKnownPolicy !== 'disable' &&
       error instanceof AidError &&
-      (error.errorCode === 'ERR_NO_RECORD' || error.errorCode === 'ERR_SECURITY') // ERR_SECURITY can be a timeout
+      canUseWellKnownFallback(error)
     ) {
       try {
         const { record, queryName, security } = await fetchWellKnown(

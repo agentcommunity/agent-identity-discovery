@@ -3,7 +3,15 @@ package org.agentcommunity.aid;
 
 public final class Constants {
   private Constants() {}
-  public static final String SPEC_VERSION = "aid1";
+  public static final String SPEC_VERSION_V1 = "aid1";
+  public static final String SPEC_VERSION_V2 = "aid2";
+  public static final String SPEC_VERSION = "aid2";
+  public static final String[] SUPPORTED_SPEC_VERSIONS = new String[] {"aid1", "aid2" };
+  // Version-specific raw record metadata. AidRecordV2 excludes legacy DNS kid/i.
+  public static final String[] AID_RECORD_V1_CANONICAL_FIELDS = new String[] {"v", "uri", "proto", "auth", "desc", "docs", "dep", "pka", "kid" };
+  public static final String[] AID_RECORD_V1_ALIAS_FIELDS = new String[] {"p", "u", "a", "s", "d", "e", "k", "i" };
+  public static final String[] AID_RECORD_V2_CANONICAL_FIELDS = new String[] {"v", "uri", "proto", "auth", "desc", "docs", "dep", "pka" };
+  public static final String[] AID_RECORD_V2_ALIAS_FIELDS = new String[] {"p", "u", "a", "s", "d", "e", "k" };
   public static final String PROTO_A2A = "a2a";
   public static final String PROTO_GRAPHQL = "graphql";
   public static final String PROTO_GRPC = "grpc";

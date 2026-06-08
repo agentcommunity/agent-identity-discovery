@@ -15,15 +15,29 @@ TypeScript reference:
 
 from __future__ import annotations
 
-from typing import Dict, Tuple
-
 # Re-export key API pieces from submodules
-from .parser import AidError, parse, is_valid_proto  # noqa: E402
+from .parser import (  # noqa: E402
+    AidError,
+    AidRecord,
+    AidRecordV1,
+    AidRecordV2,
+    RawAidRecord,
+    as_v1,
+    as_v2,
+    parse,
+    is_valid_proto,
+)
 from .discover import discover  # noqa: E402
 
 __all__ = [
     "discover",
     "parse",
+    "as_v1",
+    "as_v2",
     "is_valid_proto",
     "AidError",
-] 
+    "AidRecord",
+    "AidRecordV1",
+    "AidRecordV2",
+    "RawAidRecord",
+]

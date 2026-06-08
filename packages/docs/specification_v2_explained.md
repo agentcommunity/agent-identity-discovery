@@ -1,25 +1,25 @@
 ---
-title: 'AID v2 Explained Draft'
-description: 'Annotated draft preview of the proposed AID v2 specification'
+title: 'AID v2 Design Notes'
+description: 'Historical design notes for the AID v2 specification'
 icon: material/file-document-edit-outline
 
 extra_css_class: aid-page
 
 tags:
   - v2
-  - draft
+  - design-notes
   - '2026-05-23'
 ---
 
-# Agent Identity & Discovery (AID) v2 - Explained Draft
+# Agent Identity & Discovery (AID) v2 - Design Notes
 
-_Annotated preview for review and discussion_
+_Historical notes from the v2 specification work_
 
 **Date:** 23 May 2026
 **Editor:** Agent Community
-**Status:** Draft preview, not the current normative specification
+**Status:** Non-normative design notes
 
-> This page is a shareable review artifact. It does not replace the current [AID v1.2 specification](specification.md). The purpose is to show the proposed v2 shape, explain why each major change exists, and make review easier than reading a raw line-by-line diff.
+> The current normative protocol is the [AID v2 specification](specification.md). This page is retained as design history and review context for the v1.2-to-v2 transition.
 
 ---
 
@@ -27,7 +27,7 @@ _Annotated preview for review and discussion_
 
 This page has two layers:
 
-- **Draft specification text** uses normal normative language such as MUST, SHOULD, and MAY.
+- **Historical specification text** uses normal normative language such as MUST, SHOULD, and MAY because it was written during the v2 review.
 - **Explainer notes** explain the reason for a design choice and how it differs from v1.2.
 
 The proposal is intentionally narrow:
@@ -38,7 +38,7 @@ The proposal is intentionally narrow:
 
 ## What Changes From v1.2
 
-| Area                   | v1.2                                 | v2 draft                                 | Why                                                                                     |
+| Area                   | v1.2                                 | v2                                       | Why                                                                                     |
 | ---------------------- | ------------------------------------ | ---------------------------------------- | --------------------------------------------------------------------------------------- |
 | Record version         | `v=aid1`                             | `v=aid2`                                 | Clear wire-format break.                                                                |
 | PKA key encoding       | `k=z...` multibase/base58btc         | `k=<base64url>`                          | Uses the same value as the Ed25519 JWK `x` member.                                      |
@@ -168,13 +168,13 @@ _agent.example.com. 300 IN TXT "v=aid2;p=mcp;u=https://api.example.com/mcp;k=<sa
 When given a domain, an AID client performs these steps:
 
 1. Normalize the domain. If the domain contains non-ASCII characters, convert it to its Punycode A-label representation.
-2. Query TXT records for `_agent.<exact-host-user-entered>`. Clients MUST NOT walk up to parent domains.
+2. Query TXT records for the canonical base name `_agent.<exact-host-user-entered>`. Clients MUST NOT walk up to parent domains.
 3. Parse returned TXT answers as semicolon-delimited `key=value` records.
 4. Partition valid records by AID major version.
 5. Select the highest supported valid version allowed by local policy, normally `aid2` before `aid1`.
 6. Within the selected version, if exactly one valid record exists, use it. If more than one valid record exists, fail with ambiguity.
 7. Process optional metadata: display `docs`, warn or fail on `dep` according to policy.
-8. If `k` is present, perform PKA endpoint proof using Appendix D.
+8. If `k` is present, perform PKA endpoint proof using Appendix B.
 9. Return the discovered endpoint, protocol, metadata, PKA state, and trust source.
 
 Malformed answers do not matter when there is exactly one valid record in the selected version. Clients MUST NOT choose among multiple valid same-version records by DNS answer order.
@@ -182,6 +182,10 @@ Malformed answers do not matter when there is exactly one valid record in the se
 Returning clients that previously selected `aid2` SHOULD treat an `aid1`-only result as a version downgrade.
 
 > **Explainer:** The v2 migration needs version partitioning. Publishing `aid1` and `aid2` side by side should not trigger the same ambiguity rule as two competing `aid2` records.
+
+If an application explicitly requests a protocol, v2 clients still query the canonical base name `_agent.<exact-host-user-entered>` first. Protocol-prefixed `_agent._<proto>.<exact-host-user-entered>` probing is legacy, diagnostic, or base-failure-only behavior where supported and explicitly configured. Clients MUST NOT perform a compatibility lookup at `_agent.<proto>.<domain>`.
+
+`aid-doctor` diagnostics are base-first by default. A protocol hint does not change the primary lookup away from `_agent.<domain>` unless an explicit protocol-probe option requests diagnostic probing of `_agent._<proto>.<domain>`.
 
 ### 2.4 Exact-Host Semantics And Delegation
 
@@ -198,7 +202,9 @@ _agent.shared.team.example.com. 300 IN TXT "v=aid2;p=mcp;u=https://gateway.team.
 
 ### 2.5 Multiple Protocols
 
-The canonical location remains `_agent.<domain>`. Providers MAY additionally publish protocol-specific names such as `_agent._mcp.<domain>` or `_agent._a2a.<domain>` when an application explicitly requests a protocol.
+The canonical v2 location remains `_agent.<domain>`, and clients query that base name by default. Providers MAY additionally publish protocol-specific names such as `_agent._mcp.<domain>` or `_agent._a2a.<domain>` for legacy clients, diagnostics, or explicitly configured base-failure probing.
+
+Protocol-specific names always use the underscore form `_agent._<proto>.<domain>`. The form `_agent.<proto>.<domain>` is not part of v2 discovery.
 
 ---
 
@@ -207,7 +213,7 @@ The canonical location remains `_agent.<domain>`. Providers MAY additionally pub
 - **DNSSEC:** Providers SHOULD sign DNS records with DNSSEC. Clients SHOULD validate DNSSEC when available.
 - **HTTPS:** Remote agent URIs MUST use `https://`. Clients MUST perform standard TLS certificate and hostname validation.
 - **No secrets:** TXT records are public and MUST NOT contain secrets.
-- **Endpoint proof:** When the selected v2 record contains `k`, clients MUST verify endpoint proof using the PKA profile in Appendix D.
+- **Endpoint proof:** When the selected v2 record contains `k`, clients MUST verify endpoint proof using the PKA profile in Appendix B.
 - **Local execution safeguards:** Clients that support `proto=local` MUST require explicit user consent, integrity checks, no shell interpretation of discovered arguments, no nested discovery execution, and SHOULD use sandboxing.
 
 ### 3.1 What PKA Proves
@@ -356,7 +362,7 @@ If such a directory chains to DNS `k`, that chaining is the defining property of
 
 ## 6. IANA And Label Strategy
 
-The v2 draft keeps `_agent.<domain>` as the discovery label.
+The v2 design keeps `_agent.<domain>` as the discovery label.
 
 The earlier RFC 8552 `_agent` registration request was rejected on procedural grounds in April 2026. That label-governance question is decoupled from the v2 PKA cleanup. A later working group or BoF process may revisit the label, but this draft does not make a label change part of the key-format work.
 
@@ -438,7 +444,7 @@ The SHA-256 digest is encoded as unpadded base64url. Implementations MUST NOT ha
 
 ### B.3 Request And Response Shape
 
-Current preferred shape, pending exact Structured Fields validation for `Accept-Signature`:
+Validated RFC 9421 Structured Fields shape:
 
 ```http
 Accept-Signature: aid-pka=("@method";req "@target-uri";req "@authority";req "@status");created;expires;keyid="<jwk-thumbprint>";alg="ed25519";nonce="<client-challenge>";tag="aid-pka-v2"
@@ -580,20 +586,21 @@ Reviewer-facing language should say "DNS-current endpoint/key" and should not im
 
 ---
 
-## Appendix F: Remaining Checks Before Spec PR
+## Appendix F: Implementation Evidence Behind The Spec
 
-These are the remaining checks before turning this preview into the actual replacement spec text:
+These checks were used to turn the design notes into the current normative specification:
 
-1. Validate exact RFC 9421 `Accept-Signature` Structured Fields syntax for requesting a response signature with `nonce`, `created`, `expires`, `keyid`, `alg`, and `tag`.
-2. Create one canonical v2 PKA vector and verify it with at least one independent RFC 9421 / Structured Fields implementation before SDK implementation.
-3. Tighten the final non-normative auth.md wording without specifying ID-JAG audience, provider trust lists, registration payloads, or auth.md metadata registry details.
+1. Preserve the committed canonical v2 PKA vector as the conformance anchor for `Accept-Signature`, `Signature-Input`, the signature base, and Ed25519 verification.
+2. Record final cross-language verification evidence from the SDK implementation work.
+3. Review the RFC 9421 / Structured Fields text against that evidence so the normative spec does not depend on preview-only validation notes.
+4. Tighten the final non-normative auth.md wording without specifying ID-JAG audience, provider trust lists, registration payloads, or auth.md metadata registry details.
 
 ---
 
-## Reviewer Questions
+## Historical Reviewer Questions
 
-1. Is the no-date RFC 9421 `aid-pka` response signature shape correct and implementable?
-2. Is the `Accept-Signature` serialization valid with existing Structured Fields libraries?
+1. Does the committed canonical vector give enough evidence to freeze the no-date RFC 9421 `aid-pka` response signature shape?
+2. Do the SDK implementation results show compatible Structured Fields parsing and signature-base reconstruction across languages?
 3. Are the covered components sufficient to bind request target, response status, and nonce challenge?
 4. Are the nonce, expiry, clock-skew, redirect, cache, and authority rules practical for real deployments?
 5. Is signed non-`200` response support, especially signed `401`, the right way to support OAuth/auth.md handoff?

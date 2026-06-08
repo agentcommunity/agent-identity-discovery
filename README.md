@@ -1,7 +1,7 @@
 # Agent Identity & Discovery (AID)
 
 <div align="center">
-  <p><strong>DNS for Agents: Type a domain. Connect to its agent. Instantly.</strong></p>
+  <p><strong>The 0-th hop for agent discovery.</strong></p>
   <p>
     <a href="https://github.com/agentcommunity/agent-identity-discovery/actions/workflows/ci.yml">
       <img src="https://github.com/agentcommunity/agent-identity-discovery/actions/workflows/ci.yml/badge.svg" alt="Build Status" />
@@ -27,18 +27,29 @@
   </p>
 </div>
 
-AID is a minimal, open standard that answers one question: **"Given a domain name, where is its AI agent?"**
+AID is a minimal, open standard that answers one question: **"Given a domain name, where does its agent interaction begin?"**
 
 It uses a single DNS `TXT` record to make any agent service—whether it speaks MCP, A2A, or another protocol—instantly discoverable. No more digging through API docs, no more manual configuration.
 
 **Built by the team at [agentcommunity.org](https://agentcommunity.org)**
 
-### v1.2 Highlights
+### v2.0 Release Status
 
-- ✅ **DNS-first discovery** with optional protocol-specific subdomains (`_agent._<proto>.<domain>`)
+AID v2 is the current normative protocol surface in `packages/docs/specification.md`. `packages/docs/specification_v2_explained.md` remains as non-normative design history.
+
+- **Record version:** new generated records default to `v=aid2`.
+- **PKA key:** `k`/`pka` is the unpadded base64url Ed25519 JWK `x` value.
+- **Key identity:** HTTP Message Signature `keyid` is the RFC 7638 JWK thumbprint derived from `k`; v2 records do not publish DNS `kid`/`i`.
+- **PKA challenge:** clients request an RFC 9421 response signature with `Accept-Signature` and a nonce.
+- **Freshness:** v2 PKA requires `created`, `expires`, exact nonce echo, and response `Cache-Control: no-store`.
+- **No v1 defaults in v2:** no signed HTTP `Date`, no `AID-Challenge`, no base58 `z...` key, and no DNS `kid`/`i`.
+
+### v2.0 Highlights
+
+- ✅ **DNS-first discovery** with canonical base lookup at `_agent.<domain>`
 - ✅ **Well-known fallback** (HTTPS-only, JSON, ≤64KB, ~2s timeout, no redirects; TTL=300 on success)
-- ✅ **PKA endpoint proof** with Ed25519 HTTP Message Signatures (RFC 9421) and ±300s time windows
-- ✅ **Key aliases** for byte efficiency (single-letter keys: `v,p,u,s,a,d,e,k,i`)
+- ✅ **AID v2 PKA endpoint proof** with Ed25519 HTTP Message Signatures (RFC 9421), derived JWK thumbprint `keyid`, nonce, `created`, `expires`, and `no-store`
+- ✅ **Key aliases** for byte efficiency (single-letter keys: `v,p,u,s,a,d,e,k`; legacy aid1 also uses `i`)
 - ✅ **Metadata fields** (`docs` for documentation URLs, `dep` for deprecation timestamps)
 - ✅ **New protocols** (gRPC, GraphQL, WebSocket, Zeroconf)
 - ✅ **Multi-language parity** (TypeScript, Python, Go, Rust, .NET, Java)
@@ -65,9 +76,10 @@ graph TD
 
 > Notes:
 >
-> - Canonical location is `_agent.<domain>`. When a specific protocol is requested, clients may query `_agent._<proto>.<domain>` then `_agent.<proto>.<domain>` before the base record.
+> - Canonical location is `_agent.<domain>`. Clients query the base record first. Protocol-specific `_agent._<proto>.<domain>` probing is legacy, diagnostic, or base-failure-only behavior where explicitly supported and configured.
 > - `.well-known` JSON fallback is allowed only on DNS failure (HTTPS-only, JSON content-type, ≤64KB, ~2s timeout, no redirects). On success, TTL=300.
-> - If `pka`/`kid` are present, clients perform an Ed25519 HTTP Message Signatures handshake with exact covered fields and ±300s windows.
+> - For `aid2`, if `pka`/`k` is present, clients perform nonce-bound RFC 9421 endpoint proof using the derived JWK thumbprint keyid and response `Cache-Control: no-store`.
+> - For legacy `aid1`, `pka`/`kid` still use the v1 compatibility handshake with `AID-Challenge`, signed `Date`, and `keyid` matching DNS `kid`.
 
 ## Guiding Principles
 
@@ -299,20 +311,19 @@ The single source of truth for all protocol constants is `protocol/constants.yml
     ```
     Commit the changes to `protocol/constants.yml` along with all the newly generated files. The CI pipeline will fail if they are not in sync.
 
-### v1.2 Release Status: ✅ READY
+### Current Branch Status
 
-**Implementation Complete** - All v1.2 features implemented across 6+ languages with comprehensive testing. CLI enhanced with advanced features.
+**AID v2 implementation and docs are aligned in this branch.** Package publication and release governance are still separate release steps.
 
-**Ready for Release:**
+**Implemented in the worktree:**
 
-- ✅ All tests passing (70+ TypeScript tests + Python/Go parity tests)
-- ✅ All builds successful (7/7 packages)
-- ✅ Changesets prepared for version bumps
-- ✅ Release workflow configured (npm + PyPI automation)
-- ✅ Multi-language SDKs ready (TS, Python, Go, Rust, .NET, Java)
-- ✅ Enhanced CLI with draft saving, standardized errors, and full test coverage
+- ✅ `aid2` constants and generated spec metadata
+- ✅ v1/v2 parser and discovery compatibility
+- ✅ v2 PKA vector and Ed25519 signature verification coverage
+- ✅ TypeScript, Python, Go, Rust, .NET, and Java package tests
+- ✅ aid-doctor, aid-engine, conformance, web workbench, and docs verification paths
 
-**Next Step:** Merge to `main` with `chore(release)` commit message to trigger automated release.
+**Next Step:** finalize release ownership, package publication, and showcase DNS rollout.
 
 ### Development Environment
 

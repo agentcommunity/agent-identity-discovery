@@ -51,13 +51,13 @@ rec, ttl = discover(
 
 ```python
 from aid_py import parse
-rec = parse("v=aid1;u=https://api.example.com/mcp;p=mcp;s=Example")
+rec = parse("v=aid2;u=https://api.example.com/mcp;p=mcp;s=Example")
 print(rec.uri)
 ```
 
 Notes
 
-- PKA handshake runs automatically when `pka`/`kid` are present.
+- PKA handshake runs automatically when v2 `pka`/`k` is present. Legacy `aid1` records still use `pka`/`kid`.
 - Package is published on PyPI as `aid-discovery`.
 
 ---

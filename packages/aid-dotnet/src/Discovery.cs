@@ -27,6 +27,17 @@ public static class Discovery
         catch { return domain; }
     }
 
+    internal static IReadOnlyList<string> QueryNames(string alabel, string? protocol)
+    {
+        var names = new List<string>();
+        if (!string.IsNullOrEmpty(protocol))
+        {
+            names.Add($"{Constants.DnsSubdomain}._{protocol}.{alabel}".TrimEnd('.'));
+        }
+        names.Add($"{Constants.DnsSubdomain}.{alabel}".TrimEnd('.'));
+        return names;
+    }
+
     private static async Task<(List<string> txts, int ttl)> QueryTxtDoHAsync(string fqdn, TimeSpan timeout)
     {
         // Cloudflare DoH JSON endpoint
@@ -66,32 +77,43 @@ public static class Discovery
     private static AidRecord ParseSingleValid(IEnumerable<string> txts, TimeSpan timeout, string queryName)
     {
         AidError? last = null;
-        AidRecord? valid = null;
-        var validCount = 0;
+        var byVersion = new Dictionary<string, List<AidRecord>>(StringComparer.Ordinal)
+        {
+            [Constants.SpecVersionV2] = new(),
+            [Constants.SpecVersionV1] = new(),
+        };
         foreach (var txt in txts)
         {
             try
             {
                 var rec = Aid.Parse(txt);
-                valid = rec;
-                validCount++;
+                if (byVersion.TryGetValue(rec.V, out var records))
+                {
+                    records.Add(rec);
+                }
             }
             catch (AidError e) { last = e; }
         }
-        if (validCount == 1 && valid is not null)
+        foreach (var version in new[] { Constants.SpecVersionV2, Constants.SpecVersionV1 })
         {
+            var records = byVersion[version];
+            if (records.Count == 0)
+            {
+                continue;
+            }
+            if (records.Count > 1)
+            {
+                throw new AidError(
+                    nameof(Constants.ERR_INVALID_TXT),
+                    $"Multiple valid {version} AID records found for {queryName}; publish exactly one valid record per queried DNS name"
+                );
+            }
+            var valid = records[0];
             if (!string.IsNullOrEmpty(valid.Pka))
             {
                 Pka.PerformHandshakeAsync(valid.Uri, valid.Pka!, valid.Kid ?? string.Empty, timeout).GetAwaiter().GetResult();
             }
             return valid;
-        }
-        if (validCount > 1)
-        {
-            throw new AidError(
-                nameof(Constants.ERR_INVALID_TXT),
-                $"Multiple valid AID records found for {queryName}; publish exactly one valid record per queried DNS name"
-            );
         }
         throw last ?? new AidError(nameof(Constants.ERR_NO_RECORD), "No valid AID record in TXT answers");
     }
@@ -101,13 +123,7 @@ public static class Discovery
         options ??= new DiscoveryOptions();
         var alabel = ToALabel(domain);
 
-        var names = new List<string>();
-        if (!string.IsNullOrEmpty(options.Protocol))
-        {
-            names.Add($"{Constants.DnsSubdomain}._{options.Protocol}.{alabel}".TrimEnd('.'));
-            names.Add($"{Constants.DnsSubdomain}.{options.Protocol}.{alabel}".TrimEnd('.'));
-        }
-        names.Add($"{Constants.DnsSubdomain}.{alabel}".TrimEnd('.'));
+        var names = QueryNames(alabel, options.Protocol);
 
         AidError? last = null;
         foreach (var name in names)

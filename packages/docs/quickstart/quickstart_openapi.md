@@ -20,7 +20,7 @@ If your OpenAPI specification is hosted at a public URL, you can make it discove
     - **Example:** `https://api.my-service.io/v3/openapi.json`
 
 2.  **Construct the AID TXT Record:** Use `openapi` for protocol; `uri` points to your spec file.
-    - **Value:** `v=aid1;u=https://api.my-service.io/v3/openapi.json;p=openapi;s=My Public Service API`
+    - **Value:** `v=aid2;u=https://api.my-service.io/v3/openapi.json;p=openapi;s=My Public Service API`
 
 3.  **Publish to DNS:** Add a `TXT` record at the `_agent` subdomain for `my-service.io`.
     - **Type:** `TXT`
@@ -94,7 +94,7 @@ discoverAndAnalyzeApi('openapi.agentcommunity.org'); // Fictional example domain
 
 **Why AID here?** It turns a domain into the canonical OpenAPI spec URL, enabling dynamic client setup.
 
-For libraries in other languages (including Rust/.NET/Java WIP), see the [Package Overview](./index.md#package-overview).
+For libraries in other languages, see [SDKs and Packages](../Reference/packages.md).
 
 ---
 

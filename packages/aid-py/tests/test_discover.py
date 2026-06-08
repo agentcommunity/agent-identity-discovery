@@ -42,14 +42,18 @@ def test_discover_success(monkey_resolver):  # pylint: disable=unused-argument
     assert ttl == 300
 
 
-def test_discover_protocol_specific_success_on_base(monkeypatch):
+def test_discover_protocol_specific_falls_back_to_base_after_protocol_names(monkeypatch):
     import dns.resolver
 
+    queries = []
+
     def _fake_resolve(name, rdtype, lifetime=5.0):
+        queries.append(name)
+        if name == "_agent._mcp.example.com":
+            raise dns.resolver.NXDOMAIN()
         if name == "_agent.example.com":
             # Base record has the desired protocol
             return _FakeAnswer(["v=aid1;uri=https://api.example.com/mcp;proto=mcp"], 333)
-        # No other records should be needed
         raise dns.resolver.NXDOMAIN()
 
     monkeypatch.setattr(dns.resolver, "resolve", _fake_resolve)
@@ -57,17 +61,41 @@ def test_discover_protocol_specific_success_on_base(monkeypatch):
     assert record["proto"] == "mcp"
     assert record["uri"] == "https://api.example.com/mcp"
     assert ttl == 333
+    assert queries == ["_agent._mcp.example.com", "_agent.example.com"]
+    assert "_agent.mcp.example.com" not in queries
+
+
+def test_discover_protocol_specific_no_answer_continues_to_base(monkeypatch):
+    import dns.resolver
+
+    queries = []
+
+    def _fake_resolve(name, rdtype, lifetime=5.0):
+        queries.append(name)
+        if name == "_agent._mcp.example.com":
+            raise dns.resolver.NoAnswer()
+        if name == "_agent.example.com":
+            return _FakeAnswer(["v=aid1;uri=https://api.example.com/mcp;proto=mcp"], 333)
+        raise dns.resolver.NXDOMAIN()
+
+    monkeypatch.setattr(dns.resolver, "resolve", _fake_resolve)
+    record, ttl = discover("example.com", protocol="mcp")
+    assert record["proto"] == "mcp"
+    assert ttl == 333
+    assert queries == ["_agent._mcp.example.com", "_agent.example.com"]
 
 def test_discover_protocol_specific_fallback_to_subdomain(monkeypatch):
     import dns.resolver
 
+    queries = []
+
     def _fake_resolve(name, rdtype, lifetime=5.0):
-        if name == "_agent.example.com":
-            # Base record has a different protocol
-            return _FakeAnswer(["v=aid1;uri=https://api.example.com/fallback;p=a2a"], 444)
+        queries.append(name)
         if name == "_agent._mcp.example.com":
             # Protocol-specific subdomain has the correct one
             return _FakeAnswer(["v=aid1;uri=https://api.example.com/mcp_specific;proto=mcp"], 555)
+        if name == "_agent.example.com":
+            return _FakeAnswer(["v=aid1;uri=https://api.example.com/fallback;p=a2a"], 444)
         raise dns.resolver.NXDOMAIN()
 
     monkeypatch.setattr(dns.resolver, "resolve", _fake_resolve)
@@ -75,12 +103,16 @@ def test_discover_protocol_specific_fallback_to_subdomain(monkeypatch):
     assert record["proto"] == "mcp"
     assert record["uri"] == "https://api.example.com/mcp_specific"
     assert ttl == 555
+    assert queries == ["_agent._mcp.example.com"]
 
 
 def test_discover_fallback_to_base(monkeypatch):
     import dns.resolver
 
+    queries = []
+
     def _fake_resolve(name, rdtype, lifetime=5.0):
+        queries.append(name)
         if name == "_agent._mcp.example.com":
             raise dns.resolver.NXDOMAIN()
         if name == "_agent.example.com":
@@ -92,6 +124,8 @@ def test_discover_fallback_to_base(monkeypatch):
     assert record["proto"] == "a2a"
     assert record["uri"] == "https://fallback.com"
     assert ttl == 555
+    assert queries == ["_agent._mcp.example.com", "_agent.example.com"]
+    assert "_agent.mcp.example.com" not in queries
 
 
 def test_discover_no_record(monkeypatch):
@@ -145,6 +179,27 @@ def test_discover_succeeds_with_one_valid_and_one_malformed(monkeypatch):
     assert ttl == 300
 
 
+def test_discover_prefers_one_valid_aid2_over_aid1(monkeypatch):
+    import dns.resolver
+
+    def _fake_resolve(name, rdtype, lifetime=5.0):
+        if name == "_agent.example.com":
+            return _FakeAnswer(
+                [
+                    "v=aid1;uri=https://legacy.example.com/mcp;p=mcp",
+                    "v=aid2;u=https://v2.example.com/mcp;p=mcp",
+                ],
+                300,
+            )
+        raise dns.resolver.NXDOMAIN()
+
+    monkeypatch.setattr(dns.resolver, "resolve", _fake_resolve)
+    record, ttl = discover("example.com")
+    assert record["v"] == "aid2"
+    assert record["uri"] == "https://v2.example.com/mcp"
+    assert ttl == 300
+
+
 def test_discover_fails_on_multiple_valid_answers(monkeypatch):
     import dns.resolver
 
@@ -162,3 +217,59 @@ def test_discover_fails_on_multiple_valid_answers(monkeypatch):
     monkeypatch.setattr(dns.resolver, "resolve", _fake_resolve)
     with pytest.raises(AidError, match="Multiple valid AID records found"):
         discover("example.com")
+
+
+def test_discover_keeps_same_version_aid2_ambiguity(monkeypatch):
+    import dns.resolver
+
+    key_x = "ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ"
+
+    def _fake_resolve(name, rdtype, lifetime=5.0):
+        if name == "_agent.example.com":
+            return _FakeAnswer(
+                [
+                    f"v=aid2;uri=https://one.example.com/mcp;p=mcp;k={key_x}",
+                    f"v=aid2;u=https://two.example.com/mcp;p=mcp;k={key_x}",
+                ],
+                300,
+            )
+        raise dns.resolver.NXDOMAIN()
+
+    monkeypatch.setattr(dns.resolver, "resolve", _fake_resolve)
+    with pytest.raises(AidError, match="Multiple valid AID records found"):
+        discover("example.com")
+
+
+def test_discover_selects_valid_aid2_when_another_aid2_is_malformed(monkeypatch):
+    import dns.resolver
+
+    def _fake_resolve(name, rdtype, lifetime=5.0):
+        if name == "_agent.example.com":
+            return _FakeAnswer(
+                [
+                    "v=aid2;u=http://bad.example.com/mcp;p=mcp",
+                    "v=aid2;u=https://good.example.com/mcp;p=mcp",
+                ],
+                300,
+            )
+        raise dns.resolver.NXDOMAIN()
+
+    monkeypatch.setattr(dns.resolver, "resolve", _fake_resolve)
+    record, ttl = discover("example.com", well_known_fallback=True)
+    assert record["v"] == "aid2"
+    assert record["uri"] == "https://good.example.com/mcp"
+    assert ttl == 300
+
+
+def test_discover_rejects_only_malformed_aid_like_txt(monkeypatch):
+    import dns.resolver
+
+    def _fake_resolve(name, rdtype, lifetime=5.0):
+        if name == "_agent.example.com":
+            return _FakeAnswer(["v=aid3;u=https://future.example.com/mcp;p=mcp"], 300)
+        raise dns.resolver.NXDOMAIN()
+
+    monkeypatch.setattr(dns.resolver, "resolve", _fake_resolve)
+    with pytest.raises(AidError) as exc_info:
+        discover("example.com", well_known_fallback=True)
+    assert exc_info.value.error_code == "ERR_INVALID_TXT"

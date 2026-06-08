@@ -16,8 +16,8 @@ export type AidGeneratorData = {
   domain: string;
   docs?: string;
   dep?: string; // ISO 8601 UTC Z
-  pka?: string; // zBase58
-  kid?: string; // 1-6 chars [a-z0-9]
+  pka?: string; // aid2 base64url JWK x
+  kid?: string; // legacy aid1 compatibility only
 };
 
 const CANONICAL_TXT_KEYS = {
@@ -29,7 +29,6 @@ const CANONICAL_TXT_KEYS = {
   docs: 'd',
   dep: 'e',
   pka: 'k',
-  kid: 'i',
 } as const;
 
 const LONG_KEY_NAMES = new Set([
@@ -44,10 +43,10 @@ const LONG_KEY_NAMES = new Set([
   'kid',
 ]);
 
-// Canonical v1.x output always uses short keys. The legacy parameter is kept for call-site compatibility.
+// Canonical v2 output always uses short keys. The legacy parameter is kept for call-site compatibility.
 export function buildTxtRecordVariant(formData: AidGeneratorData, _useAliases?: boolean): string {
   void _useAliases;
-  const parts: string[] = ['v=aid1'];
+  const parts: string[] = ['v=aid2'];
   if (formData.uri) parts.push(`${CANONICAL_TXT_KEYS.uri}=${formData.uri}`);
   if (formData.proto) parts.push(`${CANONICAL_TXT_KEYS.proto}=${formData.proto}`);
   if (formData.auth) parts.push(`${CANONICAL_TXT_KEYS.auth}=${formData.auth}`);
@@ -55,7 +54,6 @@ export function buildTxtRecordVariant(formData: AidGeneratorData, _useAliases?: 
   if (formData.docs) parts.push(`${CANONICAL_TXT_KEYS.docs}=${formData.docs}`);
   if (formData.dep) parts.push(`${CANONICAL_TXT_KEYS.dep}=${formData.dep}`);
   if (formData.pka) parts.push(`${CANONICAL_TXT_KEYS.pka}=${formData.pka}`);
-  if (formData.kid) parts.push(`${CANONICAL_TXT_KEYS.kid}=${formData.kid}`);
   return parts.join(';');
 }
 

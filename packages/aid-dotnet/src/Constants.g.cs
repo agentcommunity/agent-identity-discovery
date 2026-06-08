@@ -4,7 +4,15 @@
 
 namespace AidDiscovery {
   public static class Constants {
-    public const string SpecVersion = "aid1";
+    public const string SpecVersionV1 = "aid1";
+    public const string SpecVersionV2 = "aid2";
+    public const string SpecVersion = "aid2";
+    public static readonly string[] SupportedSpecVersions = new string[] { "aid1", "aid2" };
+    // Version-specific raw record metadata. AidRecordV2 excludes legacy DNS kid/i.
+    public static readonly string[] AidRecordV1CanonicalFields = new string[] { "v", "uri", "proto", "auth", "desc", "docs", "dep", "pka", "kid" };
+    public static readonly string[] AidRecordV1AliasFields = new string[] { "p", "u", "a", "s", "d", "e", "k", "i" };
+    public static readonly string[] AidRecordV2CanonicalFields = new string[] { "v", "uri", "proto", "auth", "desc", "docs", "dep", "pka" };
+    public static readonly string[] AidRecordV2AliasFields = new string[] { "p", "u", "a", "s", "d", "e", "k" };
     public const string PROTO_A2A = "a2a";
     public const string PROTO_GRAPHQL = "graphql";
     public const string PROTO_GRPC = "grpc";

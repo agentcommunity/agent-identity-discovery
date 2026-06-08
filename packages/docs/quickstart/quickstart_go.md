@@ -34,14 +34,14 @@ func main() {
 
 ## Options
 
-Protocol-specific DNS flow and guarded `.well-known` fallback:
+Base-first DNS flow and guarded `.well-known` fallback:
 
 ```go
 rec, ttl, err := aid.DiscoverWithOptions(
     "example.com",
     5*time.Second,
     aid.DiscoveryOptions{
-        Protocol:          "mcp",       // tries _agent._mcp., then _agent.mcp., then base
+        Protocol:          "mcp",       // _agent.<domain> first
         WellKnownFallback: true,         // only on ERR_NO_RECORD / ERR_DNS_LOOKUP_FAILED
         WellKnownTimeout:  2 * time.Second,
     },
@@ -51,12 +51,12 @@ rec, ttl, err := aid.DiscoverWithOptions(
 Notes
 
 - TTL uses DNS value when available; for `.well-known` fallback, TTL is treated as 300.
-- PKA handshake runs automatically when `pka`/`kid` are present.
+- PKA handshake runs automatically when v2 `pka`/`k` is present. Legacy `aid1` records still use `pka`/`kid`.
 
 ## Parse Raw TXT
 
 ```go
-rec, err := aid.Parse("v=aid1;u=https://api.example.com/mcp;p=mcp;s=Example")
+rec, err := aid.Parse("v=aid2;u=https://api.example.com/mcp;p=mcp;s=Example")
 if err != nil { /* handle */ }
 fmt.Println(rec.URI)
 ```

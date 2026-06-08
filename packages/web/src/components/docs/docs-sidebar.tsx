@@ -11,9 +11,15 @@ interface DocsSidebarProps {
   navigation: Navigation;
 }
 
+function docsHref(slug: string): string {
+  if (!slug) return '/docs';
+  return `/docs/${slug.replace(/^(Understand|Reference|Tooling)(?=\/|$)/, (section) =>
+    section.toLowerCase(),
+  )}`;
+}
+
 function SidebarGroup({ group, pathname }: { group: NavGroup; pathname: string }) {
-  const isActive = pathname.startsWith(`/docs/${group.slug}`);
-  const [open, setOpen] = useState(isActive);
+  const [open, setOpen] = useState(true);
 
   return (
     <div>
@@ -29,7 +35,7 @@ function SidebarGroup({ group, pathname }: { group: NavGroup; pathname: string }
       {open && (
         <ul className="mt-1 space-y-0.5 pl-2">
           {group.items.map((item) => {
-            const href = `/docs/${item.slug}`;
+            const href = docsHref(item.slug);
             const active = pathname === href;
             return (
               <li key={item.slug}>
@@ -61,17 +67,21 @@ export function DocsSidebar({ navigation }: DocsSidebarProps) {
       {/* Root pages */}
       <ul className="space-y-0.5">
         {navigation.rootPages.map((item) => {
-          const href = item.slug ? `/docs/${item.slug}` : '/docs';
+          const href = docsHref(item.slug);
           const active = pathname === href;
+          const isPrimaryRoot = item.slug === '' || item.slug === 'specification';
           return (
             <li key={item.slug || 'index'}>
               <Link
                 href={href}
                 className={cn(
                   'block rounded-md px-2 py-1.5 text-sm transition-colors',
-                  active
-                    ? 'bg-muted font-medium text-foreground'
-                    : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+                  isPrimaryRoot && 'border border-border font-semibold text-foreground',
+                  active && 'bg-muted',
+                  !active &&
+                    !isPrimaryRoot &&
+                    'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+                  !active && isPrimaryRoot && 'hover:bg-muted/50',
                 )}
               >
                 {item.title}

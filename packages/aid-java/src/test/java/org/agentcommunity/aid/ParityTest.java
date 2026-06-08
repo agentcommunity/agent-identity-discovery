@@ -41,7 +41,7 @@ public class ParityTest {
 
     for (GoldenRecord gr : records) {
       AidRecord r = Parser.parse(gr.raw);
-      assertEquals("aid1", r.v, gr.name);
+      assertEquals(gr.expected.get("v"), r.v, gr.name);
       assertEquals(gr.expected.get("uri"), r.uri, gr.name);
       assertEquals(gr.expected.get("proto"), r.proto, gr.name);
       if (gr.expected.containsKey("desc")) {
@@ -60,7 +60,7 @@ public class ParityTest {
     // Missing v
     assertAidError("ERR_INVALID_TXT", () -> Parser.parse("uri=https://x;proto=mcp"));
     // Unsupported version
-    assertAidError("ERR_INVALID_TXT", () -> Parser.parse("v=aid2;uri=https://x;proto=mcp"));
+    assertAidError("ERR_INVALID_TXT", () -> Parser.parse("v=aid3;uri=https://x;proto=mcp"));
     // Unsupported protocol
     assertAidError("ERR_UNSUPPORTED_PROTO", () -> Parser.parse("v=aid1;uri=https://x;proto=unknown"));
     // Both proto and p

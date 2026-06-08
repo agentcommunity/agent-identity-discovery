@@ -3,6 +3,7 @@ use std::time::Duration;
 use crate::errors::AidError;
 use crate::parser::parse;
 use crate::record::AidRecord;
+use crate::constants_gen::{SPEC_VERSION_V1, SPEC_VERSION_V2};
 use hickory_resolver::TokioAsyncResolver;
 use idna::domain_to_ascii;
 
@@ -28,21 +29,71 @@ pub struct DiscoveryOptions {
 
 fn looks_like_aid_record(raw: &str) -> bool {
     let lower = raw.to_ascii_lowercase();
-    lower.starts_with("v=aid1")
-        || lower.starts_with("version=aid1")
-        || lower.contains(";v=aid1")
-        || lower.contains(";version=aid1")
+    lower.starts_with("v=aid")
+        || lower.starts_with("version=aid")
+        || lower.contains(";v=aid")
+        || lower.contains(";version=aid")
+}
+
+fn select_supported_record(records: Vec<AidRecord>, query_name: &str) -> Result<AidRecord, AidError> {
+    let selected_version = if records.iter().any(|record| record.v == SPEC_VERSION_V2) {
+        SPEC_VERSION_V2
+    } else {
+        SPEC_VERSION_V1
+    };
+    let mut selected = records
+        .into_iter()
+        .filter(|record| record.v == selected_version)
+        .collect::<Vec<_>>();
+    if selected.len() == 1 {
+        return Ok(selected.remove(0));
+    }
+    Err(AidError::new(
+        "ERR_INVALID_TXT",
+        format!(
+            "Multiple valid {} AID records found for {}; publish exactly one valid record per queried DNS name",
+            selected_version, query_name
+        ),
+    ))
+}
+
+fn select_from_txt_answers(raw_records: Vec<String>, query_name: &str) -> Result<Option<AidRecord>, AidError> {
+    let mut valid: Vec<AidRecord> = Vec::new();
+    let mut parse_err: Option<AidError> = None;
+    for raw_record in raw_records {
+        let raw = raw_record.trim();
+        if !looks_like_aid_record(raw) {
+            continue;
+        }
+        match parse(raw) {
+            Ok(rec) => valid.push(rec),
+            Err(err) => {
+                parse_err = Some(err);
+            }
+        }
+    }
+    if !valid.is_empty() {
+        return Ok(Some(select_supported_record(valid, query_name)?));
+    }
+    if let Some(err) = parse_err {
+        return Err(err);
+    }
+    Ok(None)
+}
+
+fn discovery_query_names(alabel: &str, protocol: Option<&str>) -> Vec<String> {
+    let mut names = Vec::new();
+    if let Some(proto) = protocol {
+        names.push(format!("_agent._{}.{}", proto, alabel));
+    }
+    names.push(format!("_agent.{}", alabel));
+    names
 }
 
 pub async fn discover_with_options(domain: &str, options: DiscoveryOptions) -> Result<AidRecord, AidError> {
     // IDNA → A-label
     let alabel = domain_to_ascii(domain).unwrap_or_else(|_| domain.to_string());
-    let mut names: Vec<String> = Vec::new();
-    if let Some(proto) = &options.protocol {
-        names.push(format!("_agent._{}.{}", proto, alabel));
-        names.push(format!("_agent.{}.{}", proto, alabel));
-    }
-    names.push(format!("_agent.{}", alabel));
+    let names = discovery_query_names(&alabel, options.protocol.as_deref());
 
     // DNS lookup using system resolver
     let resolver = TokioAsyncResolver::tokio_from_system_conf()
@@ -66,38 +117,28 @@ pub async fn discover_with_options(domain: &str, options: DiscoveryOptions) -> R
                 continue;
             }
             Ok(Ok(lookup)) => {
-                let mut valid: Option<AidRecord> = None;
-                let mut valid_count = 0usize;
-                for r in lookup.iter() {
-                    let s = r.txt_data().iter().map(|b| String::from_utf8_lossy(b).to_string()).collect::<Vec<_>>().join("");
-                    let raw = s.trim();
-                    if !looks_like_aid_record(raw) {
-                        continue;
-                    }
-                    if let Ok(rec) = parse(raw) {
-                        valid = Some(rec);
-                        valid_count += 1;
-                    }
-                }
-                if valid_count == 1 {
-                    let rec = valid.expect("single valid record must exist");
+                let raw_records = lookup
+                    .iter()
+                    .map(|r| {
+                        r.txt_data()
+                            .iter()
+                            .map(|b| String::from_utf8_lossy(b).to_string())
+                            .collect::<Vec<_>>()
+                            .join("")
+                    })
+                    .collect::<Vec<_>>();
+                if let Some(rec) = select_from_txt_answers(raw_records, &name)? {
                     #[cfg(feature = "handshake")]
                     {
-                        if let (Some(pka), Some(kid)) = (rec.pka.clone(), rec.kid.clone()) {
-                            perform_pka_handshake(&rec.uri, &pka, &kid, options.timeout).await?;
+                        if let Some(pka) = rec.pka.clone() {
+                            if rec.v == SPEC_VERSION_V1 {
+                                perform_pka_handshake(&rec.uri, &pka, rec.kid.as_deref().unwrap_or(""), options.timeout).await?;
+                            } else {
+                                perform_pka_handshake(&rec.uri, &pka, "", options.timeout).await?;
+                            }
                         }
                     }
                     return Ok(rec);
-                }
-                if valid_count > 1 {
-                    last_err = Some(AidError::new(
-                        "ERR_INVALID_TXT",
-                        format!(
-                            "Multiple valid AID records found for {}; publish exactly one valid record per queried DNS name",
-                            name
-                        ),
-                    ));
-                    break;
                 }
                 last_err = Some(AidError::new("ERR_NO_RECORD", format!("No valid AID record found for {}", name)));
                 continue;
@@ -113,4 +154,109 @@ pub async fn discover_with_options(domain: &str, options: DiscoveryOptions) -> R
         }
     }
     Err(last_err.unwrap_or_else(|| AidError::new("ERR_DNS_LOOKUP_FAILED", "DNS query failed")))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn valid_records(raw: &[&str]) -> Vec<AidRecord> {
+        raw.iter().filter_map(|txt| parse(txt).ok()).collect()
+    }
+
+    #[test]
+    fn protocol_query_names_use_underscore_then_base() {
+        assert_eq!(
+            discovery_query_names("example.com", Some("mcp")),
+            vec!["_agent._mcp.example.com".to_string(), "_agent.example.com".to_string()]
+        );
+    }
+
+    #[test]
+    fn selection_prefers_single_valid_aid2_over_aid1() {
+        let records = valid_records(&[
+            "v=aid1;u=https://example.com/v1;p=mcp",
+            "v=aid2;u=https://example.com/v2;p=mcp",
+        ]);
+
+        let selected = select_supported_record(records, "_agent.example.com").expect("select aid2");
+        assert_eq!(selected.v, SPEC_VERSION_V2);
+        assert_eq!(selected.uri, "https://example.com/v2");
+    }
+
+    #[test]
+    fn selection_rejects_multiple_valid_aid2_records() {
+        let records = valid_records(&[
+            "v=aid1;u=https://example.com/v1;p=mcp",
+            "v=aid2;u=https://example.com/a;p=mcp",
+            "v=aid2;u=https://example.com/b;p=mcp",
+        ]);
+
+        let err = select_supported_record(records, "_agent.example.com").expect_err("multiple aid2 records fail");
+        assert_eq!(err.error_code, "ERR_INVALID_TXT");
+        assert!(err.message.contains("Multiple valid aid2 AID records"));
+    }
+
+    #[test]
+    fn selection_uses_valid_aid1_when_aid2_is_malformed() {
+        let selected = select_from_txt_answers(
+            vec![
+                "v=aid1;u=https://example.com/v1;p=mcp".to_string(),
+                "v=aid2;u=https://example.com/v2;p=mcp;k=zLegacy;i=stale".to_string(),
+            ],
+            "_agent.example.com",
+        )
+        .expect("valid aid1 should be selected");
+
+        assert_eq!(selected.expect("record").v, SPEC_VERSION_V1);
+    }
+
+    #[test]
+    fn selection_uses_valid_aid2_when_another_aid2_is_malformed() {
+        let selected = select_from_txt_answers(
+            vec![
+                "v=aid2;u=https://example.com/v2;p=mcp;k=zLegacy;i=stale".to_string(),
+                "v=aid2;u=https://example.com/good;p=mcp".to_string(),
+            ],
+            "_agent.example.com",
+        )
+        .expect("valid aid2 should be selected")
+        .expect("record");
+
+        assert_eq!(selected.v, SPEC_VERSION_V2);
+        assert_eq!(selected.uri, "https://example.com/good");
+    }
+
+    #[test]
+    fn selection_rejects_malformed_aid_records_instead_of_no_record() {
+        let err = select_from_txt_answers(
+            vec!["v=aid1;u=http://bad.example.com;p=mcp".to_string()],
+            "_agent.example.com",
+        )
+        .expect_err("malformed aid-like TXT must fail");
+
+        assert_eq!(err.error_code, "ERR_INVALID_TXT");
+    }
+
+    #[test]
+    fn selection_rejects_unknown_aid_like_version_instead_of_no_record() {
+        let err = select_from_txt_answers(
+            vec!["v=aid3;u=https://future.example.com;p=mcp".to_string()],
+            "_agent.example.com",
+        )
+        .expect_err("unknown aid-like TXT must fail");
+
+        assert_eq!(err.error_code, "ERR_INVALID_TXT");
+    }
+
+    #[test]
+    fn selection_ignores_non_aid_txt_records() {
+        let selected = select_from_txt_answers(
+            vec!["google-site-verification=abc".to_string()],
+            "_agent.example.com",
+        )
+        .expect("non-aid TXT is not invalid");
+
+        assert!(selected.is_none());
+    }
 }

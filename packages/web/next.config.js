@@ -11,21 +11,13 @@ const nextConfig = {
   },
   redirects: async () => {
     return [
-      // Case-insensitive redirects: lowercase → canonical case
-      {
-        source: '/docs/understand/:slug*',
-        destination: '/docs/Understand/:slug*',
-        permanent: true,
-      },
-      { source: '/docs/reference/:slug*', destination: '/docs/Reference/:slug*', permanent: true },
-      { source: '/docs/tooling/:slug*', destination: '/docs/Tooling/:slug*', permanent: true },
       // Section index → first page in section (canonical + lowercase)
-      { source: '/docs/Understand', destination: '/docs/Understand/concepts', permanent: false },
-      { source: '/docs/understand', destination: '/docs/Understand/concepts', permanent: false },
-      { source: '/docs/Reference', destination: '/docs/Reference/protocols', permanent: false },
-      { source: '/docs/reference', destination: '/docs/Reference/protocols', permanent: false },
-      { source: '/docs/Tooling', destination: '/docs/Tooling/aid_doctor', permanent: false },
-      { source: '/docs/tooling', destination: '/docs/Tooling/aid_doctor', permanent: false },
+      { source: '/docs/Understand', destination: '/docs/understand/concepts', permanent: false },
+      { source: '/docs/understand', destination: '/docs/understand/concepts', permanent: false },
+      { source: '/docs/Reference', destination: '/docs/reference/protocols', permanent: false },
+      { source: '/docs/reference', destination: '/docs/reference/protocols', permanent: false },
+      { source: '/docs/Tooling', destination: '/docs/tooling/aid_doctor', permanent: false },
+      { source: '/docs/tooling', destination: '/docs/tooling/aid_doctor', permanent: false },
       // Friendly SDK slugs → actual filenames (302 while doc structure evolves)
       {
         source: '/docs/quickstart/typescript',

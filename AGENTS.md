@@ -3,6 +3,7 @@
 Single source of truth for humans and coding agents. Subprojects can override with their own AGENTS.md. Agents read the nearest file.
 
 ## Project overview
+
 - Monorepo: PNPM + Turborepo
 - SDKs: TypeScript `packages/aid`, Go `packages/aid-go`, Python `packages/aid-py`, Rust `packages/aid-rs`, .NET `packages/aid-dotnet`, Java `packages/aid-java`
 - Workbench UI: `packages/web` (Next.js). CLI: `packages/aid-doctor`
@@ -39,6 +40,7 @@ Single source of truth for humans and coding agents. Subprojects can override wi
 ```
 
 ## Quickstart
+
 ```bash
 pnpm i
 pnpm dev:core          # core libs
@@ -68,8 +70,8 @@ python3 -m pip install -e './packages/aid-py[dev]' && python3 -m pytest packages
 
 ## Spec and codegen
 
-* Edit `protocol/constants.yml` only.
-* Then generate and commit YAML plus all generated outputs.
+- Edit `protocol/constants.yml` only.
+- Then generate and commit YAML plus all generated outputs.
 
 ```bash
 pnpm gen
@@ -80,11 +82,12 @@ Mirrored for Web (back-compat): `packages/web/src/generated/spec.ts`.
 
 ## Examples generation
 
-* Edit `protocol/examples.yml` only for example records.
-* Examples are generated for both Terraform deployment and Web UI.
-* Includes PKA keys and v1.2 features across all examples.
+- Edit `protocol/examples.yml` only for example records.
+- Examples are generated for both Terraform deployment and Web UI.
+- Includes PKA keys, `aid2` records, and legacy `aid1` compatibility examples.
 
 Generated files:
+
 - Terraform: `showcase/terraform/examples.tf`
 - Web constants: `packages/web/src/generated/examples.ts`
 
@@ -98,13 +101,14 @@ LOCAL_URI_SCHEMES
 RawAidRecord
 ```
 
-### v1.2 notes (Final)
+### v2.0 notes (Final)
 
-- Release baseline: `packages/docs/specification.md` is v1.2.0.
-- Contract baseline: `protocol/constants.yml` schemaVersion is 1.2.0.
-- New keys: `docs` (`d`), `dep` (`e`), `pka` (`k`), `kid` (`i`).
+- Release baseline: `packages/docs/specification.md` is v2.0.0.
+- Contract baseline: `protocol/constants.yml` schemaVersion is 2.0.0 and specVersion is `aid2`.
+- New records default to `v=aid2`; clients retain `aid1` compatibility during the migration window.
+- Current keys: `docs` (`d`), `dep` (`e`), and `pka` (`k`). `kid` (`i`) is legacy `aid1` only.
 - Aliases: clients must accept single-letter keys for all fields.
-- PKA: if `pka` is present, clients must perform the handshake (RFC 9421 + Ed25519).
+- PKA: if `pka`/`k` is present in an `aid2` record, clients must perform the v2 endpoint-proof handshake (RFC 9421 + Ed25519) and derive `keyid` from `k`.
 - Fallback: clients may query `/.well-known/agent` on DNS failure.
 
 ## Workbench and CLI
@@ -129,34 +133,34 @@ For complete CLI documentation, see the [aid-doctor CLI Reference](packages/docs
 
 ## Code style
 
-* TypeScript strict, target ES2022, 2 space indent, lowercase or kebab file names, prefer named exports
-* Build with `tsup` to ESM and CJS with d.ts
-* ESLint with `unicorn` and Prettier via Husky and lint-staged
-* Tests: `*.test.ts` and `*_test.go`
-* Writing style for docs: short sentences, no em dash, use active voice
+- TypeScript strict, target ES2022, 2 space indent, lowercase or kebab file names, prefer named exports
+- Build with `tsup` to ESM and CJS with d.ts
+- ESLint with `unicorn` and Prettier via Husky and lint-staged
+- Tests: `*.test.ts` and `*_test.go`
+- Writing style for docs: short sentences, no em dash, use active voice
 
 ## Testing instructions
 
-* From any package root: `pnpm test`
-* Focus a test: `pnpm vitest run -t "<name>"`
-* Lint one package: `pnpm lint --filter <pkg>`
-* If you change `packages/docs/**`, `README.md`, `AGENTS.md`, or docs tooling/scripts, run `pnpm docs:verify` and commit the updated `packages/docs/export-manifest.json` and `packages/docs/export-manifest.sha256` if they change.
+- From any package root: `pnpm test`
+- Focus a test: `pnpm vitest run -t "<name>"`
+- Lint one package: `pnpm lint --filter <pkg>`
+- If you change `packages/docs/**`, `README.md`, `AGENTS.md`, or docs tooling/scripts, run `pnpm docs:verify` and commit the updated `packages/docs/export-manifest.json` and `packages/docs/export-manifest.sha256` if they change.
 
 ## Security
 
-* Never commit secrets. Use `.env.local` for Workbench.
-* DNS edits change trust. Follow `packages/docs/specification.md` for `_agent.<domain>` TXT.
-* Keep TTL within `DNS_TTL_MIN`..`DNS_TTL_MAX`.
-* If a record includes `pka`, perform the handshake before use.
-* `.well-known` is optional and TLS-anchored. Use DNS first.
+- Never commit secrets. Use `.env.local` for Workbench.
+- DNS edits change trust. Follow `packages/docs/specification.md` for `_agent.<domain>` TXT.
+- Keep TTL within `DNS_TTL_MIN`..`DNS_TTL_MAX`.
+- If a record includes `pka`, perform the handshake before use.
+- `.well-known` is optional and TLS-anchored. Use DNS first.
 
 ## Commits and PRs
 
-* Conventional commits. Example: `feat(aid): add DoH client`
-* Add a Changeset for user visible changes
-* PRs must pass `turbo run build test lint`, include tests, and update docs
-* PRs that change docs or docs-exported content must also pass `pnpm docs:verify`
-* Update `tracking/PHASE_X.md` if applicable
+- Conventional commits. Example: `feat(aid): add DoH client`
+- Add a Changeset for user visible changes
+- PRs must pass `turbo run build test lint`, include tests, and update docs
+- PRs that change docs or docs-exported content must also pass `pnpm docs:verify`
+- Update `tracking/PHASE_X.md` if applicable
 
 ## Extending the Spec
 

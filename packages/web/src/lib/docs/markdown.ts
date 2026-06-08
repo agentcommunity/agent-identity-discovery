@@ -57,6 +57,12 @@ function stripTargetAnnotations(content: string): string {
   return content.replaceAll(/\{\s*target="[^"]*"\s*\}/g, '');
 }
 
+function docsRouteHref(route: string): string {
+  return route.replace(/^(Understand|Reference|Tooling)(?=\/|$)/, (section) =>
+    section.toLowerCase(),
+  );
+}
+
 /**
  * Convert internal .md links to /docs/ routes.
  *
@@ -64,7 +70,7 @@ function stripTargetAnnotations(content: string): string {
  *   - `specification.md` → `/docs/specification`
  *   - `./quickstart_ts.md` → `/docs/quickstart/quickstart_ts`  (context-dependent)
  *   - `../specification.md` → `/docs/specification`
- *   - `Reference/identity_pka.md` → `/docs/Reference/identity_pka`
+ *   - `Reference/identity_pka.md` → `/docs/reference/identity_pka`
  *   - `quickstart/index.md#anchor` → `/docs/quickstart#anchor`
  */
 function convertInternalLinks(content: string, currentSlug: string): string {
@@ -112,7 +118,7 @@ function convertInternalLinks(content: string, currentSlug: string): string {
       if (resolved.startsWith('../') || resolved.includes('..')) return _match;
 
       const anchorSuffix = anchor ? `#${anchor}` : '';
-      return `[${text}](/docs/${resolved}${anchorSuffix})`;
+      return `[${text}](/docs/${docsRouteHref(resolved)}${anchorSuffix})`;
     },
   );
 }

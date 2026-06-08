@@ -89,7 +89,7 @@ describe('PKA vectors parity (TS)', () => {
     vi.restoreAllMocks();
   });
 
-  for (const v of loadVectors().vectors) {
+  for (const v of loadVectors().vectors.filter((vector) => vector.record.v === 'aid1')) {
     it(`${v.id}: ${v.desc}`, async () => {
       const seed = Buffer.from(v.key.seed_b64, 'base64');
       const pkcs8 = seedToPkcs8Ed25519(seed);

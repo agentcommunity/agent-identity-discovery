@@ -21,7 +21,7 @@ Enterprise hardening is complete for the v1.2.x scope defined in this plan.
 What is already true:
 - Spec/docs/code alignment for v1.2 naming and references is largely landed.
 - Canonical `v` key representation is aligned in the main spec table.
-- Cross-SDK protocol lookup order was aligned to `_agent._<proto>` -> `_agent.<proto>` -> `_agent.<domain>`.
+- Cross-SDK protocol lookup order was aligned to `_agent._<proto>` -> `_agent.<domain>`, with no `_agent.<proto>` compatibility lookup.
 - Browser fallback trigger was aligned to `ERR_NO_RECORD` and `ERR_DNS_LOOKUP_FAILED`.
 - Drift checks in `scripts/docs-check.mjs` were strengthened.
 - Deterministic multi-TXT behavior is implemented and tested (`#104`).
@@ -50,7 +50,7 @@ Status: Done
 Scope:
 - v1.2 naming/reference alignment
 - canonical `v` key in spec
-- protocol lookup order alignment
+- protocol lookup order alignment: `_agent._<proto>` -> `_agent.<domain>`, with no `_agent.<proto>` compatibility lookup
 - browser fallback trigger alignment
 - docs drift checks
 

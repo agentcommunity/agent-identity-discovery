@@ -1,6 +1,6 @@
 {
   "name": "@agentcommunity/aid-engine",
-  "version": "0.2.2",
+  "version": "2.0.0",
   "description": "Core engine for Agent Identity & Discovery (AID) validation and discovery",
   "keywords": [
     "agent",

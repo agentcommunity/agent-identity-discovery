@@ -47,7 +47,7 @@ use std::time::Duration;
 #[tokio::main]
 async fn main() -> Result<(), aid_rs::AidError> {
     let opts = DiscoveryOptions {
-        protocol: Some("mcp".into()), // tries _agent._mcp., then _agent.mcp., then base
+        protocol: Some("mcp".into()), // validates mcp after base lookup; proto probe is diagnostic
         timeout: Duration::from_secs(5),
         well_known_fallback: true,     // only on ERR_NO_RECORD / ERR_DNS_LOOKUP_FAILED
         well_known_timeout: Duration::from_secs(2),
@@ -64,7 +64,7 @@ async fn main() -> Result<(), aid_rs::AidError> {
 use aid_rs::parse;
 
 fn main() -> Result<(), aid_rs::AidError> {
-    let rec = parse("v=aid1;u=https://api.example.com/mcp;p=mcp;s=Example")?;
+    let rec = parse("v=aid2;u=https://api.example.com/mcp;p=mcp;s=Example")?;
     println!("{}", rec.uri);
     Ok(())
 }
@@ -73,7 +73,7 @@ fn main() -> Result<(), aid_rs::AidError> {
 Notes
 
 - TTL from DNS is respected; successful `.well-known` fallback uses TTL=300.
-- PKA handshake (when `pka`/`kid` are present) requires enabling the `handshake` feature.
+- PKA handshake (when v2 `pka`/`k` is present) requires enabling the `handshake` feature. Legacy `aid1` records still use `pka`/`kid`.
 
 ---
 

@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 import type { DoctorReport } from '@agentcommunity/aid-engine';
 import { ERROR_MESSAGES } from '@agentcommunity/aid-engine';
+import { derivePkaKeyid } from './cache';
 
 function generateActionableSuggestions(report: DoctorReport): string[] {
   const suggestions: string[] = [];
@@ -104,7 +105,11 @@ export function formatCheckResult(report: DoctorReport): string {
   // 5. PKA Handshake
   if (pka.present) {
     if (pka.verified) {
-      lines.push(`[5/6] PKA handshake ... ${icons.ok} Verified (alg=${pka.alg}, kid=${pka.kid})`);
+      const keyLabel =
+        record.parsed?.v === 'aid2'
+          ? `keyid=${derivePkaKeyid(record.parsed.pka ?? null)?.keyid ?? 'unknown'}`
+          : `legacy kid=${pka.kid ?? record.parsed?.kid ?? 'unknown'}`;
+      lines.push(`[5/6] PKA handshake ... ${icons.ok} Verified (alg=${pka.alg}, ${keyLabel})`);
     } else {
       const reason =
         record.errors.find((e) => e.message.includes('PKA'))?.message ?? 'Verification failed';
@@ -116,10 +121,23 @@ export function formatCheckResult(report: DoctorReport): string {
 
   // 6. Downgrade Check
   if (downgrade.checked) {
-    if (downgrade.status === 'downgrade') {
-      lines.push(`[6/6] Downgrade check ... ${icons.warn} Security downgrade detected`);
+    const status = downgrade.status;
+    if (status === 'downgrade' || status === 'pka_removed') {
+      lines.push(`[6/6] Downgrade check ... ${icons.warn} PKA removed`);
+    } else if (status === 'key_rotation' || status === 'key_replaced') {
+      lines.push(`[6/6] Downgrade check ... ${icons.warn} PKA key replaced`);
+    } else if (status === 'pka_added') {
+      lines.push(`[6/6] Downgrade check ... ${icons.ok} PKA added`);
+    } else if (status === 'version_downgrade') {
+      lines.push(`[6/6] Downgrade check ... ${icons.warn} AID version downgrade aid2->aid1`);
+    } else if (status === 'fallback_well_known_tls') {
+      lines.push(
+        `[6/6] Downgrade check ... ${icons.warn} DNS failed; using TLS-hosted fallback metadata (trustSource=well-known-tls)`,
+      );
     } else {
-      lines.push(`[6/6] Downgrade check ... ${icons.ok} No change`);
+      lines.push(
+        `[6/6] Downgrade check ... ${icons.ok} ${status === 'first_seen' ? 'First seen' : 'No change'}`,
+      );
     }
   } else {
     lines.push(`[6/6] Downgrade check ... ${chalk.gray('Skipped')}`);

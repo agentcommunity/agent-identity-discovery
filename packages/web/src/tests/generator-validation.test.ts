@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { validateGeneratorPayload } from '@/lib/api/generator-validation';
 
 describe('generator validation', () => {
-  it('accepts a valid v1.1 payload', () => {
+  it('accepts a valid v2 payload', () => {
     const result = validateGeneratorPayload({
       domain: 'example.com',
       uri: 'https://api.example.com/mcp',
@@ -11,13 +11,12 @@ describe('generator validation', () => {
       desc: 'Primary endpoint',
       docs: 'https://docs.example.com/agent',
       dep: '2026-01-01T00:00:00Z',
-      pka: 'z7rW8rTq8o4mM6vVf7w1k3m4uQn9p2YxCAbcDeFgHiJ',
-      kid: 'g1',
+      pka: 'ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ',
     });
 
     expect(result.success).toBe(true);
     expect(result.errors).toHaveLength(0);
-    expect(result.txt).toContain('v=aid1');
+    expect(result.txt).toContain('v=aid2');
     expect(result.txt).toContain('u=https://api.example.com/mcp');
     expect(result.txt).toContain('p=mcp');
     expect(result.bytes.desc).toBeLessThanOrEqual(60);
@@ -33,7 +32,7 @@ describe('generator validation', () => {
     });
 
     expect(result.success).toBe(true);
-    expect(result.txt).toBe('v=aid1;u=https://api.example.com/mcp;p=mcp;a=pat;s=Primary endpoint');
+    expect(result.txt).toBe('v=aid2;u=https://api.example.com/mcp;p=mcp;a=pat;s=Primary endpoint');
   });
 
   it('rejects docs links that are not https', () => {
@@ -62,7 +61,7 @@ describe('generator validation', () => {
     expect(result.errors.some((error) => error.code === 'ERR_URI_SCHEME')).toBe(true);
   });
 
-  it('requires kid when pka is present', () => {
+  it('rejects legacy PKA encodings', () => {
     const result = validateGeneratorPayload({
       domain: 'example.com',
       uri: 'https://api.example.com/mcp',
@@ -71,6 +70,19 @@ describe('generator validation', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.errors.some((error) => error.code === 'ERR_KID_REQUIRED')).toBe(true);
+    expect(result.errors.some((error) => error.code === 'ERR_PKA_FORMAT')).toBe(true);
+  });
+
+  it('rejects kid in v2 output', () => {
+    const result = validateGeneratorPayload({
+      domain: 'example.com',
+      uri: 'https://api.example.com/mcp',
+      proto: 'mcp',
+      pka: 'ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ',
+      kid: 'g1',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.errors.some((error) => error.code === 'ERR_KID_NOT_ALLOWED')).toBe(true);
   });
 });

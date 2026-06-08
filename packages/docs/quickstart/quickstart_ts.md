@@ -38,7 +38,8 @@ main();
 ## Options
 
 ```ts
-// Hint protocol-specific subdomain (tries _agent._mcp.<domain> first):
+// Query _agent.<domain> first. Protocol-prefixed probing is legacy, diagnostic,
+// or base-failure-only where supported and configured.
 await discover('example.com', { protocol: 'mcp' });
 
 // Timeout (ms, Node only):
@@ -56,7 +57,7 @@ await discover('example.com', { wellKnownTimeoutMs: 2000 });
 ```ts
 import { parse } from '@agentcommunity/aid';
 
-const rec = parse('v=aid1;u=https://api.example.com/mcp;p=mcp;s=Example');
+const rec = parse('v=aid2;u=https://api.example.com/mcp;p=mcp;s=Example');
 console.log(rec.proto, rec.uri);
 ```
 

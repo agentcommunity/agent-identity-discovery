@@ -1,28 +1,17 @@
 import { webcrypto as nodeWebcrypto } from 'node:crypto';
 
-function base58btcEncode(bytes: Uint8Array): string {
-  const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-  let zeros = 0;
-  while (zeros < bytes.length && bytes[zeros] === 0) zeros++;
-  const size = Math.ceil((bytes.length * Math.log(256)) / Math.log(58)) + 1;
-  const b = new Uint8Array(size);
-  let length = 0;
-  for (let i = zeros; i < bytes.length; i++) {
-    let carry = bytes[i];
-    let j = size - 1;
-    while (carry !== 0 || j >= size - length) {
-      carry += 256 * b[j];
-      b[j] = carry % 58;
-      carry = Math.floor(carry / 58);
-      j--;
-    }
-    length = size - 1 - j;
+function toBase64Url(bytes: Uint8Array): string {
+  return Buffer.from(bytes).toString('base64url');
+}
+
+function decodeBase64Url(value: string): Uint8Array | null {
+  if (!/^[A-Za-z0-9_-]+$/.test(value) || value.includes('=')) return null;
+  if (value.length % 4 === 1) return null;
+  try {
+    return new Uint8Array(Buffer.from(value, 'base64url'));
+  } catch {
+    return null;
   }
-  let it = size - length;
-  while (it < size && b[it] === 0) it++;
-  let out = '1'.repeat(zeros);
-  for (let i = it; i < size; i++) out += ALPHABET[b[i]];
-  return out;
 }
 
 /**
@@ -40,27 +29,23 @@ export async function generateEd25519KeyPair(): Promise<{
   ])) as CryptoKeyPair;
   const rawPub = new Uint8Array(await nodeWebcrypto.subtle.exportKey('raw', kp.publicKey));
   const pkcs8 = new Uint8Array(await nodeWebcrypto.subtle.exportKey('pkcs8', kp.privateKey));
-  const pubMb = 'z' + base58btcEncode(rawPub);
+  const publicKey = toBase64Url(rawPub);
   const pem =
     '-----BEGIN PRIVATE KEY-----\n' +
     Buffer.from(pkcs8).toString('base64') +
     '\n-----END PRIVATE KEY-----\n';
 
   return {
-    publicKey: pubMb,
+    publicKey,
     privateKeyPem: pem,
     privateKeyBytes: pkcs8,
   };
 }
 
 export function verifyPka(pka: string): { valid: boolean; reason?: string } {
-  if (!pka || pka[0] !== 'z') return { valid: false, reason: 'Missing z multibase prefix' };
-  const s = pka.slice(1);
-  const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-  for (const c of s)
-    if (!ALPHABET.includes(c)) return { valid: false, reason: 'Invalid base58 character' };
-  // Perform a simple decode length check by rough sizing: base58 ~ 1.37x expansion
-  const approx = Math.floor((s.length * Math.log(58)) / Math.log(256));
-  if (approx !== 32 && approx !== 33) return { valid: false, reason: 'Unexpected key length' };
+  if (!pka) return { valid: false, reason: 'Missing PKA key' };
+  const decoded = decodeBase64Url(pka);
+  if (!decoded) return { valid: false, reason: 'PKA must be unpadded base64url' };
+  if (decoded.length !== 32) return { valid: false, reason: 'Unexpected key length' };
   return { valid: true };
 }

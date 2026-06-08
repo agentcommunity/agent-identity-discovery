@@ -39,7 +39,7 @@ export function Footer() {
                   </li>
                   <li>
                     <Link
-                      href="/docs/Understand/rationale"
+                      href="/docs/understand/rationale"
                       className="text-muted-foreground hover:text-foreground transition-all duration-200 hover:translate-x-1"
                     >
                       Design Rationale
@@ -78,7 +78,7 @@ export function Footer() {
                   </li>
                   <li>
                     <Link
-                      href="/docs/Tooling/aid_doctor"
+                      href="/docs/tooling/aid_doctor"
                       className="text-muted-foreground hover:text-foreground transition-all duration-200 hover:translate-x-1"
                     >
                       CLI Tool
@@ -93,37 +93,37 @@ export function Footer() {
               </p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
                 <Link
-                  href="/docs/Reference/discovery_api"
+                  href="/docs/reference/discovery_api"
                   className="text-muted-foreground hover:text-foreground transition-all duration-200 hover:translate-x-1"
                 >
                   Discovery API
                 </Link>
                 <Link
-                  href="/docs/Reference/identity_pka"
+                  href="/docs/reference/identity_pka"
                   className="text-muted-foreground hover:text-foreground transition-all duration-200 hover:translate-x-1"
                 >
                   Identity & PKA
                 </Link>
                 <Link
-                  href="/docs/Reference/protocols"
+                  href="/docs/reference/protocols"
                   className="text-muted-foreground hover:text-foreground transition-all duration-200 hover:translate-x-1"
                 >
                   Protocols
                 </Link>
                 <Link
-                  href="/docs/Reference/security"
+                  href="/docs/reference/security"
                   className="text-muted-foreground hover:text-foreground transition-all duration-200 hover:translate-x-1"
                 >
                   Security
                 </Link>
                 <Link
-                  href="/docs/Reference/troubleshooting"
+                  href="/docs/reference/troubleshooting"
                   className="text-muted-foreground hover:text-foreground transition-all duration-200 hover:translate-x-1"
                 >
                   Troubleshooting
                 </Link>
                 <Link
-                  href="/docs/Reference/versioning"
+                  href="/docs/reference/versioning"
                   className="text-muted-foreground hover:text-foreground transition-all duration-200 hover:translate-x-1"
                 >
                   Versioning

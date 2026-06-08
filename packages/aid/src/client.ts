@@ -1,4 +1,10 @@
-import { type AidRecord, DNS_TTL_MIN, SPEC_VERSION, DNS_SUBDOMAIN } from './constants';
+import {
+  type AidRecord,
+  DNS_TTL_MIN,
+  DNS_SUBDOMAIN,
+  SPEC_VERSION_V1,
+  SPEC_VERSION_V2,
+} from './constants';
 import { AidError, parse, AidRecordValidator, canonicalizeRaw } from './parser';
 import { performPKAHandshake } from './pka.js';
 import {
@@ -24,7 +30,7 @@ import { query } from 'dns-query';
 export interface DiscoveryOptions {
   /** Timeout for DNS query in milliseconds (default: 5000) */
   timeout?: number;
-  /** Protocol-specific subdomain to try (optional). When provided, underscore and non-underscore forms are attempted. */
+  /** Protocol-specific subdomain to try first (optional), using _agent._<proto>.<domain>. */
   protocol?: string;
   /** Enable .well-known fallback on ERR_NO_RECORD or ERR_DNS_LOOKUP_FAILED (default: true) */
   wellKnownFallback?: boolean;
@@ -63,7 +69,7 @@ function constructQueryName(domain: string, protocol?: string, useUnderscore = f
 
 function looksLikeAidRecord(raw: string): boolean {
   const pattern = new RegExp(
-    String.raw`(?:^|;)\s*(?:v|version)\s*=\s*${SPEC_VERSION}(?:\s*(?:;|$))`,
+    String.raw`(?:^|;)\s*(?:v|version)\s*=\s*aid[0-9]+(?:\s*(?:;|$))`,
     'i',
   );
   return pattern.test(raw);
@@ -106,6 +112,15 @@ type ResponseLike = { ok: boolean; status: number; headers: HeadersLike; text():
 type FetchInit = { signal?: unknown; redirect?: 'error' | 'follow' | 'manual' };
 type FetchLike = (input: string, init?: FetchInit) => Promise<ResponseLike>;
 type DnssecResponse = { Status: number; AD?: boolean };
+
+async function performPKAHandshakeForRecord(record: AidRecord): Promise<void> {
+  if (!record.pka) return;
+  if (record.v === SPEC_VERSION_V1) {
+    await performPKAHandshake(record.uri, record.pka, record.kid ?? '');
+    return;
+  }
+  await performPKAHandshake(record.uri, record.pka);
+}
 
 async function queryDnssecStatus(queryName: string, timeoutMs: number): Promise<boolean | null> {
   const fetchImpl = (globalThis as unknown as { fetch?: FetchLike }).fetch;
@@ -260,7 +275,7 @@ async function fetchWellKnown(
     }
     if (record.pka) {
       try {
-        await performPKAHandshake(record.uri, record.pka, record.kid ?? '');
+        await performPKAHandshakeForRecord(record);
       } catch (pkaError) {
         // Preserve ERR_SECURITY errors from PKA verification
         if (pkaError instanceof AidError && pkaError.errorCode === 'ERR_SECURITY') {
@@ -270,7 +285,7 @@ async function fetchWellKnown(
       }
     }
     enforcePkaPolicy(record, url, security);
-    enforceDowngradePolicy(record, url, policy, security);
+    await enforceDowngradePolicy(record, url, policy, security);
     return { record, raw: text.trim(), queryName: url, security };
   } catch (e) {
     if (e instanceof AidError) {
@@ -379,26 +394,31 @@ export async function discover(
         }
       }
 
-      if (validRecords.length === 1) {
-        const result = validRecords[0];
-        if (result.record.pka) {
-          await performPKAHandshake(result.record.uri, result.record.pka, result.record.kid ?? '');
+      if (validRecords.length > 0) {
+        const selectedVersion = validRecords.some((result) => result.record.v === SPEC_VERSION_V2)
+          ? SPEC_VERSION_V2
+          : SPEC_VERSION_V1;
+        const selectedRecords = validRecords.filter(
+          (result) => result.record.v === selectedVersion,
+        );
+
+        if (selectedRecords.length > 1) {
+          throw new AidError(
+            'ERR_INVALID_TXT',
+            `Multiple valid ${selectedVersion} AID records found for ${queryName}; publish exactly one valid record per queried DNS name`,
+          );
         }
+
+        const result = selectedRecords[0];
+        await performPKAHandshakeForRecord(result.record);
         const security = createDiscoverySecurity(policy, false);
         enforcePkaPolicy(result.record, queryName, security);
-        enforceDowngradePolicy(result.record, queryName, policy, security);
+        await enforceDowngradePolicy(result.record, queryName, policy, security);
         if (policy.dnssecPolicy !== 'off') {
           const validated = await queryDnssecStatus(queryName, timeout);
           enforceDnssecPolicy(security, queryName, validated);
         }
         return { ...result, security };
-      }
-
-      if (validRecords.length > 1) {
-        throw new AidError(
-          'ERR_INVALID_TXT',
-          `Multiple valid AID records found for ${queryName}; publish exactly one valid record per queried DNS name`,
-        );
       }
 
       if (lastAidError) throw lastAidError;
@@ -433,8 +453,8 @@ export async function discover(
   const baseName = constructQueryName(domain);
 
   const runDns = async (): Promise<DiscoveryResult> => {
-    // Canonical: base _agent.<domain> query
-    // If protocol is explicitly requested, attempt protocol-specific subdomains afterwards
+    // Canonical: base _agent.<domain> query.
+    // If protocol is explicitly requested, first try _agent._<proto>.<domain>.
     if (!protocol) {
       return await Promise.race([
         queryOnce(baseName),
@@ -448,7 +468,7 @@ export async function discover(
       ]);
     }
 
-    // Protocol explicitly requested: try underscore form first, then fall back to base
+    // Protocol explicitly requested: try underscore form, then base.
     const protoNameUnderscore = constructQueryName(domain, protocol, true);
 
     // 1) underscore form

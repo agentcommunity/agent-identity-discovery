@@ -16,7 +16,7 @@ If your agent's `AgentCard` is hosted at a public URL, you can make it discovera
     - **Example:** `https://api.my-a2a-agent.com/agent.json`
 
 2.  **Construct the AID TXT Record:** Use `a2a` for protocol. `uri` points to your `AgentCard`.
-    - **Value:** `v=aid1;u=https://api.my-a2a-agent.com/agent.json;p=a2a;s=My Autonomous A2A Agent`
+    - **Value:** `v=aid2;u=https://api.my-a2a-agent.com/agent.json;p=a2a;s=My Autonomous A2A Agent`
 
 3.  **Publish to DNS:** Add a `TXT` record at the `_agent` subdomain for `my-a2a-agent.com`.
     - **Type:** `TXT`
@@ -89,7 +89,7 @@ connectToA2aAgent('a2a.agentcommunity.org'); // Fictional example domain
 
 **Why AID here?** DNS gives you a stable, network-level pointer to the `AgentCard`. A2A handles the rest.
 
-For libraries in other languages (including Rust/.NET/Java WIP), see the [Package Overview](./index.md#package-overview).
+For libraries in other languages, see [SDKs and Packages](../Reference/packages.md).
 
 ---
 

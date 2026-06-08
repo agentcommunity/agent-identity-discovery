@@ -5,18 +5,32 @@ import type { DiscoveryData } from '@/hooks/use-discovery';
 import type { HandshakeSuccessData } from '@/hooks/use-connection';
 
 // Generated spec types (from protocol/constants.yml)
-import type { AidRecordV1, HandshakeV1 } from '@/generated/spec';
+import type { AidRecord, HandshakeV1 } from '@/generated/spec';
 
 function isDiscoveryData(x: unknown): x is DiscoveryData {
-  return typeof x === 'object' && x !== null && 'uri' in x && 'proto' in x;
+  return (
+    typeof x === 'object' &&
+    x !== null &&
+    'uri' in x &&
+    'proto' in x &&
+    typeof (x as { uri?: unknown }).uri === 'string' &&
+    typeof (x as { proto?: unknown }).proto === 'string'
+  );
 }
 
-function isAidRecordV1Raw(x: unknown): x is AidRecordV1 {
-  return typeof x === 'object' && x !== null && 'uri' in x && 'proto' in x;
+function isAidRecordRaw(x: unknown): x is AidRecord {
+  return (
+    typeof x === 'object' &&
+    x !== null &&
+    'uri' in x &&
+    'proto' in x &&
+    typeof (x as { uri?: unknown }).uri === 'string' &&
+    typeof (x as { proto?: unknown }).proto === 'string'
+  );
 }
 
 const normalizeRecord = (raw: unknown): CanonicalRecord | null => {
-  if (!isDiscoveryData(raw) && !isAidRecordV1Raw(raw)) return null;
+  if (!isDiscoveryData(raw) && !isAidRecordRaw(raw)) return null;
   const uri = raw.uri;
   let host: string | undefined = (raw as Partial<DiscoveryData>).host;
   let port: number | undefined = (raw as Partial<DiscoveryData>).port;

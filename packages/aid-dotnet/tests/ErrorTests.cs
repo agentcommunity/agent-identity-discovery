@@ -36,6 +36,15 @@ public class ErrorTests
         Assert.Equal("ERR_INVALID_TXT", ex.ErrorCode);
     }
 
+    [Theory]
+    [InlineData("http://localhost/mcp")]
+    [InlineData("http://127.0.0.1/mcp")]
+    public void RemoteProtocolRejectsLoopbackHttp(string uri)
+    {
+        var ex = Assert.Throws<AidError>(() => Aid.Parse($"v=aid1;uri={uri};proto=mcp"));
+        Assert.Equal("ERR_INVALID_TXT", ex.ErrorCode);
+    }
+
     [Fact]
     public void LocalInvalidScheme()
     {

@@ -41,13 +41,13 @@ await Discovery.DiscoverAsync("example.com", new DiscoveryOptions { WellKnownTim
 ```csharp
 using AidDiscovery;
 
-var rec = Aid.Parse("v=aid1;u=https://api.example.com/mcp;p=mcp;s=Example");
+var rec = Aid.Parse("v=aid2;u=https://api.example.com/mcp;p=mcp;s=Example");
 Console.WriteLine($"proto={rec.Proto}, uri={rec.Uri}");
 ```
 
 Notes
 
-- PKA handshake runs automatically when `pka`/`kid` are present.
+- PKA handshake runs automatically when v2 `pka`/`k` is present. Legacy `aid1` records still use `pka`/`kid`.
 - Errors: `AidError : Exception` exposes `.ErrorCode` (symbol) and `.Code` (number).
 
 ---

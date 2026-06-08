@@ -136,13 +136,14 @@ Public Key Attestation adds cryptographic endpoint proof. Proper key management 
 
 ### Best Practices
 
-- **Generate keys securely:** Use a cryptographically secure random number generator for Ed25519 key pairs. The `aid-doctor keygen` command does this correctly.
+- **Generate keys securely:** Use a cryptographically secure random number generator for Ed25519 key pairs. The `aid-doctor pka generate` command does this correctly.
 - **Protect the private key:** Store it in a secrets manager or HSM. Never commit it to version control or embed it in client-side code.
-- **Use `kid` for rotation:** When rotating keys, publish the new key with a new `kid` value. Clients use `kid` to detect that a rotation occurred (versus a downgrade attack).
-- **Rotation procedure:**
-  1. Generate new key pair with new `kid`
+- **Use derived key identity in v2:** For new v2 records, publish `k` as the unpadded base64url Ed25519 JWK `x` value. Clients derive the RFC 7638 JWK thumbprint and use it as the HTTP signature `keyid`.
+- **v1 compatibility:** Legacy `aid1` records still use `k=z...` plus `i`/`kid`.
+- **Key replacement procedure:**
+  1. Generate a new key pair
   2. Deploy the new private key to your server
-  3. Update the DNS TXT record with the new `pka` and `kid`
+  3. Update the DNS TXT record with the new `pka`/`k`
   4. After TTL expiration, the old key is no longer served by DNS
 - **Monitor for downgrade:** If your domain previously published `pka`, removing it looks like a downgrade attack to compliant clients. Always rotate to a new key rather than removing PKA.
 
@@ -159,20 +160,21 @@ Use this checklist when deploying or auditing an AID record.
 ### Provider Checklist
 
 - [ ] DNSSEC enabled on your zone
-- [ ] `_agent` TXT record present and valid (`v=aid1` + required keys)
+- [ ] `_agent` TXT record present and valid (`v=aid2` for new records, or `v=aid1` during compatibility)
 - [ ] TTL set to 300–900 seconds
 - [ ] No secrets in the TXT record (no API keys, tokens, or passwords)
 - [ ] URI uses `https://` for all remote protocols
 - [ ] PKA key pair generated securely (if using PKA)
 - [ ] Private key stored in secrets manager (if using PKA)
-- [ ] `kid` set for key rotation tracking (if using PKA)
+- [ ] Derived RFC 7638 keyid recorded in rollout notes (if using v2 PKA)
+- [ ] `kid` set only for legacy `aid1` PKA records
 - [ ] `docs` key points to valid documentation URL (if set)
 - [ ] `dep` key uses valid ISO 8601 UTC timestamp (if set)
 - [ ] Validated with `aid-doctor check yourdomain.com`
 
 ### Client Checklist
 
-- [ ] Validate `v=aid1` before parsing other keys
+- [ ] Validate the record version before parsing other keys
 - [ ] Require `https://` for remote URIs (reject `http://`)
 - [ ] Block or warn on cross-origin redirects
 - [ ] Prompt for explicit consent before local execution
@@ -188,7 +190,8 @@ For production adoption across separate DNS and application owners, follow the [
 
 ## See Also
 
-- [Identity & PKA](identity_pka.md) — Full PKA handshake details
+- [Identity & PKA](identity_pka.md) — Conceptual endpoint-proof overview
+- [PKA Endpoint Proof](pka.md) — Full PKA handshake details
 - [Enterprise Rollout](enterprise_rollout.md) — DNS team and application team rollout checklist
 - [Specification](../specification.md) — Normative security requirements
 - [Troubleshooting](troubleshooting.md) — Common security-related errors

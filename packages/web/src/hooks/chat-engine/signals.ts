@@ -100,7 +100,7 @@ function discoveryErrorHints(domain: string, code?: string): { title: string; hi
       return {
         title: 'AID record is invalid',
         hints: [
-          'Ensure v=aid1 and both uri/proto are present.',
+          'Ensure v=aid2 and both uri/proto are present.',
           'Do not mix full keys with single-letter aliases in the same record.',
           'If dep is set and in the past, rotate to a non-deprecated record.',
         ],
@@ -109,7 +109,7 @@ function discoveryErrorHints(domain: string, code?: string): { title: string; hi
       return {
         title: 'Protocol token is unsupported',
         hints: [
-          'Use a protocol token from the v1.1 registry (mcp, a2a, openapi, etc).',
+          'Use a supported protocol token (mcp, a2a, openapi, etc).',
           'If this is intentional, update the client to support the protocol.',
         ],
       };
@@ -234,7 +234,10 @@ export function buildDiscoveryResultSignal(domain: string, result: DiscoveryResu
 
   const { record, metadata } = result.value;
   const fallbackUsed = isHttpsUrl(metadata.dnsQuery);
-  const depDate = record.dep ? new Date(record.dep) : null;
+  const dep = typeof record.dep === 'string' ? record.dep : undefined;
+  const auth = typeof record.auth === 'string' ? record.auth : undefined;
+  const docs = typeof record.docs === 'string' ? record.docs : undefined;
+  const depDate = dep ? new Date(dep) : null;
   const depFuture =
     depDate instanceof Date && !Number.isNaN(depDate.getTime()) && depDate > new Date();
 
@@ -245,12 +248,12 @@ export function buildDiscoveryResultSignal(domain: string, result: DiscoveryResu
     { label: 'Lookup time', value: `${metadata.lookupTime}ms` },
   ];
 
-  if (record.auth) details.push({ label: 'Auth hint', value: record.auth });
-  if (record.docs) details.push({ label: 'Docs', value: record.docs });
-  if (record.dep) {
+  if (auth) details.push({ label: 'Auth hint', value: auth });
+  if (docs) details.push({ label: 'Docs', value: docs });
+  if (dep) {
     details.push({
       label: 'Deprecation',
-      value: record.dep,
+      value: dep,
       tone: depFuture ? 'warning' : 'default',
     });
   }

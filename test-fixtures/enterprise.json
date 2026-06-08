@@ -128,6 +128,62 @@
       "expect": {
         "errorCode": "ERR_NO_RECORD"
       }
+    },
+    {
+      "name": "node-well-known-tls-downgrade-warn",
+      "runtime": "node",
+      "queryName": "_agent.example.com",
+      "options": {
+        "dnssecPolicy": "off",
+        "downgradePolicy": "warn",
+        "previousSecurity": {
+          "version": "aid2",
+          "trustSource": "dns",
+          "keyThumbprints": ["WWpn_pfHui9YKR4CZtQsDGMu7_Gch2zYChfSvnxgtPk"]
+        }
+      },
+      "dns": {
+        "errorCode": "ERR_NO_RECORD"
+      },
+      "wellKnown": {
+        "body": {
+          "v": "aid2",
+          "u": "https://api.example.com/mcp",
+          "p": "mcp",
+          "k": "ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ"
+        }
+      },
+      "expect": {
+        "warningCodes": ["DOWNGRADE_DETECTED"]
+      }
+    },
+    {
+      "name": "node-well-known-tls-downgrade-fail",
+      "runtime": "node",
+      "queryName": "_agent.example.com",
+      "options": {
+        "dnssecPolicy": "off",
+        "downgradePolicy": "fail",
+        "previousSecurity": {
+          "version": "aid2",
+          "trustSource": "dns",
+          "keyThumbprints": ["WWpn_pfHui9YKR4CZtQsDGMu7_Gch2zYChfSvnxgtPk"]
+        }
+      },
+      "dns": {
+        "errorCode": "ERR_NO_RECORD"
+      },
+      "wellKnown": {
+        "body": {
+          "v": "aid2",
+          "u": "https://api.example.com/mcp",
+          "p": "mcp",
+          "k": "ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ"
+        }
+      },
+      "expect": {
+        "errorCode": "ERR_SECURITY"
+      }
     }
   ]
 }

@@ -29,7 +29,7 @@ fn build_base(order: &[&str], challenge: &str, method: &str, target: &str, host:
 }
 
 #[tokio::test]
-async fn rust_pka_valid_and_kid_mismatch() {
+async fn rust_pka_kid_mismatch_fails() {
     let server = MockServer::start();
     let seed = [0u8; 32];
     let sk = SigningKey::from_bytes(&seed);
@@ -39,45 +39,14 @@ async fn rust_pka_valid_and_kid_mismatch() {
     let created: i64 = (std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs()) as i64;
     let order = ["AID-Challenge", "@method", "@target-uri", "host", "date"]; // exact set
 
-    // well-known
-    let well_known = server.mock(|when, then| {
-        when.method("GET").path("/.well-known/agent");
-        then.status(200)
-            .header("content-type", "application/json")
-            .body(format!("{{\"v\":\"aid1\",\"u\":\"{}\",\"p\":\"mcp\",\"k\":\"{}\",\"i\":\"{}\"}}", server.url("/mcp"), pka, kid));
-    });
-
-    // Prepare deterministic headers (use env overrides in client)
-    std::env::set_var("AID_TEST_PKA_CHALLENGE", "TESTCHAL");
     let date_hdr = httpdate::fmt_http_date(std::time::SystemTime::now());
-    std::env::set_var("AID_TEST_PKA_DATE", &date_hdr);
-    let (.., base) = build_base(&order, "TESTCHAL", "GET", &server.url("/mcp"), &server.address().to_string(), &date_hdr, created, kid, "ed25519");
-    let sig = sk.sign(&base);
-    let sig_b64 = B64.encode(sig.to_bytes());
-    let sig_input = format!("sig=(\"{}\");created={};keyid={};alg=\"ed25519\"", order.join("\" \""), created, kid);
-    let sig_header = format!("sig=:{}:", sig_b64);
-    let dh_for_header = date_hdr.clone();
-    let handshake_ok = server.mock(move |when, then| {
-        when.method("GET").path("/mcp");
-        then.status(200)
-            .header("date", &dh_for_header)
-            .header("Signature-Input", sig_input.clone())
-            .header("Signature", sig_header.clone());
-    });
-
-    // Execute handshake
-    let url = server.url("/mcp");
-    perform_pka_handshake(&url, &pka, kid, Duration::from_secs(2)).await.unwrap();
-    handshake_ok.assert_hits(1);
-
-    // handshake (kid mismatch)
     let kid2 = "b2";
     let (.., base_bad) = build_base(&order, "TESTCHAL", "GET", &server.url("/bad"), &server.address().to_string(), &date_hdr, created, kid2, "ed25519");
     let sig_bad = sk.sign(&base_bad);
     let sig_bad_b64 = B64.encode(sig_bad.to_bytes());
     let sig_input_bad = format!("sig=(\"{}\");created={};keyid={};alg=\"ed25519\"", order.join("\" \""), created, kid2);
     let sig_header_bad = format!("sig=:{}:", sig_bad_b64);
-    let handshake_bad = server.mock(|when, then| {
+    let _handshake_bad = server.mock(|when, then| {
         when.method("GET").path("/bad");
         then.status(200)
             .header("date", date_hdr)

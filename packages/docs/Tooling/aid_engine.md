@@ -58,12 +58,11 @@ const record = buildTxtRecordVariant({
   proto: 'mcp',
   auth: 'pat',
   desc: 'Example Agent',
-  pka: 'zBase58PublicKey',
-  kid: 'g1',
-}); // Canonical v1.x output uses short keys
+  pka: 'JrQLj5P_89iXES9-vFgrIy29clF9CC_oPPsw3c5D0bs',
+}); // Canonical v2 output uses short keys
 
 console.log(record);
-// "v=aid1;u=https://api.example.com/agent;p=mcp;a=pat;s=Example Agent;k=zBase58PublicKey;i=g1"
+// "v=aid2;u=https://api.example.com/agent;p=mcp;a=pat;s=Example Agent;k=JrQLj5P_89iXES9-vFgrIy29clF9CC_oPPsw3c5D0bs"
 ```
 
 ### Validation
@@ -71,7 +70,7 @@ console.log(record);
 ```typescript
 import { validateTxtRecord } from '@agentcommunity/aid-engine';
 
-const validation = validateTxtRecord('v=aid1;u=https://api.example.com/agent;p=mcp');
+const validation = validateTxtRecord('v=aid2;u=https://api.example.com/agent;p=mcp');
 console.log(validation.isValid); // true
 console.log(validation.errors); // []
 ```
@@ -81,7 +80,7 @@ console.log(validation.errors); // []
 ```typescript
 import { verifyPka } from '@agentcommunity/aid-engine';
 
-const result = verifyPka('zBase58PublicKey');
+const result = verifyPka('JrQLj5P_89iXES9-vFgrIy29clF9CC_oPPsw3c5D0bs');
 console.log(result.valid); // true/false
 console.log(result.reason); // error message if invalid
 ```
@@ -186,19 +185,27 @@ const result = await runCheck('example.com', {
   checkDowngrade: true, // Enable downgrade detection
   previousCacheEntry: {
     // For downgrade checking
-    lastSeen: '2024-01-01T00:00:00Z',
-    pka: 'zPreviousKey',
+    lastSeen: '2026-05-01T00:00:00.000Z',
+    version: 'aid2',
+    trustSource: 'dns',
+    pka: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+    kid: null,
+    keyid: 'ogRZbCR5KTrPFCAfuYmCMwj0w7Yuk3Lr6YWQWfpkbf0',
+    jwkX: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+    hash: null,
   },
 });
 ```
 
 ### Protocol-Specific Probing
 
+`aid-engine` diagnostics are base-first. The `protocol` option labels the requested protocol in the report, but the primary lookup remains `_agent.<domain>`.
+
 ```typescript
 const result = await runCheck('example.com', {
   protocol: 'mcp', // Hint for protocol-specific subdomain
-  probeProtoSubdomain: true, // Try _agent._mcp.example.com first
-  probeProtoEvenIfBase: false, // Don't probe if base exists
+  probeProtoSubdomain: true, // After base failure, probe _agent._mcp.example.com for diagnostics
+  probeProtoEvenIfBase: false, // Set true to probe after base success and warn on drift
 });
 ```
 

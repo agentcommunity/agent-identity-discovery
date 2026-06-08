@@ -103,9 +103,12 @@ export async function processDomain(
   }
 
   const discoveryData = discoveryRes.value;
-  const proto = toProtocolToken(discoveryData.record.proto);
+  const proto = toProtocolToken(
+    typeof discoveryData.record.proto === 'string' ? discoveryData.record.proto : undefined,
+  );
   const uri = String(discoveryData.record.uri ?? '');
-  const authHint = discoveryData.record.auth as string | undefined;
+  const authHint =
+    typeof discoveryData.record.auth === 'string' ? discoveryData.record.auth : undefined;
 
   // 2. Connection phase
   actions.setStatus('connecting');
@@ -146,8 +149,8 @@ export async function provideAuth(
 
   const rec = state.discovery.value.record;
   const authUri = String(rec.uri ?? '');
-  const authProto = toProtocolToken(rec.proto);
-  const authHint = rec.auth as string | undefined;
+  const authProto = toProtocolToken(typeof rec.proto === 'string' ? rec.proto : undefined);
+  const authHint = typeof rec.auth === 'string' ? rec.auth : undefined;
 
   actions.setStatus('connecting');
   const authSignalId = addSignal(actions, buildAuthRetryRunningSignal());

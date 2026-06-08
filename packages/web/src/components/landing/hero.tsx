@@ -108,7 +108,7 @@ export function Hero() {
 
           {/* headline */}
           <h1 className="mb-6 text-5xl md:text-7xl font-bold tracking-tighter text-foreground animate-fade-in-up">
-            DKIM for Agents<span className="text-emerald-500">.</span>
+            the 0-th hop for agent discovery<span className="text-emerald-500">.</span>
           </h1>
 
           {/* lede — the payoff */}
@@ -138,7 +138,7 @@ export function Hero() {
             >
               <RecordRow k="u" v={`https://${current.domain}/${current.path}`} note="where" />
               <RecordRow k="p" v={current.proto} note="what protocol" />
-              <RecordRow k="k" v="z7rW8rTq8o4mM6vVf7w…" note="proof · Ed25519" accent />
+              <RecordRow k="k" v="ebVWLo_mVPlAeLES6K…" note="proof · Ed25519" accent />
             </div>
           </div>
         </div>

@@ -6,7 +6,56 @@ package aid
 // Version
 // ---------------------------------------------------------------------------
 
-const SpecVersion = "aid1"
+const SpecVersionV1 = "aid1"
+const SpecVersionV2 = "aid2"
+const SpecVersion = "aid2"
+
+var SupportedSpecVersions = []string{
+	"aid1",
+	"aid2",
+}
+
+// Version-specific raw record metadata. AidRecordV2 excludes legacy DNS kid/i.
+var AidRecordV1CanonicalFields = []string{
+	"v",
+	"uri",
+	"proto",
+	"auth",
+	"desc",
+	"docs",
+	"dep",
+	"pka",
+	"kid",
+}
+var AidRecordV1AliasFields = []string{
+	"p",
+	"u",
+	"a",
+	"s",
+	"d",
+	"e",
+	"k",
+	"i",
+}
+var AidRecordV2CanonicalFields = []string{
+	"v",
+	"uri",
+	"proto",
+	"auth",
+	"desc",
+	"docs",
+	"dep",
+	"pka",
+}
+var AidRecordV2AliasFields = []string{
+	"p",
+	"u",
+	"a",
+	"s",
+	"d",
+	"e",
+	"k",
+}
 
 // ---------------------------------------------------------------------------
 // Protocol tokens
