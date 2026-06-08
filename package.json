@@ -8,7 +8,7 @@
   "author": "Agent Community",
   "repository": {
     "type": "git",
-    "url": "https://github.com/agentcommunity/agent-identity-discovery.git"
+    "url": "git+https://github.com/agentcommunity/agent-identity-discovery.git"
   },
   "engines": {
     "node": ">=20.18.0",

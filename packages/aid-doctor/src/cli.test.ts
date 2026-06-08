@@ -260,7 +260,7 @@ describe('AID Doctor CLI', () => {
 
       expect(packageJson.name).toBe('@agentcommunity/aid-doctor');
       expect(packageJson.bin).toBeDefined();
-      expect(packageJson.bin['aid-doctor']).toBe('./dist/cli.js');
+      expect(packageJson.bin['aid-doctor']).toBe('dist/cli.js');
     });
 
     it('uses package.json as the commander version source', async () => {
