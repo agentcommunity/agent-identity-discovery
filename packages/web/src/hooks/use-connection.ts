@@ -33,7 +33,7 @@ export interface HandshakeSuccessData {
   agentCard?: AgentCard;
   security?: {
     dnssec?: boolean;
-    pka?: { present: boolean; attempted: boolean; verified: boolean | null; kid: string | null };
+    pka?: { present: boolean; attempted: boolean; verified: boolean | null; keyid: string | null };
     tls?: { checked: boolean; valid: boolean | null; daysRemaining: number | null };
     warnings?: Array<{ code: string; message: string }>;
     errors?: Array<{ code: string; message: string }>;

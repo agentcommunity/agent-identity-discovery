@@ -40,11 +40,11 @@ export const scenarios: Record<string, ScenarioManifest> = {
       ok: true,
       value: {
         record: {
-          v: 'aid1',
-          uri: 'tcp://messy.agentcommunity.org:9999/weird-path',
+          v: 'aid2',
+          uri: 'https://messy.agentcommunity.org/mcp',
           proto: 'mcp',
           host: 'messy.agentcommunity.org',
-          port: 9999,
+          port: 443,
           desc: 'Chaotic experimental agent',
         } as unknown as import('@/hooks/use-discovery').DiscoveryData,
         metadata: {
@@ -52,6 +52,8 @@ export const scenarios: Record<string, ScenarioManifest> = {
           lookupTime: 100,
           recordType: 'TXT',
           source: 'DNS',
+          txtRecord:
+            ' v=aid2 ; u=https://messy.agentcommunity.org/mcp ; p=mcp ; s=Chaotic experimental agent ',
         },
       },
     },
@@ -79,11 +81,11 @@ export const scenarios: Record<string, ScenarioManifest> = {
       ok: true,
       value: {
         record: {
-          v: 'aid1',
-          uri: 'https://api.firecrawl.dev',
-          proto: 'a2a',
-          host: 'api.firecrawl.dev',
-          port: 443,
+          v: 'aid2',
+          uri: 'npx:firecrawl-mcp',
+          proto: 'local',
+          host: 'firecrawl-mcp',
+          port: 0,
           desc: 'Firecrawl Agent',
         } as unknown as import('@/hooks/use-discovery').DiscoveryData,
         metadata: {
@@ -91,6 +93,8 @@ export const scenarios: Record<string, ScenarioManifest> = {
           lookupTime: 50,
           recordType: 'TXT',
           source: 'DNS',
+          txtRecord:
+            'v=aid2;u=npx:firecrawl-mcp;p=local;d=https://docs.firecrawl.dev/mcp-server;s=Firecrawl Agent',
         },
       },
     },
@@ -116,7 +120,7 @@ export const scenarios: Record<string, ScenarioManifest> = {
       ok: true,
       value: {
         record: {
-          v: 'aid1',
+          v: 'aid2',
           uri: 'https://api.playwright.dev/mcp',
           proto: 'openapi',
           host: 'api.playwright.dev',
@@ -128,6 +132,8 @@ export const scenarios: Record<string, ScenarioManifest> = {
           lookupTime: 60,
           recordType: 'TXT',
           source: 'DNS',
+          txtRecord:
+            'v=aid2;u=https://api.playwright.dev/mcp;p=openapi;d=https://github.com/microsoft/playwright-mcp;s=Playwright Agent',
         },
       },
     },
@@ -153,10 +159,10 @@ export const scenarios: Record<string, ScenarioManifest> = {
       ok: true,
       value: {
         record: {
-          v: 'aid1',
-          uri: 'wss://multi.string.com/api',
+          v: 'aid2',
+          uri: 'https://multi-string.agentcommunity.org/mcp',
           proto: 'mcp',
-          host: 'multi.string.com',
+          host: 'multi-string.agentcommunity.org',
           port: 443,
           desc: 'Agent from multiple TXT records',
         } as unknown as import('@/hooks/use-discovery').DiscoveryData,
@@ -165,6 +171,8 @@ export const scenarios: Record<string, ScenarioManifest> = {
           lookupTime: 140,
           recordType: 'TXT',
           source: 'DNS',
+          txtRecord:
+            'v=aid2;u=https://multi-string.agentcommunity.org/mcp;p=mcp;s=Agent from multiple TXT records',
         },
       },
     },
@@ -189,7 +197,7 @@ export const scenarios: Record<string, ScenarioManifest> = {
       ok: true,
       value: {
         record: {
-          v: 'aid1',
+          v: 'aid2',
           uri: 'https://does-not-exist.agentcommunity.org:1234',
           proto: 'mcp',
           host: 'does-not-exist.agentcommunity.org',
@@ -201,6 +209,8 @@ export const scenarios: Record<string, ScenarioManifest> = {
           lookupTime: 95,
           recordType: 'TXT',
           source: 'DNS',
+          txtRecord:
+            'v=aid2;u=https://does-not-exist.agentcommunity.org:1234;p=mcp;s=Offline Agent',
         },
       },
     },

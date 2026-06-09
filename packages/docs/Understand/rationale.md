@@ -21,7 +21,7 @@ This document provides the rationale behind the design decisions in the Agent Id
 
 The design of AID is guided by a single, overarching principle: **Pragmatism over Purity**. Our goal is to create a standard that is immediately useful and adoptable by the widest possible audience. This led to three core tenets:
 
-1.  **Embrace Existing Infrastructure:** The protocol leverages DNS TXT records, a technology that is universally supported, well-understood, and configurable by every domain owner on the planet. It avoids dependencies on newer, less-adopted standards or centralized services.
+1.  **Embrace Existing Infrastructure:** The protocol leverages DNS TXT records, a technology that is widely supported, well-understood, and configurable through ordinary DNS hosting and registrar workflows. It avoids making newer or less universally exposed record types mandatory for the first-contact path.
 2.  **Minimize Complexity:** The v2 specification is intentionally lean. It solves one problem and one problem only: _discovering the primary entry point for an agent service_. By resisting the temptation to solve adjacent problems (like capability negotiation or rich configuration), AID remains simple to implement for both providers and clients.
 3.  **Default to Decentralization:** The protocol is inherently decentralized. There is no central registry, no required registration, and no single point of failure. If you own a domain, you can publish an AID record. This aligns with the foundational principles of the open internet.
 
@@ -29,7 +29,7 @@ The design of AID is guided by a single, overarching principle: **Pragmatism ove
 
 The minimalist design of AID delivers several key advantages:
 
-- **Ubiquitous and Immediate Deployability:** By using DNS TXT records, any service provider can implement AID today without waiting for new infrastructure to be deployed. Client libraries can be built with standard DNS resolvers available in every major programming language.
+- **Ubiquitous and Immediate Deployability:** By using DNS TXT records, service providers can implement AID today without waiting for new infrastructure to be deployed. Client libraries can be built with standard DNS resolvers available in every major programming language. See [Why AID ships on TXT records](https://agentcommunity.org/blog/why-txt-records) for the deployment argument behind this choice.
 - **Unambiguous and Namespace-Safe Discovery:** The `_agent.<domain>` subdomain follows established conventions for service discovery ([RFC8552]), preventing collisions and keeping the root domain clean. The non-normative guidance for protocol-specific subdomains (e.g., `_agent._mcp.<domain>`) further demonstrates this flexibility.
 - **Human-Readable and Easily Debuggable:** The `key=value` format is simple to read and write. A developer can debug any AID record with a single command (`dig TXT _agent.example.com`) without needing special tools, which dramatically lowers the barrier to entry. The optional `p` alias for `proto` is a minor but thoughtful concession to brevity in this human-readable context.
 - **Superior User Experience via the `desc` Key:** The optional `desc` key is a small but critical feature. It allows a client to provide human-readable context _before_ a connection is made (e.g., "Connect to 'Google's AI Tools'?"), which builds user trust and clarity.
@@ -69,7 +69,7 @@ A successful standard is defined as much by the problems it _doesn't_ solve as b
 ### **5. Alternatives Considered and Rejected**
 
 - **Full `aid.json` Manifest:** While powerful for describing complex local and remote implementations, the manifest-based approach was deemed too burdensome for the core standard. It required providers to host and maintain a JSON file, and clients to implement a significantly more complex resolution and validation logic. The `proto=local` token captures much of the manifest's value with less complexity.
-- **DNS `SRV` or `HTTPS/SVCB` Records:** These are technically more "correct" for service discovery. However, they lack the universal, simple configuration support of `TXT` records in many DNS providers' dashboards. Furthermore, client-side resolver support is not yet ubiquitous. For v2, `TXT` offers the path of least resistance to adoption, with a clear migration path to `SRV`/`HTTPS` in the future.
+- **DNS `SRV` or `HTTPS/SVCB` Records:** These are valuable service-discovery and service-binding mechanisms, and future AID profiles or adjacent discovery systems may use them. They are not the mandatory v2 baseline because AID optimizes for the smallest deployable first-contact hop: one compact TXT record that ordinary domain owners can publish and ordinary clients can query. TXT keeps experimentation and adoption cheap while the richer service-binding design space remains open.
 - **Centralized Registry:** A central "Agent Store" or registry was rejected as it violates the principle of decentralization, creates a single point of failure, and introduces a gatekeeper to the ecosystem. DNS is the world's most successful decentralized registry, and AID leverages it directly.
 - **Full Pkarr-style DHT Resolution:** We deeply admire the [Pkarr](https://pkarr.org/) project for its commitment to decentralized, censorship-resistant identity via a DHT. However, for AID's goal of creating a minimal, immediately deployable bootstrap layer, requiring clients to implement DHT lookups and interact with relays was deemed too high a barrier to entry. AID PKA uses compact Ed25519 key material but remains DNS-authority-rooted instead of key-address-rooted.
 - **DNS-First, with a Pragmatic `.well-known` Fallback**
@@ -78,7 +78,7 @@ A successful standard is defined as much by the problems it _doesn't_ solve as b
 
 ### **6. Discovery vs Identity (and PKA in v2)**
 
-PKA keeps the endpoint-proof role but uses `k` as unpadded base64url JWK `x`, derives `keyid` with RFC 7638, and no longer publishes `kid` in DNS for `aid2`.
+PKA keeps the endpoint-proof role but uses `k` as unpadded base64url JWK `x`, derives `keyid` with RFC 7638, and no longer publishes `kid` in DNS for `aid2`. The older [PKA as External Trust Anchor](https://agentcommunity.org/blog/external_identity_anchor) post explains the cross-boundary trust problem behind PKA, but it describes the legacy `aid1` wire format. Use the current specification for v2 header, key, nonce, and `keyid` behavior.
 
 Discovery answers “where and how do I connect?” Identity answers “am I really talking to who DNS pointed me to?” AID keeps these responsibilities separate by design, then offers PKA as an optional, cryptographic proof to harden discovery without changing DNS.
 

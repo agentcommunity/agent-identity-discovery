@@ -3,7 +3,6 @@ import type { ProtocolGuidance } from '@/hooks/use-connection';
 
 // Re-export for use by protocol handlers
 
-
 /**
  * Agent Card structure per A2A specification
  */
@@ -29,7 +28,12 @@ export interface ProtocolResult {
     capabilities: Array<{ id: string; type: 'tool' | 'resource' }>;
     security?: {
       dnssec?: boolean;
-      pka?: { present: boolean; attempted: boolean; verified: boolean | null; kid: string | null };
+      pka?: {
+        present: boolean;
+        attempted: boolean;
+        verified: boolean | null;
+        keyid: string | null;
+      };
       tls?: { checked: boolean; valid: boolean | null; daysRemaining: number | null };
       warnings?: Array<{ code: string; message: string }>;
       errors?: Array<{ code: string; message: string }>;
@@ -42,7 +46,7 @@ export interface ProtocolResult {
   // Security info (available for all protocols)
   security?: {
     dnssec?: boolean;
-    pka?: { present: boolean; attempted: boolean; verified: boolean | null; kid: string | null };
+    pka?: { present: boolean; attempted: boolean; verified: boolean | null; keyid: string | null };
     tls?: { checked: boolean; valid: boolean | null; daysRemaining: number | null };
     warnings?: Array<{ code: string; message: string }>;
     errors?: Array<{ code: string; message: string }>;
@@ -80,5 +84,5 @@ export interface ProtocolHandler {
   handle(options: ProtocolHandlerOptions): Promise<ProtocolResult>;
 }
 
-export {type ProtocolToken} from '@/lib/datasources/types';
-export {type ProtocolGuidance} from '@/hooks/use-connection';
+export { type ProtocolToken } from '@/lib/datasources/types';
+export { type ProtocolGuidance } from '@/hooks/use-connection';

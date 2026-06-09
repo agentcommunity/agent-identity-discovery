@@ -340,15 +340,15 @@ If such a directory chains to DNS `k`, that chaining is the defining property of
 
 ## **6. Label Strategy**
 
-AID v2 keeps `_agent.<domain>` as the discovery label.
+AID v2 keeps `_agent.<domain>` as the discovery label for compatibility with existing deployments.
 
-The earlier RFC 8552 `_agent` registration request was rejected on procedural grounds in April 2026. That label-governance question is decoupled from the v2 PKA cleanup. A later working group or BoF process may revisit the label, but v2 does not make a label change part of the key-format work.
+Label governance is separate from the v2 key-format and endpoint-proof updates, and may be addressed by a future working group or BoF process.
 
 ---
 
 ## **7. Registries**
 
-The auth and protocol registries remain compatible with v1.2 unless changed through the normal extension process.
+The auth and protocol registries remain compatible with legacy `aid1` records unless changed through the normal extension process.
 
 ### **7.1. Auth Tokens**
 

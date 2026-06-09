@@ -40,7 +40,15 @@ const getSecurityInfo = async (hostname: string): Promise<Record<string, unknown
 
     return {
       dnssec: report.dnssec.present,
-      pka: report.pka,
+      pka: {
+        present: report.pka.present,
+        attempted: report.pka.attempted,
+        verified: report.pka.verified,
+        keyid: report.pka.keyid,
+        alg: report.pka.alg,
+        createdSkewSec: report.pka.createdSkewSec,
+        covered: report.pka.covered,
+      },
       tls: report.tls,
       warnings: report.record.warnings,
       errors: report.record.errors,

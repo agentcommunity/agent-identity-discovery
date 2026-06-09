@@ -105,13 +105,14 @@ If you need to test record changes against a sandbox zone, point `cloudflare_zon
 
 ## Spec alignment
 
-The records published here demonstrate the complete AID v1.2 surface area. Relevant specification sections:
+The records published here demonstrate the AID v2 surface area. Relevant specification sections:
 
 - **§2 — TXT Record Specification**: format, required keys, key aliases, multi-string handling.
-- **§2.4 — Exact-host semantics and explicit delegation**: covered by the optional `include_protocol_specific` records.
+- **§2.4 — Exact-host semantics and explicit delegation**: canonical base-name behavior.
+- **§2.5 — Multiple Protocols And Protocol-Specific Compatibility Names**: covered by the optional `include_protocol_specific` records.
 - **§4 — DNS and Caching**: TTL recommendation enforced via `record_ttl`.
-- **Appendix B — Protocol Registry**: every `proto` token in the registry has a representative showcase record (`mcp`, `a2a`, `openapi`, `grpc`, `graphql`, `local`, `ucp`).
-- **Appendix D — PKA Handshake**: `_agent.pka-basic` exercises the live PKA endpoint.
+- **§7.2 — Protocol Tokens**: every protocol token has a representative showcase record (`mcp`, `a2a`, `openapi`, `grpc`, `graphql`, `local`, `ucp`).
+- **Appendix B — PKA Handshake**: `_agent.pka-basic` exercises the live PKA endpoint.
 
 The full spec lives at [`packages/docs/specification.md`](../../packages/docs/specification.md).
 
@@ -132,7 +133,7 @@ The full spec lives at [`packages/docs/specification.md`](../../packages/docs/sp
 
 ## References
 
-- [Specification](../../packages/docs/specification.md) — AID v1.2.
+- [Specification](../../packages/docs/specification.md) — AID v2.
 - [`protocol/examples.yml`](../../protocol/examples.yml) — source of truth for showcase records.
 - [`scripts/generate-examples.ts`](../../scripts/generate-examples.ts) — generator that emits `examples.tf` and the web constants.
 - [`.github/workflows/showcase-dns.yml`](../../.github/workflows/showcase-dns.yml) — the CI deployment workflow.

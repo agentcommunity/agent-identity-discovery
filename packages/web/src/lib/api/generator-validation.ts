@@ -180,7 +180,6 @@ export const validateGeneratorPayload = (payload: unknown): GeneratorValidationR
       docs: data.docs,
       dep: data.dep,
       pka: data.pka,
-      kid: data.kid,
     };
     txt = buildTxtRecordVariant(engineData, true);
     txtBytes = safeByteLength(txt);

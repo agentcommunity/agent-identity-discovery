@@ -118,7 +118,7 @@ function discoveryErrorHints(domain: string, code?: string): { title: string; hi
         title: 'Discovery blocked by security checks',
         hints: [
           'Check DNS/network access and public resolver reachability.',
-          'If pka is present, verify handshake headers and key rotation data.',
+          'If pka is present, verify the derived keyid and AID v2 handshake headers.',
           'Inspect TLS and redirect behavior on fallback endpoints.',
         ],
       };
@@ -263,6 +263,9 @@ export function buildDiscoveryResultSignal(domain: string, result: DiscoveryResu
       value: formatPkaStatus(metadata.pka),
       tone: metadata.pka.verified === false ? 'error' : 'default',
     });
+    if (metadata.pka.keyid) {
+      details.push({ label: 'PKA keyid', value: metadata.pka.keyid });
+    }
   }
   if (metadata.tls) {
     details.push({
@@ -366,6 +369,9 @@ export function buildConnectionResultSignal(
         value: formatPkaStatus(security.pka),
         tone: security.pka.verified === false ? 'error' : 'default',
       });
+      if (security.pka.keyid) {
+        details.push({ label: 'PKA keyid', value: security.pka.keyid });
+      }
     }
     if (security?.tls) {
       details.push({

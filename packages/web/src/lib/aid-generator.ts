@@ -17,7 +17,6 @@ export interface AidGeneratorData {
   docs?: string;
   dep?: string; // ISO timestamp
   pka?: string;
-  kid?: string;
 }
 
 // The core logic function
@@ -43,13 +42,10 @@ export function validateTxt(record: string): { isValid: boolean; error?: string 
     const v = map.get('v') ?? map.get('version');
     const uri = map.get('u') ?? map.get('uri');
     const proto = map.get('p') ?? map.get('proto');
-    if (v !== 'aid1' && v !== 'aid2') throw new Error('Missing or invalid version');
+    if (v !== 'aid2') throw new Error('Missing or invalid version');
     if (!uri) throw new Error('Missing uri/u');
     if (!proto) throw new Error('Missing proto/p');
-    if (v === 'aid2' && (map.get('i') || map.get('kid')))
-      throw new Error('kid is not valid in aid2');
-    if (v === 'aid1' && (map.get('k') || map.get('pka')) && !map.get('i') && !map.get('kid'))
-      throw new Error('kid requires pka');
+    if (map.get('i') || map.get('kid')) throw new Error('kid is not valid in aid2');
     return { isValid: true };
   } catch (error) {
     return { isValid: false, error: error instanceof Error ? error.message : 'Invalid' };

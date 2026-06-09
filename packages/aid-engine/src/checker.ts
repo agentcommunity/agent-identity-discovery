@@ -154,6 +154,7 @@ function initReport(domain: string, protocol?: string): DoctorReport {
       attempted: false,
       verified: null,
       kid: null,
+      keyid: null,
       alg: null,
       createdSkewSec: null,
       covered: null,
@@ -308,8 +309,10 @@ export async function runCheck(domain: string, opts: CheckOptions): Promise<Doct
     }
 
     if (record.pka) {
+      const keyMaterial = derivePkaKeyid(record.pka);
       report.pka.present = true;
       report.pka.kid = record.v === 'aid1' ? (record.kid ?? null) : null;
+      report.pka.keyid = keyMaterial?.keyid ?? null;
       report.pka.alg = 'ed25519';
       report.pka.attempted = true;
       try {

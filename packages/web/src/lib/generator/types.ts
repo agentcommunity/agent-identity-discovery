@@ -7,7 +7,6 @@ export interface AidGeneratorFormData {
   docs?: string;
   dep?: string;
   pka?: string;
-  kid?: string;
 }
 
 export interface ValidationIssue {
@@ -20,5 +19,3 @@ export interface ValidationResult {
   errors: ValidationIssue[];
   warnings: ValidationIssue[];
 }
-
-

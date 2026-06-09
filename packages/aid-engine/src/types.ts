@@ -83,6 +83,7 @@ export interface PkaBlock {
   attempted: boolean;
   verified: boolean | null;
   kid: string | null;
+  keyid: string | null;
   alg: string | null;
   createdSkewSec: number | null;
   covered: string[] | null;

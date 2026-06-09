@@ -32,6 +32,43 @@ interface FormattedExample extends ExampleRecord {
   name: string;
 }
 
+function parseExampleRecord(record: string): Map<string, string> {
+  const entries = record
+    .split(';')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const separator = part.indexOf('=');
+      if (separator === -1) return [part.toLowerCase(), ''] as const;
+      return [
+        part.slice(0, separator).trim().toLowerCase(),
+        part.slice(separator + 1).trim(),
+      ] as const;
+    });
+
+  return new Map(entries);
+}
+
+function validateV2ShowcaseExamples(examples: ExamplesData): void {
+  const failures: string[] = [];
+
+  Object.entries(examples.examples).forEach(([category, categoryExamples]) => {
+    Object.entries(categoryExamples).forEach(([name, example]) => {
+      const fields = parseExampleRecord(example.record);
+      if (fields.get('v') !== 'aid2') {
+        failures.push(`${category}.${name}: expected v=aid2`);
+      }
+      if (fields.has('i') || fields.has('kid')) {
+        failures.push(`${category}.${name}: aid2 examples must not publish kid/i`);
+      }
+    });
+  });
+
+  if (failures.length > 0) {
+    throw new Error(`Showcase examples must be v2-only:\n${failures.join('\n')}`);
+  }
+}
+
 const GENERATED_WARNING = `/**
  * GENERATED FILE - DO NOT EDIT
  *
@@ -178,6 +215,7 @@ try {
   const yamlPath = path.resolve(process.cwd(), 'protocol/examples.yml');
   const yamlContent = readFileSync(yamlPath, 'utf8');
   const examples = parse(yamlContent) as ExamplesData;
+  validateV2ShowcaseExamples(examples);
 
   // Generate Terraform locals
   const terraformContent = generateTerraformLocals(examples);

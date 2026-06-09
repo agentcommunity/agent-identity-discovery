@@ -123,8 +123,6 @@ export function parseRecordString(str: string): Partial<AidGeneratorFormData> {
   if (dep) out.dep = dep;
   const pka = get('k', 'pka');
   if (pka) out.pka = pka;
-  const kid = get('i', 'kid');
-  if (kid) out.kid = kid;
   return out;
 }
 

@@ -31,7 +31,6 @@ const defaultFormData: GeneratorFormData = {
   docs: '',
   dep: '',
   pka: '',
-  kid: '',
 };
 
 export function useGeneratorForm() {
@@ -127,7 +126,6 @@ export function useGeneratorForm() {
       docs: parsed.docs ?? previous.docs,
       dep: parsed.dep ?? previous.dep,
       pka: parsed.pka ?? previous.pka,
-      kid: parsed.kid ?? previous.kid,
     }));
   };
 
