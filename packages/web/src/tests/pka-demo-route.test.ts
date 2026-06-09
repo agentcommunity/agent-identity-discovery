@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, createPublicKey, verify as verifySignature } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { GET, OPTIONS } from '@/app/api/pka-demo/route';
 
@@ -11,9 +11,6 @@ const decodeSignatureHeader = (value: string): Uint8Array => {
   if (!encoded) throw new Error(`Invalid Signature header: ${value}`);
   return new Uint8Array(Buffer.from(encoded, 'base64'));
 };
-
-const toArrayBuffer = (bytes: Uint8Array): ArrayBuffer =>
-  bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 
 const toBase64Url = (bytes: Uint8Array): string =>
   Buffer.from(bytes).toString('base64url').replaceAll('=', '');
@@ -66,22 +63,18 @@ describe('/api/pka-demo', () => {
       '"@status": 200',
       `"@signature-params": ${signatureParams}`,
     ].join('\n');
-    const key = await globalThis.crypto.subtle.importKey(
-      'jwk',
-      { kty: 'OKP', crv: 'Ed25519', x: info.publicKey },
-      { name: 'Ed25519' },
-      false,
-      ['verify'],
-    );
-
-    await expect(
-      globalThis.crypto.subtle.verify(
-        'Ed25519',
+    const key = createPublicKey({
+      key: { kty: 'OKP', crv: 'Ed25519', x: info.publicKey },
+      format: 'jwk',
+    });
+    expect(
+      verifySignature(
+        null,
+        Buffer.from(signatureBase, 'utf8'),
         key,
-        toArrayBuffer(decodeSignatureHeader(signature)),
-        new TextEncoder().encode(signatureBase),
+        Buffer.from(decodeSignatureHeader(signature)),
       ),
-    ).resolves.toBe(true);
+    ).toBe(true);
   });
 
   it('does not accept the legacy AID-Challenge handshake path', async () => {
