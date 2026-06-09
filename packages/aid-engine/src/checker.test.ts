@@ -147,6 +147,11 @@ describe('runCheck security-state downgrade cache', () => {
 
     const report = await check();
 
+    expect(report.pka).toMatchObject({
+      present: true,
+      kid: null,
+      keyid: ZERO_THUMBPRINT,
+    });
     expect(report.cacheEntry).toMatchObject({
       version: 'aid2',
       trustSource: 'dns',

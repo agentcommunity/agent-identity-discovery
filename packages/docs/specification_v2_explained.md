@@ -19,7 +19,14 @@ _Historical notes from the v2 specification work_
 **Editor:** Agent Community
 **Status:** Non-normative design notes
 
-> The current normative protocol is the [AID v2 specification](specification.md). This page is retained as design history and review context for the v1.2-to-v2 transition.
+> The current normative protocol is the [AID v2 specification](specification.md). This page is retained as design history and review context for the legacy `aid1` to v2 transition.
+
+## Background Reading
+
+Two earlier Agent Community posts are useful background, but the v2 specification is the implementation authority:
+
+- [PKA as External Trust Anchor](https://agentcommunity.org/blog/external_identity_anchor) explains the first-contact identity problem PKA addresses. It was written for the legacy `aid1` wire format, so use it for the trust model, not for current header, key, or `keyid` details.
+- [Why AID ships on TXT records](https://agentcommunity.org/blog/why-txt-records) explains the deployment rationale for using TXT as the mandatory baseline. AID v2 keeps that TXT baseline for the 0-th hop while leaving richer service-binding records to future profiles or adjacent discovery systems.
 
 ---
 
@@ -28,7 +35,7 @@ _Historical notes from the v2 specification work_
 This page has two layers:
 
 - **Historical specification text** uses normal normative language such as MUST, SHOULD, and MAY because it was written during the v2 review.
-- **Explainer notes** explain the reason for a design choice and how it differs from v1.2.
+- **Explainer notes** explain the reason for a design choice and how it differs from legacy `aid1`.
 
 The proposal is intentionally narrow:
 
@@ -36,9 +43,9 @@ The proposal is intentionally narrow:
 
 ---
 
-## What Changes From v1.2
+## What Changes From Legacy `aid1`
 
-| Area                   | v1.2                                 | v2                                       | Why                                                                                     |
+| Area                   | Legacy `aid1`                        | v2                                       | Why                                                                                     |
 | ---------------------- | ------------------------------------ | ---------------------------------------- | --------------------------------------------------------------------------------------- |
 | Record version         | `v=aid1`                             | `v=aid2`                                 | Clear wire-format break.                                                                |
 | PKA key encoding       | `k=z...` multibase/base58btc         | `k=<base64url>`                          | Uses the same value as the Ed25519 JWK `x` member.                                      |
@@ -362,17 +369,17 @@ If such a directory chains to DNS `k`, that chaining is the defining property of
 
 ## 6. IANA And Label Strategy
 
-The v2 design keeps `_agent.<domain>` as the discovery label.
+The v2 design keeps `_agent.<domain>` as the discovery label for compatibility with existing deployments.
 
-The earlier RFC 8552 `_agent` registration request was rejected on procedural grounds in April 2026. That label-governance question is decoupled from the v2 PKA cleanup. A later working group or BoF process may revisit the label, but this draft does not make a label change part of the key-format work.
+Label governance is separate from the v2 key-format and endpoint-proof updates, and may be addressed by a future working group or BoF process.
 
-> **Explainer:** Renaming the label while also changing key semantics would make review harder. v2 can clarify PKA without forcing the namespace question into the same decision.
+> **Explainer:** v2 can clarify PKA without forcing the namespace question into the same decision.
 
 ---
 
 ## 7. Registries
 
-The auth and protocol registries remain compatible with v1.2 unless changed through the normal extension process.
+The auth and protocol registries remain compatible with legacy `aid1` records unless changed through the normal extension process.
 
 ### Auth Tokens
 

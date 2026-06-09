@@ -11,7 +11,7 @@ const discoveryOk = (): DiscoveryResult => ({
   ok: true,
   value: {
     record: {
-      v: 'aid1',
+      v: 'aid2',
       uri: 'https://api.example.com/mcp',
       proto: 'mcp',
       auth: 'pat',
@@ -41,6 +41,25 @@ describe('chat-engine signal builders', () => {
     expect(signal.status).toBe('success');
     expect(signal.title).toContain('AID resolver');
     expect(signal.details?.some((d) => d.label === 'Protocol' && d.value === 'mcp')).toBe(true);
+  });
+
+  it('includes derived PKA keyid in discovery details', () => {
+    const result = discoveryOk();
+    if (!result.ok) throw new Error('Expected successful discovery fixture');
+    result.value.metadata.pka = {
+      present: true,
+      verified: null,
+      keyid: 'sYkYRKJfa8y8rCgWHb-qxqR4LY93c_hbbL10YbvT88o',
+    };
+
+    const signal = buildDiscoveryResultSignal('example.com', result);
+    expect(
+      signal.details?.some(
+        (detail) =>
+          detail.label === 'PKA keyid' &&
+          detail.value === 'sYkYRKJfa8y8rCgWHb-qxqR4LY93c_hbbL10YbvT88o',
+      ),
+    ).toBe(true);
   });
 
   it('maps ERR_NO_RECORD to discovery guidance', () => {

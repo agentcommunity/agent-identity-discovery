@@ -10,7 +10,7 @@ import { ChevronDown } from 'lucide-react';
 
 export interface SecurityFieldsProps {
   pka?: string;
-  onChange: (patch: Partial<{ pka?: string; kid?: string }>) => void;
+  onChange: (patch: Partial<{ pka?: string }>) => void;
 }
 
 export function SecurityFields({ pka, onChange }: SecurityFieldsProps) {
@@ -45,7 +45,7 @@ export function SecurityFields({ pka, onChange }: SecurityFieldsProps) {
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent className="mt-2">
-          <PkaKeyGenerator onPublicKey={(k) => onChange({ pka: k, kid: '' })} />
+          <PkaKeyGenerator onPublicKey={(k) => onChange({ pka: k })} />
         </CollapsibleContent>
       </Collapsible>
     </div>

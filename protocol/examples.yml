@@ -10,246 +10,127 @@ examples:
   tutorials:
     simple:
       domain: 'simple.agentcommunity.org'
-      record: 'v=aid1;u=https://api.example.com/mcp;p=mcp;a=pat;s=Basic MCP Example'
+      record: 'v=aid2;u=https://api.example.com/mcp;p=mcp;a=pat;s=Basic MCP Example'
       icon: '🤖'
       description: 'Simple MCP server example'
       category: 'tutorials'
 
-    v2_simple:
-      domain: 'v2-simple.agentcommunity.org'
-      record: 'v=aid2;u=https://api.example.com/mcp;p=mcp;a=pat;s=Basic MCP Example'
-      icon: '🤖'
-      description: 'v2 shadow for the simple MCP server example'
-      category: 'tutorials'
-
     local_docker:
       domain: 'local-docker.agentcommunity.org'
-      record: 'v=aid1;u=docker:myimage;p=local;s=Local Docker Agent'
+      record: 'v=aid2;u=docker:myimage;p=local;s=Local Docker Agent'
       icon: '🐳'
       description: 'Local agent via Docker'
       category: 'tutorials'
 
-    v2_local_docker:
-      domain: 'v2-local-docker.agentcommunity.org'
-      record: 'v=aid2;u=docker:myimage;p=local;s=Local Docker Agent'
-      icon: '🐳'
-      description: 'v2 shadow for the local Docker agent'
-      category: 'tutorials'
-
     messy:
       domain: 'messy.agentcommunity.org'
-      record: ' v=aid1 ; u=https://api.example.com/mcp ; p=mcp ; extra=ignored '
+      record: ' v=aid2 ; u=https://api.example.com/mcp ; p=mcp ; extra=ignored '
       icon: '🧹'
       description: 'Messy formatting with extra fields'
       category: 'tutorials'
 
-    v2_messy:
-      domain: 'v2-messy.agentcommunity.org'
-      record: ' v=aid2 ; u=https://api.example.com/mcp ; p=mcp ; extra=ignored '
-      icon: '🧹'
-      description: 'v2 shadow for messy formatting with extra fields'
-      category: 'tutorials'
-
     multi_string:
       domain: 'multi-string.agentcommunity.org'
-      record: 'v=aid1;u=https://api.example.com/mcp;p=mcp;s=Multi string part 1'
+      record: 'v=aid2;u=https://api.example.com/mcp;p=mcp;s=Multi string part 1'
       icon: '📄'
       description: 'Multi-string DNS record example'
       category: 'tutorials'
 
-    v2_multi_string:
-      domain: 'v2-multi-string.agentcommunity.org'
-      record: 'v=aid2;u=https://api.example.com/mcp;p=mcp;s=Multi string part 1'
-      icon: '📄'
-      description: 'v2 shadow for the multi-string DNS record example'
-      category: 'tutorials'
-
     pka_basic:
       domain: 'pka-basic.agentcommunity.org'
-      record: 'v=aid1;p=mcp;u=https://aid.agentcommunity.org/api/pka-demo;k=z2Cwtdw9EZzy1Mhv8ZmGRoMJPkJcU3amQQhpUJx35pKUs;i=p1;s=Live PKA Demo'
+      record: 'v=aid2;p=mcp;u=https://aid.agentcommunity.org/api/pka-demo;k=Eesj9h7MD0cRERrc_ICXu5Lb1WkokpkbWAkRcDsxUvA;s=Live PKA Demo'
       icon: '🔐'
       description: 'Live PKA endpoint proof demo'
       category: 'tutorials'
 
-    v2_pka_basic:
-      domain: 'v2-pka-basic.agentcommunity.org'
-      record: 'v=aid2;p=mcp;u=https://aid.agentcommunity.org/api/pka-demo;k=Eesj9h7MD0cRERrc_ICXu5Lb1WkokpkbWAkRcDsxUvA;s=Live PKA Demo'
-      icon: '🔐'
-      description: 'v2 shadow for the live PKA endpoint proof demo'
-      category: 'tutorials'
-
   # Feature complete & Reference examples
   reference:
-    complete_v1_2:
+    complete:
       domain: 'complete.agentcommunity.org'
-      record: 'v=aid1;p=mcp;u=https://api.complete.agentcommunity.org/mcp;d=https://docs.agentcommunity.org/complete;e=2026-12-31T23:59:59Z;s=Complete v1.2 with all features'
-      icon: '✨'
-      description: 'Complete v1.2 example with all features'
-      category: 'reference'
-
-    v2_complete:
-      domain: 'v2-complete.agentcommunity.org'
       record: 'v=aid2;p=mcp;u=https://api.complete.agentcommunity.org/mcp;d=https://docs.agentcommunity.org/complete;e=2026-12-31T23:59:59Z;s=Complete v2 with all features'
       icon: '✨'
-      description: 'v2 shadow with all features'
+      description: 'Complete v2 example with all features'
       category: 'reference'
 
     secure:
       domain: 'secure.agentcommunity.org'
-      record: 'v=aid1;u=https://api.secure.agentcommunity.org/mcp;p=mcp;a=pat;d=https://docs.agentcommunity.org/secure;s=Secure MCP with Auth'
-      icon: '🔒'
-      description: 'Secure service with auth'
-      category: 'reference'
-
-    v2_secure:
-      domain: 'v2-secure.agentcommunity.org'
       record: 'v=aid2;u=https://api.secure.agentcommunity.org/mcp;p=mcp;a=pat;d=https://docs.agentcommunity.org/secure;s=Secure MCP with Auth'
       icon: '🔒'
-      description: 'v2 shadow for the secure service with auth'
+      description: 'Secure service with auth'
       category: 'reference'
 
   # Real-world service examples
   real_world:
     supabase:
       domain: 'supabase.agentcommunity.org'
-      record: 'v=aid1;u=https://api.supabase.com/mcp;p=mcp;a=pat;d=https://supabase.com/docs/guides/getting-started/mcp;s=Supabase MCP (Mock Service)'
+      record: 'v=aid2;u=https://api.supabase.com/mcp;p=mcp;a=pat;d=https://supabase.com/docs/guides/getting-started/mcp;s=Supabase MCP (Mock Service)'
       icon: '/icons/supabase.svg'
       description: 'Supabase database service'
       category: 'real_world'
 
-    v2_supabase:
-      domain: 'v2-supabase.agentcommunity.org'
-      record: 'v=aid2;u=https://api.supabase.com/mcp;p=mcp;a=pat;d=https://supabase.com/docs/guides/getting-started/mcp;s=Supabase MCP (Mock Service)'
-      icon: '/icons/supabase.svg'
-      description: 'v2 shadow for the Supabase database service'
-      category: 'real_world'
-
     auth0:
       domain: 'auth0.agentcommunity.org'
-      record: 'v=aid1;u=https://ai.auth0.com/mcp;p=mcp;a=pat;d=https://auth0.com/docs/get-started/auth0-mcp-server;s=Auth0 MCP (Mock Service)'
+      record: 'v=aid2;u=https://ai.auth0.com/mcp;p=mcp;a=pat;d=https://auth0.com/docs/get-started/auth0-mcp-server;s=Auth0 MCP (Mock Service)'
       icon: '/icons/auth0.svg'
       description: 'Auth0 identity service'
       category: 'real_world'
 
-    v2_auth0:
-      domain: 'v2-auth0.agentcommunity.org'
-      record: 'v=aid2;u=https://ai.auth0.com/mcp;p=mcp;a=pat;d=https://auth0.com/docs/get-started/auth0-mcp-server;s=Auth0 MCP (Mock Service)'
-      icon: '/icons/auth0.svg'
-      description: 'v2 shadow for the Auth0 identity service'
-      category: 'real_world'
-
     firecrawl:
       domain: 'firecrawl.agentcommunity.org'
-      record: 'v=aid1;u=npx:firecrawl-mcp;p=local;d=https://docs.firecrawl.dev/mcp-server;s=Firecrawl Web Scraping Agent'
+      record: 'v=aid2;u=npx:firecrawl-mcp;p=local;d=https://docs.firecrawl.dev/mcp-server;s=Firecrawl Web Scraping Agent'
       icon: '🔥'
       description: 'Firecrawl web scraping (local)'
       category: 'real_world'
 
-    v2_firecrawl:
-      domain: 'v2-firecrawl.agentcommunity.org'
-      record: 'v=aid2;u=npx:firecrawl-mcp;p=local;d=https://docs.firecrawl.dev/mcp-server;s=Firecrawl Web Scraping Agent'
-      icon: '🔥'
-      description: 'v2 shadow for Firecrawl web scraping'
-      category: 'real_world'
-
     playwright:
       domain: 'playwright.agentcommunity.org'
-      record: 'v=aid1;u=https://api.playwright.dev;p=openapi;d=https://github.com/microsoft/playwright-mcp;s=Playwright OpenAPI (Mock Service)'
-      icon: '/icons/playwright.svg'
-      description: 'Playwright browser automation'
-      category: 'real_world'
-
-    v2_playwright:
-      domain: 'v2-playwright.agentcommunity.org'
       record: 'v=aid2;u=https://api.playwright.dev;p=openapi;d=https://github.com/microsoft/playwright-mcp;s=Playwright OpenAPI (Mock Service)'
       icon: '/icons/playwright.svg'
-      description: 'v2 shadow for Playwright browser automation'
+      description: 'Playwright browser automation'
       category: 'real_world'
 
   # Protocol showcase examples (demonstrate non-MCP protocols)
   protocols:
     a2a_showcase:
       domain: 'a2a.agentcommunity.org'
-      record: 'v=aid1;u=https://a2a.agentcommunity.org/.well-known/agent.json;p=a2a;d=https://a2aprotocol.ai/;s=A2A Protocol Showcase'
+      record: 'v=aid2;u=https://a2a.agentcommunity.org/.well-known/agent.json;p=a2a;d=https://a2aprotocol.ai/;s=A2A Protocol Showcase'
       icon: '🤝'
       description: 'Agent-to-Agent protocol example'
       category: 'protocols'
 
-    v2_a2a_showcase:
-      domain: 'v2-a2a.agentcommunity.org'
-      record: 'v=aid2;u=https://a2a.agentcommunity.org/.well-known/agent.json;p=a2a;d=https://a2aprotocol.ai/;s=A2A Protocol Showcase'
-      icon: '🤝'
-      description: 'v2 shadow for the Agent-to-Agent protocol example'
-      category: 'protocols'
-
     ucp_showcase:
       domain: 'ucp.agentcommunity.org'
-      record: 'v=aid1;u=https://ucp.agentcommunity.org/ucp;p=ucp;d=https://www.universalcommerce.io/;s=UCP Commerce Showcase'
+      record: 'v=aid2;u=https://ucp.agentcommunity.org/ucp;p=ucp;d=https://www.universalcommerce.io/;s=UCP Commerce Showcase'
       icon: '🛒'
       description: 'Universal Commerce Protocol example'
       category: 'protocols'
 
-    v2_ucp_showcase:
-      domain: 'v2-ucp.agentcommunity.org'
-      record: 'v=aid2;u=https://ucp.agentcommunity.org/ucp;p=ucp;d=https://www.universalcommerce.io/;s=UCP Commerce Showcase'
-      icon: '🛒'
-      description: 'v2 shadow for the Universal Commerce Protocol example'
-      category: 'protocols'
-
     graphql_showcase:
       domain: 'graphql.agentcommunity.org'
-      record: 'v=aid1;u=https://graphql.agentcommunity.org/graphql;p=graphql;d=https://graphql.org/;s=GraphQL Agent Showcase'
+      record: 'v=aid2;u=https://graphql.agentcommunity.org/graphql;p=graphql;d=https://graphql.org/;s=GraphQL Agent Showcase'
       icon: '◇'
       description: 'GraphQL API protocol example'
       category: 'protocols'
 
-    v2_graphql_showcase:
-      domain: 'v2-graphql.agentcommunity.org'
-      record: 'v=aid2;u=https://graphql.agentcommunity.org/graphql;p=graphql;d=https://graphql.org/;s=GraphQL Agent Showcase'
-      icon: '◇'
-      description: 'v2 shadow for the GraphQL API protocol example'
-      category: 'protocols'
-
     grpc_showcase:
       domain: 'grpc.agentcommunity.org'
-      record: 'v=aid1;u=https://grpc.agentcommunity.org;p=grpc;d=https://grpc.io/;s=gRPC Agent Showcase'
-      icon: '⚡'
-      description: 'gRPC protocol example'
-      category: 'protocols'
-
-    v2_grpc_showcase:
-      domain: 'v2-grpc.agentcommunity.org'
       record: 'v=aid2;u=https://grpc.agentcommunity.org;p=grpc;d=https://grpc.io/;s=gRPC Agent Showcase'
       icon: '⚡'
-      description: 'v2 shadow for the gRPC protocol example'
+      description: 'gRPC protocol example'
       category: 'protocols'
 
   # Error testing cases
   error_cases:
     no_server:
       domain: 'no-server.agentcommunity.org'
-      record: 'v=aid1;u=https://does-not-exist.agentcommunity.org:1234;p=mcp;s=Offline Agent'
+      record: 'v=aid2;u=https://does-not-exist.agentcommunity.org:1234;p=mcp;s=Offline Agent'
       icon: '❌'
       description: 'Non-responsive server for testing'
       category: 'error_cases'
 
-    v2_no_server:
-      domain: 'v2-no-server.agentcommunity.org'
-      record: 'v=aid2;u=https://does-not-exist.agentcommunity.org:1234;p=mcp;s=Offline Agent'
-      icon: '❌'
-      description: 'v2 shadow for non-responsive server testing'
-      category: 'error_cases'
-
     deprecated:
       domain: 'deprecated.agentcommunity.org'
-      record: 'v=aid1;u=https://api.deprecated.agentcommunity.org/mcp;p=mcp;a=pat;e=2025-12-31T23:59:59Z;d=https://docs.agentcommunity.org/migration;s=Deprecated - migrate soon'
-      icon: '⚠️'
-      description: 'Deprecated service example'
-      category: 'error_cases'
-
-    v2_deprecated:
-      domain: 'v2-deprecated.agentcommunity.org'
       record: 'v=aid2;u=https://api.deprecated.agentcommunity.org/mcp;p=mcp;a=pat;e=2025-12-31T23:59:59Z;d=https://docs.agentcommunity.org/migration;s=Deprecated - migrate soon'
       icon: '⚠️'
-      description: 'v2 shadow for the deprecated service example'
+      description: 'Deprecated service example'
       category: 'error_cases'

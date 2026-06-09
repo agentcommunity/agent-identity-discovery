@@ -17,12 +17,12 @@ How does a client, given only a domain name, discover where the agent is, what p
 A provider publishes a DNS TXT record at `_agent.<domain>`:
 
 ```
-_agent.acme.com. 300 IN TXT "v=aid1;p=mcp;u=https://agent.acme.com/mcp;k=z6MkrTQ...;i=a1;a=oauth2_code"
+_agent.acme.com. 300 IN TXT "v=aid2;p=mcp;u=https://agent.acme.com/mcp;k=Eesj9h7MD0cRERrc_ICXu5Lb1WkokpkbWAkRcDsxUvA;a=oauth2_code"
 ```
 
-That one record tells a client: the agent lives at this URL, speaks MCP, expects OAuth 2.0 code flow, and here's an Ed25519 public key you can use to verify the endpoint controls the private key. No prior enrollment. No central registry. Just DNS, which organizations already own and manage.
+That one record tells a client: the agent lives at this URL, speaks MCP, expects OAuth 2.0 code flow, and publishes an Ed25519 public key you can use to verify that the endpoint controls the corresponding private key. No prior enrollment. No central registry. Just DNS, which organizations already own and manage.
 
-The spec is at v1.2 (finalized February 2026). We have SDKs in TypeScript, Go, Python, Rust, .NET, and Java, plus a CLI validation tool called aid-doctor. The full specification and all code are at:
+The current spec is v2. We have SDKs in TypeScript, Go, Python, Rust, .NET, and Java, plus a CLI validation tool called aid-doctor. The full specification and all code are at:
 
 - Project: https://aid.agentcommunity.org
 - Specification: https://aid.agentcommunity.org/docs/specification
@@ -30,16 +30,16 @@ The spec is at v1.2 (finalized February 2026). We have SDKs in TypeScript, Go, P
 
 ## How this maps to your questions
 
-**Identification (your Question Area 2).** You ask how agents should be identified and what metadata is essential. AID's answer: anchor identity in DNS, the same way organizations already establish identity for email (SPF/DKIM), web services (TLS), and everything else. The record carries protocol, endpoint URI, auth scheme, docs URL, deprecation timestamp, and an optional public key with a rotation ID. Domain ownership is organizational identity. No new namespace needed.
+**Identification (your Question Area 2).** You ask how agents should be identified and what metadata is essential. AID's answer: anchor identity in DNS, the same way organizations already establish identity for email (SPF/DKIM), web services (TLS), and everything else. The record carries protocol, endpoint URI, auth scheme, docs URL, deprecation timestamp, and an optional public key for endpoint proof. Domain ownership is organizational identity. No new namespace needed.
 
 **Authentication (Question Area 3).** You ask what strong authentication looks like for agents and how to handle key management. AID includes a mechanism called PKA (Public Key for Agent) built on Ed25519 and HTTP Message Signatures (RFC 9421). The flow:
 
-1. Client sends a random nonce as an AID-Challenge header
-2. Server signs it with the Ed25519 private key
-3. Client verifies against the public key in DNS
-4. A 300-second freshness window prevents replay
+1. Client sends a random nonce for the PKA proof request.
+2. Server returns an RFC 9421 HTTP Message Signature over the request method, target URI, authority, and response status.
+3. Client verifies the Ed25519 signature against the public key in DNS and derives `keyid` from that key.
+4. `created`, `expires`, nonce binding, and `Cache-Control: no-store` prevent replay.
 
-Key rotation uses the `kid` field. Clients detect downgrade if a previously present PKA disappears. DNSSEC protects the key material in transit. The result: cryptographic proof that the endpoint is controlled by whoever controls that domain's DNS, with no prior trust relationship required.
+AID core publishes the current endpoint-proof key and leaves managed rotation profiles to higher layers. Clients can detect downgrade if a previously present PKA disappears. DNSSEC can protect the key material in transit. The result: cryptographic proof that the endpoint is controlled by whoever controls that domain's DNS, with no prior trust relationship required.
 
 **Authorization and zero trust (Question Area 4).** AID defines two enterprise policy modes. "Balanced" verifies PKA when present, prefers DNSSEC, allows HTTP fallback, and warns on downgrades. "Strict" requires PKA and DNSSEC, disables fallback, and fails on any downgrade. Beyond that: HTTPS is mandatory for remote agents, cross-origin redirects are blocked, and local execution requires explicit user consent, integrity fingerprinting, and sandboxing. These are the kinds of controls SP 800-207 calls for.
 

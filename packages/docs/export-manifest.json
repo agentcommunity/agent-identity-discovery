@@ -114,13 +114,13 @@
     },
     {
       "path": "specification_v2_explained.md",
-      "bytes": 32991,
-      "sha256": "cd445ace373a5424962978c2fffc3d5308919b3df0e2a375e2263dcb66f7ea20"
+      "bytes": 33560,
+      "sha256": "e1020844ec1872d2e50660ceded5d4c4c73978716c2dfc655d33d63a4d81ee8e"
     },
     {
       "path": "specification.md",
-      "bytes": 28392,
-      "sha256": "257c5570d995033d3135fe652d81737dbf5c5851ba700a1718bfe83e663d5dc4"
+      "bytes": 28301,
+      "sha256": "9dc3e69eb9d1b8f714c72b79c85cd626060c5ec5975bb802d69e7259e051d59c"
     },
     {
       "path": "Tooling/aid_doctor.md",
@@ -154,9 +154,9 @@
     },
     {
       "path": "Understand/rationale.md",
-      "bytes": 14285,
-      "sha256": "aaf570057c083bd9d81c68205287a0d2dd1947dc777f6f596beebe42ae26c470"
+      "bytes": 14814,
+      "sha256": "599a515ee2f1c179d3538459626595141a6d18c97dbbe81f6aac836e3f540814"
     }
   ],
-  "aggregateSha256": "09242224dab1ba75035b5832650503b24c40c76f7a2d015b1daf7a0edd1d356c"
+  "aggregateSha256": "80498194c1ec4db254f5d1d57ee1d6e70e429bf0eb058dec57d248b7adaaf573"
 }

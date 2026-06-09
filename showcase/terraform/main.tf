@@ -28,9 +28,9 @@ variable "record_ttl" {
 }
 
 # Optional: include protocol-specific subdomain examples like _agent._mcp.<sub> and _agent._a2a.<sub>.
-# These are NOT canonical; base `_agent.<domain>` remains primary. See spec §2.4.
+# These are NOT canonical; base `_agent.<domain>` remains primary. See spec §2.5.
 variable "include_protocol_specific" {
-  description = "If true, also create protocol-specific example records at _agent._<proto>.<sub>." 
+  description = "If true, also create protocol-specific example records at _agent._<proto>.<sub>."
   type        = bool
   default     = false
 }
@@ -47,16 +47,16 @@ locals {
   # We will define the common prefix here to keep the records clean
   record_prefix = "_agent"
 
-  # Optional protocol-specific examples (underscore form). See spec §2.4.
+  # Optional protocol-specific examples (underscore form). See spec §2.5.
   # These demonstrate exposing multiple distinct services. They are NOT the default.
   protocol_specific_records = {
     mcp_simple = {
       name  = "${local.record_prefix}._mcp.simple"
-      value = "v=aid1;u=https://api.example.com/mcp;p=mcp;s=Example via protocol-specific subdomain (optional)"
+      value = "v=aid2;u=https://api.example.com/mcp;p=mcp;s=Example via protocol-specific subdomain (optional)"
     }
     a2a_gateway = {
       name  = "${local.record_prefix}._a2a.gateway"
-      value = "v=aid1;u=https://a2a.example.com/ping;p=a2a;s=A2A gateway (optional)"
+      value = "v=aid2;u=https://a2a.example.com/ping;p=a2a;s=A2A gateway (optional)"
     }
   }
 

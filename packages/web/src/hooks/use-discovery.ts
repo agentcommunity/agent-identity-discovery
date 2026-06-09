@@ -27,7 +27,7 @@ export interface DiscoveryMetadata {
   source: 'DNS-over-HTTPS' | 'DNS';
   txtRecord?: string;
   dnssecPresent?: boolean;
-  pka?: { present: boolean; verified: boolean | null; kid: string | null };
+  pka?: { present: boolean; verified: boolean | null; keyid: string | null };
   tls?: { valid: boolean | null; daysRemaining: number | null };
 }
 
@@ -37,6 +37,28 @@ export type DiscoveryResult = Result<{ record: DiscoveryData; metadata: Discover
 // TEMPORARY backward-compat alias so that legacy imports compile during migration.
 // FIXME: remove after all call-sites adopt Result pattern.
 export type LegacyDiscoveryResult = DiscoveryResult;
+
+const toBase64Url = (bytes: Uint8Array): string => {
+  let binary = '';
+  for (const byte of bytes) {
+    binary += String.fromCodePoint(byte);
+  }
+  return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
+};
+
+const deriveAid2Keyid = async (pka: string): Promise<string | null> => {
+  if (!globalThis.crypto?.subtle) return null;
+  try {
+    const input = `{"crv":"Ed25519","kty":"OKP","x":"${pka}"}`;
+    const digest = await globalThis.crypto.subtle.digest(
+      'SHA-256',
+      new TextEncoder().encode(input),
+    );
+    return toBase64Url(new Uint8Array(digest));
+  } catch {
+    return null;
+  }
+};
 
 /**
  * React hook for performing client-side AID DNS discovery.
@@ -59,6 +81,11 @@ export function useDiscovery() {
       const reconstructedTxt = Object.entries(libResult.record)
         .map(([k, v]) => `${k}=${v as string}`)
         .join(';');
+      const pkaKeyid = parsed.pka
+        ? (parsed.v === 'aid2'
+          ? await deriveAid2Keyid(parsed.pka)
+          : (parsed.kid ?? null))
+        : null;
 
       // Format the successful result into the shape our UI expects
       const successResult: DiscoveryResult = {
@@ -79,7 +106,7 @@ export function useDiscovery() {
               ? {
                   present: true,
                   verified: null,
-                  kid: parsed.v === 'aid1' ? (parsed.kid ?? null) : null,
+                  keyid: pkaKeyid,
                 }
               : undefined,
           },
