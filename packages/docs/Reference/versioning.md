@@ -40,6 +40,7 @@ The AID specification and its surrounding tooling (libraries, validators) are ve
 - **No DNS `kid` in v2:** `kid`/`i` remains valid only for legacy `aid1` PKA.
 - **RFC 9421 endpoint proof:** v2 PKA uses nonce-bound HTTP Message Signatures with `created`, `expires`, and `Cache-Control: no-store`.
 - **Trust source:** Discovery results distinguish DNS-rooted records from `.well-known` records with `trustSource=dns` or `trustSource=well-known-tls`.
+- Optional PKA domain-binding profile (Appendix B.7): `AID-Domain` request header and `aid-pka-v2-db` tag let an endpoint consent to — or refuse — serving as the agent for the queried domain. Clients report `domainBound` on discovery results.
 
 ### v1.2.0 — Compatibility Baseline
 

@@ -104,8 +104,8 @@
     },
     {
       "path": "Reference/versioning.md",
-      "bytes": 5522,
-      "sha256": "4fb3e33d133676855021d614af766760a34fa6e7e2a4ec3f64f01f2f097b42fe"
+      "bytes": 5769,
+      "sha256": "a13bfe29b402cd252f4304c9cf28e49c3b7e1f4535b32b9cee2143c079d3a814"
     },
     {
       "path": "Reference/well_known_json.md",
@@ -119,8 +119,8 @@
     },
     {
       "path": "specification.md",
-      "bytes": 28301,
-      "sha256": "9dc3e69eb9d1b8f714c72b79c85cd626060c5ec5975bb802d69e7259e051d59c"
+      "bytes": 31267,
+      "sha256": "74dec490623a56519189bf0fb27ba0f90e75ff477ef66354b18fafc2f13998ce"
     },
     {
       "path": "Tooling/aid_doctor.md",
@@ -158,5 +158,5 @@
       "sha256": "599a515ee2f1c179d3538459626595141a6d18c97dbbe81f6aac836e3f540814"
     }
   ],
-  "aggregateSha256": "80498194c1ec4db254f5d1d57ee1d6e70e429bf0eb058dec57d248b7adaaf573"
+  "aggregateSha256": "128c6c2cb48c81a50d8d47877e9a2de052fc1e1443ad1dc7759e189fdab37d42"
 }
