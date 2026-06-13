@@ -137,7 +137,7 @@ An AID client, when given a `<domain>`, **MUST** perform these steps:
 7. Within the selected version, if exactly one valid record exists, use it. If more than one valid record exists, fail with ambiguity. Clients **MUST NOT** choose among multiple valid same-version records by DNS answer order.
 8. Process optional metadata. If `docs` (`d`) is present, clients MAY display it. If `dep` (`e`) is in the future, clients SHOULD warn. If `dep` is in the past, clients SHOULD fail gracefully.
 9. If `k` is present, perform PKA endpoint proof using Appendix B.
-10. Return the discovered endpoint, protocol, metadata, PKA state, and trust source.
+10. Return the discovered endpoint, protocol, metadata, PKA state (including the domain-binding indicator when domain binding was requested; see Appendix B.7), and trust source.
 
 Malformed answers do not matter when there is exactly one valid record in the selected version. Returning clients that previously selected `aid2` **SHOULD** treat an `aid1`-only result as a version downgrade.
 
@@ -221,7 +221,7 @@ AID's security model addresses the following threat landscape.
 
 - **DNS spoofing or cache poisoning:** DNSSEC validation, when available.
 - **Endpoint impersonation:** PKA endpoint proof with Ed25519 HTTP Message Signatures.
-- **Unauthorized association:** the optional domain-binding profile (Appendix B.7), when supported by the endpoint.
+- **Unauthorized association:** the optional domain-binding profile (Appendix B.7). This mitigation applies only when a client **requires** domain binding; merely requesting it does not stop an attacker-controlled endpoint from returning a valid unbound proof.
 - **PKA removal or key replacement:** Returning clients can detect changes when they retain previous security state.
 - **Version downgrade:** Returning clients can detect `aid2` to `aid1` downgrade when they retain previous version state.
 - **Command injection in local agents:** Local execution safeguards.
@@ -484,26 +484,29 @@ A verifier accepts a v2 PKA response only when:
 
 ### **B.7. Domain Binding (Optional Profile)**
 
-This optional profile lets an endpoint prove that it consents to serve as the agent for the queried domain, addressing the unauthorized-association gap described in Section 3.1.
+This optional profile lets an endpoint prove that it consents to serve as the agent for the queried domain, addressing the unauthorized-association gap described in Section 3.1 (What PKA Proves).
 
-A client requesting domain binding sends the canonicalized queried domain in the `AID-Domain` request header and requests an extended response signature:
+A client requesting domain binding sends the queried domain in the `AID-Domain` request header and requests an extended response signature:
 
 ```http
 AID-Domain: example.com
 Accept-Signature: aid-pka=("@method";req "@target-uri";req "@authority";req "aid-domain";req "@status");created;expires;keyid="<jwk-thumbprint>";alg="ed25519";nonce="<client-challenge>";tag="aid-pka-v2-db"
 ```
 
-The `AID-Domain` value is the queried domain in A-label form, lowercase, without a trailing dot or port.
+The `AID-Domain` value is the exact host the client queried in Section 2.3 (step 2), normalized to its A-label form per Section 2.3 (step 1), lowercased, and without a trailing dot or port. Signer and verifier **MUST** use this identical byte value.
 
-A server that supports this profile and serves the named domain responds with the Appendix B.3 shape, except that the covered components include `"aid-domain";req` after `"@authority";req` and the tag is `aid-pka-v2-db`. The `aid-domain` component is the request header field, so the signature binds the exact value the client sent.
+A server that supports this profile and serves the named domain responds with the Appendix B.3 shape, except that the covered components include `"aid-domain";req` after `"@authority";req` and the tag is `aid-pka-v2-db`. The `aid-domain` component is the request header field — its RFC 9421 component identifier is the lowercased field name `aid-domain` — so the signature binds the exact value the client sent.
 
 A server that supports this profile but does not serve the named domain **MUST NOT** produce a signature covering that `AID-Domain` value. It SHOULD respond with status `403` and no `Signature-Input` header. A server that does not support this profile ignores the header and responds with the base Appendix B.3 shape (`tag="aid-pka-v2"`), which remains a valid endpoint proof without domain binding.
+
+A response that carries no valid `aid-pka-v2` or `aid-pka-v2-db` signature — including a `403` refusal — is a failed endpoint proof under Section 3, so discovery fails whenever the selected record contains `k`. A profile-aware endpoint that refuses an unserved domain therefore causes discovery to fail for that domain, which is the intended outcome.
 
 Verifier rules, in addition to Appendix B.6:
 
 1. A response with `tag="aid-pka-v2-db"` **MUST** cover `"aid-domain";req`, and the signature base is constructed with the exact `AID-Domain` value the client sent. A response with `tag="aid-pka-v2"` **MUST NOT** cover `aid-domain`.
 2. A client that did not send `AID-Domain` **MUST** reject a `tag="aid-pka-v2-db"` response.
-3. Clients **SHOULD** surface whether the accepted proof was domain-bound, and MAY require domain binding by local policy.
+3. Clients that request domain binding **MUST** expose a boolean domain-binding indicator as part of PKA state, set `true` only when a valid `tag="aid-pka-v2-db"` proof was verified for the queried domain and `false` for a verified unbound (`tag="aid-pka-v2"`) proof.
+4. Requesting domain binding does not by itself mitigate unauthorized association, because an attacker-controlled endpoint can ignore `AID-Domain` and return a valid unbound proof. A client gains the mitigation only when it **requires** domain binding and rejects unbound proofs by local policy.
 
 Domain binding is a statement by the endpoint that it serves the named domain. It does not prove authorization, delegation, or organizational identity.
 
