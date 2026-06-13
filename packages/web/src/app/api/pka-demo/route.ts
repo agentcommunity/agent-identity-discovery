@@ -84,6 +84,8 @@ export async function GET(request: Request) {
     });
   }
 
+  // Security boundary: only an allowlisted (fixed, safe) domain reaches the signing
+  // path below, so the value placed in the signed "aid-domain" line is never attacker-controlled.
   if (requestedTag === 'aid-pka-v2-db' && aidDomain !== null && !SERVED_DOMAINS.has(aidDomain)) {
     return NextResponse.json(
       { error: `This endpoint does not serve as the agent for ${aidDomain}.` },

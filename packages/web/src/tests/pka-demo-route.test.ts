@@ -93,10 +93,73 @@ describe('/api/pka-demo', () => {
     const response = OPTIONS();
 
     expect(response.headers.get('Access-Control-Allow-Headers')).toBe(
-      'Accept-Signature, Cache-Control',
+      'Accept-Signature, Cache-Control, AID-Domain',
     );
     expect(response.headers.get('Access-Control-Expose-Headers')).toBe(
       'Signature, Signature-Input, Cache-Control',
     );
+  });
+
+  it('refuses to sign domain binding for a domain it does not serve', async () => {
+    const response = await GET(
+      new Request(PKA_DEMO_URL, {
+        headers: {
+          'Accept-Signature':
+            'aid-pka=("@method";req "@target-uri";req "@authority";req "aid-domain";req "@status");created;expires;keyid="sYkYRKJfa8y8rCgWHb-qxqR4LY93c_hbbL10YbvT88o";alg="ed25519";nonce="test-nonce-123";tag="aid-pka-v2-db"',
+          'AID-Domain': 'evil.example',
+        },
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(response.headers.get('Signature-Input')).toBeNull();
+    expect(response.headers.get('Signature')).toBeNull();
+  });
+
+  it('signs a domain-bound response for a served domain', async () => {
+    const infoResponse = await GET(new Request(PKA_DEMO_URL));
+    const info = (await infoResponse.json()) as { publicKey: string };
+
+    const response = await GET(
+      new Request(PKA_DEMO_URL, {
+        headers: {
+          'Accept-Signature':
+            'aid-pka=("@method";req "@target-uri";req "@authority";req "aid-domain";req "@status");created;expires;keyid="sYkYRKJfa8y8rCgWHb-qxqR4LY93c_hbbL10YbvT88o";alg="ed25519";nonce="test-nonce-123";tag="aid-pka-v2-db"',
+          'AID-Domain': 'aid.agentcommunity.org',
+        },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+
+    const signatureInput = response.headers.get('Signature-Input');
+    const signature = response.headers.get('Signature');
+    expect(signatureInput).toContain('tag="aid-pka-v2-db"');
+    expect(signatureInput).toContain('"aid-domain";req');
+    if (!signatureInput || !signature) throw new Error('Missing signature headers');
+
+    const signatureParams = signatureInput.replace(/^aid-pka=/, '');
+    const signatureBase = [
+      '"@method";req: GET',
+      `"@target-uri";req: ${PKA_DEMO_URL}`,
+      '"@authority";req: aid.agentcommunity.org',
+      '"aid-domain";req: aid.agentcommunity.org',
+      '"@status": 200',
+      `"@signature-params": ${signatureParams}`,
+    ].join('\n');
+    const key = createPublicKey({
+      key: { kty: 'OKP', crv: 'Ed25519', x: info.publicKey },
+      format: 'jwk',
+    });
+    expect(
+      verifySignature(
+        null,
+        Buffer.from(signatureBase, 'utf8'),
+        key,
+        Buffer.from(decodeSignatureHeader(signature)),
+      ),
+    ).toBe(true);
   });
 });
