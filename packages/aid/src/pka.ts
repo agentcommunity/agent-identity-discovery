@@ -605,6 +605,8 @@ function buildV2SignatureBase(
     if (item.name === '@target-uri') lines.push(`"@target-uri";req: ${ctx.targetUri}`);
     if (item.name === '@authority') lines.push(`"@authority";req: ${ctx.authority}`);
     if (item.name === 'aid-domain') {
+      // Fail-closed invariant: unreachable in normal flow (the tag/coverage gates in
+      // performV2PKAHandshake reject a covered aid-domain without a sent domain), kept as defense-in-depth.
       if (ctx.aidDomain === undefined) {
         throw new AidError(
           'ERR_SECURITY',

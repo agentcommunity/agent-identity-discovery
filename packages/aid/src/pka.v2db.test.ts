@@ -118,6 +118,25 @@ describe('AID v2 PKA domain binding', () => {
     ).rejects.toThrow('Signature-Input must cover required fields');
   });
 
+  it('rejects a plain aid-pka-v2 response that covers aid-domain', async () => {
+    const vector = loadVector('v2-rfc9421-response-signature');
+    const tampered: typeof vector = {
+      ...vector,
+      response: {
+        ...vector.response,
+        signature_input: vector.response.signature_input.replace(
+          '"@authority";req ',
+          '"@authority";req "aid-domain";req ',
+        ),
+      },
+    };
+    mockVectorResponse(tampered);
+
+    await expect(
+      performPKAHandshake(tampered.record.u, tampered.record.k, undefined, 'example.com'),
+    ).rejects.toThrow('Signature-Input must cover required fields');
+  });
+
   it('rejects an unrequested domain-bound response', async () => {
     const vector = loadVector('v2-db-rfc9421-domain-bound');
     mockVectorResponse(vector);
