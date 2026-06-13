@@ -6,7 +6,7 @@ import {
   SPEC_VERSION_V2,
 } from './constants';
 import { AidError, parse, AidRecordValidator, canonicalizeRaw } from './parser';
-import { performPKAHandshake } from './pka.js';
+import { performPKAHandshake, type PKAHandshakeResult } from './pka.js';
 import {
   type DiscoverySecurity,
   type DnssecPolicy,
@@ -113,13 +113,15 @@ type FetchInit = { signal?: unknown; redirect?: 'error' | 'follow' | 'manual' };
 type FetchLike = (input: string, init?: FetchInit) => Promise<ResponseLike>;
 type DnssecResponse = { Status: number; AD?: boolean };
 
-async function performPKAHandshakeForRecord(record: AidRecord): Promise<void> {
-  if (!record.pka) return;
+async function performPKAHandshakeForRecord(
+  record: AidRecord,
+  domain?: string,
+): Promise<PKAHandshakeResult | undefined> {
+  if (!record.pka) return undefined;
   if (record.v === SPEC_VERSION_V1) {
-    await performPKAHandshake(record.uri, record.pka, record.kid ?? '');
-    return;
+    return await performPKAHandshake(record.uri, record.pka, record.kid ?? '');
   }
-  await performPKAHandshake(record.uri, record.pka);
+  return await performPKAHandshake(record.uri, record.pka, undefined, domain);
 }
 
 async function queryDnssecStatus(queryName: string, timeoutMs: number): Promise<boolean | null> {
@@ -162,6 +164,7 @@ async function fetchWellKnown(
   raw: string;
   queryName: string;
   security: DiscoverySecurity;
+  pka?: PKAHandshakeResult;
 }> {
   const policy = resolveSecurityPolicy(options);
   const security = createDiscoverySecurity(policy, true);
@@ -273,9 +276,10 @@ async function fetchWellKnown(
         );
       }
     }
+    let pkaResult: PKAHandshakeResult | undefined;
     if (record.pka) {
       try {
-        await performPKAHandshakeForRecord(record);
+        pkaResult = await performPKAHandshakeForRecord(record, normalizeDomain(domain));
       } catch (pkaError) {
         // Preserve ERR_SECURITY errors from PKA verification
         if (pkaError instanceof AidError && pkaError.errorCode === 'ERR_SECURITY') {
@@ -286,7 +290,13 @@ async function fetchWellKnown(
     }
     enforcePkaPolicy(record, url, security);
     await enforceDowngradePolicy(record, url, policy, security);
-    return { record, raw: text.trim(), queryName: url, security };
+    return {
+      record,
+      raw: text.trim(),
+      queryName: url,
+      security,
+      ...(pkaResult ? { pka: pkaResult } : {}),
+    };
   } catch (e) {
     if (e instanceof AidError) {
       // Preserve ERR_SECURITY errors from PKA verification, don't convert to ERR_FALLBACK_FAILED
@@ -319,6 +329,8 @@ export interface DiscoveryResult {
   queryName: string;
   /** Security policy evaluation for the chosen result. */
   security: DiscoverySecurity;
+  /** PKA handshake outcome when the record carried a key. */
+  pka?: PKAHandshakeResult;
 }
 
 /**
@@ -410,7 +422,10 @@ export async function discover(
         }
 
         const result = selectedRecords[0];
-        await performPKAHandshakeForRecord(result.record);
+        const pkaResult = await performPKAHandshakeForRecord(
+          result.record,
+          normalizeDomain(domain),
+        );
         const security = createDiscoverySecurity(policy, false);
         enforcePkaPolicy(result.record, queryName, security);
         await enforceDowngradePolicy(result.record, queryName, policy, security);
@@ -418,7 +433,7 @@ export async function discover(
           const validated = await queryDnssecStatus(queryName, timeout);
           enforceDnssecPolicy(security, queryName, validated);
         }
-        return { ...result, security };
+        return { ...result, security, ...(pkaResult ? { pka: pkaResult } : {}) };
       }
 
       if (lastAidError) throw lastAidError;
@@ -516,12 +531,12 @@ export async function discover(
       (error.errorCode === 'ERR_NO_RECORD' || error.errorCode === 'ERR_DNS_LOOKUP_FAILED')
     ) {
       try {
-        const { record, raw, queryName, security } = await fetchWellKnown(
+        const { record, raw, queryName, security, pka } = await fetchWellKnown(
           domain,
           wellKnownTimeoutMs,
           options,
         );
-        return { record, raw, ttl: DNS_TTL_MIN, queryName, security };
+        return { record, raw, ttl: DNS_TTL_MIN, queryName, security, ...(pka ? { pka } : {}) };
       } catch (fallbackError) {
         if (fallbackError instanceof AidError) {
           // Propagate rich details from the fallback
