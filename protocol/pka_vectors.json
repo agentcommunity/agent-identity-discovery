@@ -411,6 +411,78 @@
       "expires": 1767139260,
       "nonce": "oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8",
       "expect": "pass"
+    },
+    {
+      "id": "v2-db-rfc9421-domain-bound",
+      "desc": "Valid AID v2 domain-bound response signature: aid-domain covered with ;req and tag aid-pka-v2-db",
+      "record": {
+        "v": "aid2",
+        "u": "https://api.example.com/mcp?check=1",
+        "p": "mcp",
+        "k": "ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ"
+      },
+      "key": {
+        "public_x": "ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ",
+        "jwk_thumbprint": "WWpn_pfHui9YKR4CZtQsDGMu7_Gch2zYChfSvnxgtPk",
+        "seed_b64": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA="
+      },
+      "domain": "example.com",
+      "request": {
+        "method": "GET",
+        "target_uri": "https://api.example.com/mcp?check=1",
+        "authority": "api.example.com",
+        "aid_domain": "example.com",
+        "accept_signature": "aid-pka=(\"@method\";req \"@target-uri\";req \"@authority\";req \"aid-domain\";req \"@status\");created;expires;keyid=\"WWpn_pfHui9YKR4CZtQsDGMu7_Gch2zYChfSvnxgtPk\";alg=\"ed25519\";nonce=\"oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8\";tag=\"aid-pka-v2-db\"",
+        "cache_control": "no-store"
+      },
+      "response": {
+        "status": 401,
+        "cache_control": "no-store",
+        "signature_input": "aid-pka=(\"@method\";req \"@target-uri\";req \"@authority\";req \"aid-domain\";req \"@status\");created=1767139200;expires=1767139260;keyid=\"WWpn_pfHui9YKR4CZtQsDGMu7_Gch2zYChfSvnxgtPk\";alg=\"ed25519\";nonce=\"oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8\";tag=\"aid-pka-v2-db\"",
+        "signature": "aid-pka=:IFpCJEQDXBHi7cs92Zm/DIHanJ1wlhdyKHy3fj48LV8k4cp8RPn/VmltrYuE64cfvqX825xw+qtUPXAsk+80CQ==:"
+      },
+      "covered": ["@method;req", "@target-uri;req", "@authority;req", "aid-domain;req", "@status"],
+      "signature_base": "\"@method\";req: GET\n\"@target-uri\";req: https://api.example.com/mcp?check=1\n\"@authority\";req: api.example.com\n\"aid-domain\";req: example.com\n\"@status\": 401\n\"@signature-params\": (\"@method\";req \"@target-uri\";req \"@authority\";req \"aid-domain\";req \"@status\");created=1767139200;expires=1767139260;keyid=\"WWpn_pfHui9YKR4CZtQsDGMu7_Gch2zYChfSvnxgtPk\";alg=\"ed25519\";nonce=\"oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8\";tag=\"aid-pka-v2-db\"",
+      "created": 1767139200,
+      "expires": 1767139260,
+      "nonce": "oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8",
+      "expect": "pass"
+    },
+    {
+      "id": "v2-db-missing-aid-domain-coverage",
+      "desc": "Response uses tag aid-pka-v2-db but does not cover aid-domain and must be rejected",
+      "record": {
+        "v": "aid2",
+        "u": "https://api.example.com/mcp?check=1",
+        "p": "mcp",
+        "k": "ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ"
+      },
+      "key": {
+        "public_x": "ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ",
+        "jwk_thumbprint": "WWpn_pfHui9YKR4CZtQsDGMu7_Gch2zYChfSvnxgtPk",
+        "seed_b64": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA="
+      },
+      "domain": "example.com",
+      "request": {
+        "method": "GET",
+        "target_uri": "https://api.example.com/mcp?check=1",
+        "authority": "api.example.com",
+        "aid_domain": "example.com",
+        "accept_signature": "aid-pka=(\"@method\";req \"@target-uri\";req \"@authority\";req \"aid-domain\";req \"@status\");created;expires;keyid=\"WWpn_pfHui9YKR4CZtQsDGMu7_Gch2zYChfSvnxgtPk\";alg=\"ed25519\";nonce=\"oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8\";tag=\"aid-pka-v2-db\"",
+        "cache_control": "no-store"
+      },
+      "response": {
+        "status": 401,
+        "cache_control": "no-store",
+        "signature_input": "aid-pka=(\"@method\";req \"@target-uri\";req \"@authority\";req \"@status\");created=1767139200;expires=1767139260;keyid=\"WWpn_pfHui9YKR4CZtQsDGMu7_Gch2zYChfSvnxgtPk\";alg=\"ed25519\";nonce=\"oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8\";tag=\"aid-pka-v2-db\"",
+        "signature": "aid-pka=:/KvRsdnIHSUp/aMK+82dE2MtoLbo0qVWKk9hF/lFi9NW2eiljPxZIgY0HXOddhEdwTu7m1NTAHDM1CTA425DCA==:"
+      },
+      "covered": ["@method;req", "@target-uri;req", "@authority;req", "@status"],
+      "signature_base": "\"@method\";req: GET\n\"@target-uri\";req: https://api.example.com/mcp?check=1\n\"@authority\";req: api.example.com\n\"@status\": 401\n\"@signature-params\": (\"@method\";req \"@target-uri\";req \"@authority\";req \"@status\");created=1767139200;expires=1767139260;keyid=\"WWpn_pfHui9YKR4CZtQsDGMu7_Gch2zYChfSvnxgtPk\";alg=\"ed25519\";nonce=\"oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8\";tag=\"aid-pka-v2-db\"",
+      "created": 1767139200,
+      "expires": 1767139260,
+      "nonce": "oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8",
+      "expect": "fail"
     }
   ]
 }
