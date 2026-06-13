@@ -168,7 +168,9 @@ describe('AID v2 PKA handshake', () => {
       },
     );
 
-    await expect(performPKAHandshake(vector.record.u, vector.record.k)).resolves.toBeUndefined();
+    await expect(performPKAHandshake(vector.record.u, vector.record.k)).resolves.toEqual({
+      domainBound: false,
+    });
   });
 
   it('canonicalizes uppercase hosts, default ports, query, and fragments for @target-uri', async () => {
@@ -207,7 +209,9 @@ describe('AID v2 PKA handshake', () => {
       },
     );
 
-    await expect(performPKAHandshake(vector.record.u, vector.record.k)).resolves.toBeUndefined();
+    await expect(performPKAHandshake(vector.record.u, vector.record.k)).resolves.toEqual({
+      domainBound: false,
+    });
   });
 
   it('rejects aid2 PKA responses without Cache-Control: no-store', async () => {

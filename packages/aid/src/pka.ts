@@ -86,6 +86,24 @@ function asciiLowerCase(s: string): string {
   return res;
 }
 
+export interface PKAHandshakeResult {
+  /** True when the endpoint signed the AID-Domain binding for the queried domain. */
+  domainBound: boolean;
+}
+
+export const AID_DOMAIN_HEADER = 'AID-Domain';
+const AID_PKA_TAG_V2 = 'aid-pka-v2';
+const AID_PKA_TAG_V2_DB = 'aid-pka-v2-db';
+
+export function canonicalizeAidDomain(domain: string): string {
+  let value = asciiLowerCase(domain.trim());
+  if (value.endsWith('.')) value = value.slice(0, -1);
+  if (!value || !/^[a-z0-9.:[\]_-]+$/.test(value)) {
+    throw new AidError('ERR_SECURITY', 'Invalid AID-Domain value');
+  }
+  return value;
+}
+
 // Minimal types to avoid DOM deps
 interface HeaderLike {
   get(name: string): string | null | undefined;
@@ -439,7 +457,7 @@ function parseSignatureParams(
 
 interface V2CoveredItem {
   raw: string;
-  name: '@method' | '@target-uri' | '@authority' | '@status';
+  name: '@method' | '@target-uri' | '@authority' | '@status' | 'aid-domain';
   req: boolean;
 }
 
@@ -461,7 +479,7 @@ function parseV2CoveredItem(raw: string): V2CoveredItem {
   const name = match[1] as V2CoveredItem['name'];
   const params = match[2] ? match[2].split(';').filter(Boolean) : [];
 
-  if (!['@method', '@target-uri', '@authority', '@status'].includes(name)) {
+  if (!['@method', '@target-uri', '@authority', '@status', 'aid-domain'].includes(name)) {
     throw new AidError('ERR_SECURITY', `Unsupported covered field: ${name}`);
   }
   const reqCount = params.filter((param) => param === 'req').length;
@@ -472,19 +490,20 @@ function parseV2CoveredItem(raw: string): V2CoveredItem {
   return { raw, name, req: reqCount === 1 };
 }
 
-function validateV2CoveredSet(covered: V2CoveredItem[]): void {
-  if (covered.length !== 4) {
-    throw new AidError('ERR_SECURITY', 'Signature-Input must cover required fields');
-  }
-
+function validateV2CoveredSet(covered: V2CoveredItem[], domainBound: boolean): void {
   const expected = new Map<V2CoveredItem['name'], boolean>([
     ['@method', true],
     ['@target-uri', true],
     ['@authority', true],
     ['@status', false],
   ]);
-  const seen = new Set<string>();
+  if (domainBound) expected.set('aid-domain', true);
 
+  if (covered.length !== expected.size) {
+    throw new AidError('ERR_SECURITY', 'Signature-Input must cover required fields');
+  }
+
+  const seen = new Set<string>();
   for (const item of covered) {
     if (seen.has(item.name) || expected.get(item.name) !== item.req) {
       throw new AidError('ERR_SECURITY', 'Signature-Input must cover required fields');
@@ -511,7 +530,6 @@ function parseV2SignatureHeaders(headers: HeaderLike): V2SignatureHeaders {
   const coveredRaw = signatureParamsRaw.slice(1, closeIndex).trim();
   const paramsRaw = signatureParamsRaw.slice(closeIndex + 1);
   const covered = splitInnerListItems(coveredRaw).map(parseV2CoveredItem);
-  validateV2CoveredSet(covered);
 
   const params = parseSignatureParams(paramsRaw);
   const createdRaw = params.get('created')?.rawValue;
@@ -533,6 +551,8 @@ function parseV2SignatureHeaders(headers: HeaderLike): V2SignatureHeaders {
   if (!/^\d+$/.test(createdRaw) || !/^\d+$/.test(expiresRaw)) {
     throw new AidError('ERR_SECURITY', 'Invalid Signature-Input timestamp');
   }
+
+  validateV2CoveredSet(covered, tag === AID_PKA_TAG_V2_DB);
 
   const signatureRaw = extractDictionaryMember(sig, 'aid-pka');
   const sigMatch = /^:\s*([^:]+?)\s*:$/.exec(signatureRaw);
@@ -577,13 +597,22 @@ function requestAuthority(uri: string): string {
 function buildV2SignatureBase(
   covered: V2CoveredItem[],
   signatureParamsRaw: string,
-  ctx: { method: string; targetUri: string; authority: string; status: number },
+  ctx: { method: string; targetUri: string; authority: string; status: number; aidDomain?: string },
 ): Uint8Array {
   const lines: string[] = [];
   for (const item of covered) {
     if (item.name === '@method') lines.push(`"@method";req: ${ctx.method}`);
     if (item.name === '@target-uri') lines.push(`"@target-uri";req: ${ctx.targetUri}`);
     if (item.name === '@authority') lines.push(`"@authority";req: ${ctx.authority}`);
+    if (item.name === 'aid-domain') {
+      if (ctx.aidDomain === undefined) {
+        throw new AidError(
+          'ERR_SECURITY',
+          'Signature covers aid-domain but no AID-Domain was sent',
+        );
+      }
+      lines.push(`"aid-domain";req: ${ctx.aidDomain}`);
+    }
     if (item.name === '@status') lines.push(`"@status": ${ctx.status}`);
   }
   lines.push(`"@signature-params": ${signatureParamsRaw}`);
@@ -604,8 +633,12 @@ async function deriveAid2KeyMaterial(
   return { publicKey, keyid: uint8ToBase64Url(new Uint8Array(digest)) };
 }
 
-function buildAcceptSignatureV2(keyid: string, nonce: string): string {
-  return `aid-pka=("@method";req "@target-uri";req "@authority";req "@status");created;expires;keyid="${keyid}";alg="ed25519";nonce="${nonce}";tag="aid-pka-v2"`;
+function buildAcceptSignatureV2(keyid: string, nonce: string, domainBound: boolean): string {
+  const covered = domainBound
+    ? '("@method";req "@target-uri";req "@authority";req "aid-domain";req "@status")'
+    : '("@method";req "@target-uri";req "@authority";req "@status")';
+  const tag = domainBound ? AID_PKA_TAG_V2_DB : AID_PKA_TAG_V2;
+  return `aid-pka=${covered};created;expires;keyid="${keyid}";alg="ed25519";nonce="${nonce}";tag="${tag}"`;
 }
 
 async function performV1PKAHandshake(uri: string, pka: string, kid: string): Promise<void> {
@@ -666,11 +699,16 @@ async function performV1PKAHandshake(uri: string, pka: string, kid: string): Pro
   if (!ok) throw new AidError('ERR_SECURITY', 'PKA signature verification failed');
 }
 
-async function performV2PKAHandshake(uri: string, pka: string): Promise<void> {
+async function performV2PKAHandshake(
+  uri: string,
+  pka: string,
+  domain?: string,
+): Promise<PKAHandshakeResult> {
   const cryptoImpl: CryptoLike =
     (globalThis as unknown as { crypto?: CryptoLike }).crypto ??
     (nodeWebcrypto as unknown as CryptoLike);
   const { publicKey, keyid: expectedKeyid } = await deriveAid2KeyMaterial(pka, cryptoImpl);
+  const canonicalDomain = domain === undefined ? undefined : canonicalizeAidDomain(domain);
   const nonce = uint8ToBase64Url(cryptoImpl.getRandomValues(new Uint8Array(32)));
   const requestUri = normalizeRequestUri(uri);
   const authority = requestAuthority(requestUri);
@@ -684,8 +722,13 @@ async function performV2PKAHandshake(uri: string, pka: string): Promise<void> {
     res = await fetchImpl(requestUri, {
       method: 'GET',
       headers: {
-        'Accept-Signature': buildAcceptSignatureV2(expectedKeyid, nonce),
+        'Accept-Signature': buildAcceptSignatureV2(
+          expectedKeyid,
+          nonce,
+          canonicalDomain !== undefined,
+        ),
         'Cache-Control': 'no-store',
+        ...(canonicalDomain !== undefined ? { [AID_DOMAIN_HEADER]: canonicalDomain } : {}),
       },
       redirect: 'error',
     });
@@ -718,8 +761,12 @@ async function performV2PKAHandshake(uri: string, pka: string): Promise<void> {
   if (!timingSafeEqual(parsed.nonce, nonce)) {
     throw new AidError('ERR_SECURITY', 'Signature nonce mismatch');
   }
-  if (!timingSafeEqual(parsed.tag, 'aid-pka-v2')) {
+  const isDomainBound = timingSafeEqual(parsed.tag, AID_PKA_TAG_V2_DB);
+  if (!isDomainBound && !timingSafeEqual(parsed.tag, AID_PKA_TAG_V2)) {
     throw new AidError('ERR_SECURITY', 'Invalid signature tag');
+  }
+  if (isDomainBound && canonicalDomain === undefined) {
+    throw new AidError('ERR_SECURITY', 'Unrequested domain-bound signature tag');
   }
 
   const base = buildV2SignatureBase(parsed.covered, parsed.signatureParamsRaw, {
@@ -727,18 +774,25 @@ async function performV2PKAHandshake(uri: string, pka: string): Promise<void> {
     targetUri: requestUri,
     authority,
     status: res.status,
+    ...(canonicalDomain !== undefined ? { aidDomain: canonicalDomain } : {}),
   });
   const key = await cryptoImpl.subtle.importKey('raw', publicKey, { name: 'Ed25519' }, false, [
     'verify',
   ]);
   const ok = await cryptoImpl.subtle.verify('Ed25519', key, parsed.signature, base);
   if (!ok) throw new AidError('ERR_SECURITY', 'PKA signature verification failed');
+  return { domainBound: isDomainBound };
 }
 
-export async function performPKAHandshake(uri: string, pka: string, kid?: string): Promise<void> {
+export async function performPKAHandshake(
+  uri: string,
+  pka: string,
+  kid?: string,
+  domain?: string,
+): Promise<PKAHandshakeResult> {
   if (kid !== undefined) {
     await performV1PKAHandshake(uri, pka, kid);
-    return;
+    return { domainBound: false };
   }
-  await performV2PKAHandshake(uri, pka);
+  return await performV2PKAHandshake(uri, pka, domain);
 }
