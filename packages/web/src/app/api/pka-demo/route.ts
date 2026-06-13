@@ -51,6 +51,8 @@ export async function GET(request: Request) {
   const acceptSignature = request.headers.get('accept-signature');
   const v2Nonce = extractNonce(acceptSignature);
   const requestedTag = extractTag(acceptSignature);
+  // The AID SDK pre-canonicalizes AID-Domain (A-label, lowercased, no trailing dot/port).
+  // This trim+lowercase is belt-and-suspenders for the ASCII-only showcase domains in SERVED_DOMAINS.
   const aidDomain = request.headers.get('aid-domain')?.trim().toLowerCase() ?? null;
   const boundDomain = requestedTag === 'aid-pka-v2-db' && aidDomain !== null ? aidDomain : null;
 

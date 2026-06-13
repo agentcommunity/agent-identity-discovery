@@ -331,6 +331,8 @@ export async function runCheck(domain: string, opts: CheckOptions): Promise<Doct
         if (record.v === 'aid1') {
           await performPKAHandshake(record.uri, record.pka, record.kid ?? '');
         } else {
+          // Sends AID-Domain so the endpoint can prove/refuse the binding; the domainBound
+          // result is verified but not yet surfaced in the doctor report (deferred follow-up).
           await performPKAHandshake(record.uri, record.pka, undefined, normalizeDomainHost(domain));
         }
         report.pka.verified = true;

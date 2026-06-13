@@ -89,4 +89,37 @@ describe('PKA domain binding integration', () => {
     expect(sawAidDomain).toBe('example.com');
     expect(result.pka).toEqual({ domainBound: true });
   });
+
+  it('fails discovery when the endpoint refuses domain binding', async () => {
+    const kp = await nodeWebcrypto.subtle.generateKey('Ed25519', true, ['sign', 'verify']);
+    const rawPub = new Uint8Array(await nodeWebcrypto.subtle.exportKey('raw', kp.publicKey));
+    const x = b64url(rawPub);
+
+    g.fetch = vi.fn(async (url: string) => {
+      if (url.includes('/.well-known/agent')) {
+        return {
+          ok: true,
+          status: 200,
+          headers: {
+            get: (n: string) => (n.toLowerCase() === 'content-type' ? 'application/json' : null),
+          },
+          text: async () =>
+            JSON.stringify({ v: 'aid2', u: 'https://api.example.com/mcp', p: 'mcp', k: x }),
+        };
+      }
+      // Endpoint refuses to attest for the queried domain: 403 with no signature headers.
+      return {
+        ok: false,
+        status: 403,
+        headers: {
+          get: (name: string) => (name.toLowerCase() === 'cache-control' ? 'no-store' : null),
+        },
+        text: async () => '',
+      };
+    });
+
+    await expect(discover('example.com', { wellKnownFallback: true })).rejects.toMatchObject({
+      errorCode: 'ERR_SECURITY',
+    });
+  });
 });
