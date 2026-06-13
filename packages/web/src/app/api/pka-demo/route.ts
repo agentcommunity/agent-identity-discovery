@@ -10,6 +10,17 @@ const PUBLIC_KEY_X = 'Eesj9h7MD0cRERrc_ICXu5Lb1WkokpkbWAkRcDsxUvA';
 const KEYID = 'sYkYRKJfa8y8rCgWHb-qxqR4LY93c_hbbL10YbvT88o';
 
 const V2_COVERED = '("@method";req "@target-uri";req "@authority";req "@status")';
+const V2_COVERED_DB =
+  '("@method";req "@target-uri";req "@authority";req "aid-domain";req "@status")';
+
+// Domains this endpoint agrees to serve as an agent for (AID domain binding).
+const SERVED_DOMAINS = new Set([
+  'agentcommunity.org',
+  'aid.agentcommunity.org',
+  'pka-basic.agentcommunity.org',
+  'localhost',
+  '127.0.0.1',
+]);
 
 let cachedKey: CryptoKey | null = null;
 
@@ -31,9 +42,17 @@ function extractNonce(acceptSignature: string | null): string | null {
   return /(?:^|;)\s*nonce="([^"]+)"/.exec(acceptSignature)?.[1] ?? null;
 }
 
+function extractTag(acceptSignature: string | null): string | null {
+  if (!acceptSignature) return null;
+  return /(?:^|;)\s*tag="([^"]+)"/.exec(acceptSignature)?.[1] ?? null;
+}
+
 export async function GET(request: Request) {
   const acceptSignature = request.headers.get('accept-signature');
   const v2Nonce = extractNonce(acceptSignature);
+  const requestedTag = extractTag(acceptSignature);
+  const aidDomain = request.headers.get('aid-domain')?.trim().toLowerCase() ?? null;
+  const boundDomain = requestedTag === 'aid-pka-v2-db' && aidDomain !== null ? aidDomain : null;
 
   if (!v2Nonce) {
     if (acceptSignature || request.headers.has('aid-challenge')) {
@@ -65,6 +84,16 @@ export async function GET(request: Request) {
     });
   }
 
+  if (requestedTag === 'aid-pka-v2-db' && aidDomain !== null && !SERVED_DOMAINS.has(aidDomain)) {
+    return NextResponse.json(
+      { error: `This endpoint does not serve as the agent for ${aidDomain}.` },
+      {
+        status: 403,
+        headers: { 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' },
+      },
+    );
+  }
+
   const url = new URL(request.url);
   const targetUri = url.toString();
   const method = 'GET';
@@ -75,11 +104,14 @@ export async function GET(request: Request) {
   const authority = url.port
     ? `${url.hostname.toLowerCase()}:${url.port}`
     : url.hostname.toLowerCase();
-  const sigInputValue = `${V2_COVERED};created=${nowSec};expires=${expires};keyid="${KEYID}";alg="ed25519";nonce="${v2Nonce}";tag="aid-pka-v2"`;
+  const covered = boundDomain === null ? V2_COVERED : V2_COVERED_DB;
+  const tag = boundDomain === null ? 'aid-pka-v2' : 'aid-pka-v2-db';
+  const sigInputValue = `${covered};created=${nowSec};expires=${expires};keyid="${KEYID}";alg="ed25519";nonce="${v2Nonce}";tag="${tag}"`;
   const lines = [
     `"@method";req: ${method}`,
     `"@target-uri";req: ${targetUri}`,
     `"@authority";req: ${authority}`,
+    ...(boundDomain === null ? [] : [`"aid-domain";req: ${boundDomain}`]),
     `"@status": ${status}`,
     `"@signature-params": ${sigInputValue}`,
   ];
@@ -112,7 +144,7 @@ export function OPTIONS() {
     headers: {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Accept-Signature, Cache-Control',
+      'Access-Control-Allow-Headers': 'Accept-Signature, Cache-Control, AID-Domain',
       'Access-Control-Expose-Headers': 'Signature, Signature-Input, Cache-Control',
       'Access-Control-Max-Age': '86400',
     },

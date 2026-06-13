@@ -9,6 +9,18 @@ import { runProtocolProbe } from './protoProbe';
 import { ERROR_MESSAGES } from './error_messages';
 import { findLongKeyNames } from './generator';
 
+/**
+ * Normalize a discovery domain to its bare host for the AID-Domain binding
+ * header (strips any port / scheme), mirroring the client SDK's normalizeDomain.
+ */
+function normalizeDomainHost(domain: string): string {
+  try {
+    return new URL(`http://${domain}`).hostname;
+  } catch {
+    return domain;
+  }
+}
+
 // --- PKA key identity helpers (mirrors aid-doctor/src/cache.ts) ---
 
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
@@ -319,7 +331,7 @@ export async function runCheck(domain: string, opts: CheckOptions): Promise<Doct
         if (record.v === 'aid1') {
           await performPKAHandshake(record.uri, record.pka, record.kid ?? '');
         } else {
-          await performPKAHandshake(record.uri, record.pka);
+          await performPKAHandshake(record.uri, record.pka, undefined, normalizeDomainHost(domain));
         }
         report.pka.verified = true;
       } catch (e) {
