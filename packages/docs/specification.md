@@ -136,7 +136,7 @@ An AID client, when given a `<domain>`, **MUST** perform these steps:
 6. Select the highest supported valid version allowed by local policy. Clients that support `aid2` **SHOULD** prefer `aid2` over `aid1`.
 7. Within the selected version, if exactly one valid record exists, use it. If more than one valid record exists, fail with ambiguity. Clients **MUST NOT** choose among multiple valid same-version records by DNS answer order.
 8. Process optional metadata. If `docs` (`d`) is present, clients MAY display it. If `dep` (`e`) is in the future, clients SHOULD warn. If `dep` is in the past, clients SHOULD fail gracefully.
-9. If `k` is present, perform PKA endpoint proof using Appendix B.
+9. If `k` is present, perform PKA endpoint proof using Appendix B. For `aid2` records, clients **SHOULD** request domain binding by sending the `AID-Domain` header (the A-label, lowercased, portless queried host from step 1) as described in Appendix B.7, unless local policy disables it (Section 3.3, `domain-binding=off`).
 10. Return the discovered endpoint, protocol, metadata, PKA state (including the domain-binding indicator when domain binding was requested; see Appendix B.7), and trust source.
 
 Malformed answers do not matter when there is exactly one valid record in the selected version. Returning clients that previously selected `aid2` **SHOULD** treat an `aid1`-only result as a version downgrade.
@@ -242,6 +242,7 @@ Clients that expose enterprise controls **SHOULD** provide simple policy knobs:
 - **DNSSEC policy:** `off | prefer | require`
 - **Well-known policy:** `auto | disable`
 - **Downgrade policy:** `off | warn | fail`
+- **Domain-binding policy:** `off | prefer | require`
 
 Policy semantics:
 
@@ -249,6 +250,11 @@ Policy semantics:
 - `dnssec=require`: discovery fails when DNSSEC validation is unavailable or unsuccessful for the selected DNS answer.
 - `well-known=disable`: clients do not use `/.well-known/agent`.
 - `downgrade=warn|fail`: applies to PKA removal, key replacement, and `aid2` to `aid1` downgrade when previous state exists.
+- `domain-binding=off`: the client does not send `AID-Domain` on PKA requests.
+- `domain-binding=prefer` (default): the client sends `AID-Domain`. A domain-bound proof (`tag="aid-pka-v2-db"`) is recorded as such; an unbound proof (`tag="aid-pka-v2"`) is still accepted. `prefer` records the outcome but does not enforce it.
+- `domain-binding=require`: when an endpoint proof is performed for a record containing `k`, discovery fails unless the proof is domain-bound (`tag="aid-pka-v2-db"`). This is the only mode that mitigates unauthorized association (Section 3.1, Appendix B.7); merely sending `AID-Domain` does not. Has no effect when no `k` is present or PKA yields no proof. `pka=require` and `domain-binding=require` compose: `pka=require` fails first when `k` is absent, then `domain-binding=require` enforces binding on the resulting proof.
+
+When a record is discovered through the `.well-known` fallback (`trustSource=well-known-tls`, Appendix C), the queried host and the TLS-validated host are the same origin, so an `AID-Domain` binding there is largely redundant with TLS host validation. Clients still send `AID-Domain` and `domain-binding=require` still enforces, but the binding adds little beyond TLS in that path.
 
 If discovery succeeds only through `.well-known`, the result cannot satisfy `dnssec=require`.
 
