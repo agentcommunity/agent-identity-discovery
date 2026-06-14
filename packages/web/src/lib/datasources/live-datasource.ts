@@ -1,5 +1,6 @@
 import { discover } from '@agentcommunity/aid/browser';
 import type { DiscoveryResult } from '@/hooks/use-discovery';
+import { buildPkaMetadata } from '@/hooks/use-discovery';
 import type { HandshakeResult, HandshakeSuccessData } from '@/hooks/use-connection';
 import type { Datasource, HandshakeOptions } from './types';
 
@@ -33,6 +34,9 @@ export class LiveDatasource implements Datasource {
             recordType: 'TXT',
             source: 'DNS-over-HTTPS',
             txtRecord: reconstructedTxt,
+            pka: record.pka
+              ? buildPkaMetadata(record as Parameters<typeof buildPkaMetadata>[0], libResult)
+              : undefined,
           },
         },
       };
