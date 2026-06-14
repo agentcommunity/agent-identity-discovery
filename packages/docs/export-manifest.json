@@ -84,8 +84,8 @@
     },
     {
       "path": "Reference/pka.md",
-      "bytes": 8809,
-      "sha256": "95456fa12bad807148ae55f5745604f9ae7e481f51747c638aba95ed099ed1bf"
+      "bytes": 8810,
+      "sha256": "016ba9db578ba93ed42d25632657abb287435d0981a662ab3f25adadba59d0ac"
     },
     {
       "path": "Reference/protocols.md",
@@ -94,8 +94,8 @@
     },
     {
       "path": "Reference/security.md",
-      "bytes": 11917,
-      "sha256": "37519eb2c7b93a29d49ba4b71fbcd7cb616408b0ee9f147d8498a74e0881612a"
+      "bytes": 12335,
+      "sha256": "9d087862dfa93d81dd3e92042bd2d86d5b07f412e4fff171760555f4e7cd31af"
     },
     {
       "path": "Reference/troubleshooting.md",
@@ -158,5 +158,5 @@
       "sha256": "599a515ee2f1c179d3538459626595141a6d18c97dbbe81f6aac836e3f540814"
     }
   ],
-  "aggregateSha256": "4107e33a246b0d091181a1209f2979b80c0001607a23aff14351b12481107ce0"
+  "aggregateSha256": "191f6b0ace36bfe7d14480dd09abc47a86c8fb54705404b0c687aca57209840e"
 }
