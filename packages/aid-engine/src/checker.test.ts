@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { performPKAHandshake } from '@agentcommunity/aid';
 
 let nextDiscovery: any;
 
@@ -19,7 +20,7 @@ vi.mock('@agentcommunity/aid', () => {
   return {
     AidError,
     enforceRedirectPolicy: vi.fn().mockResolvedValue(undefined),
-    performPKAHandshake: vi.fn().mockResolvedValue(undefined),
+    performPKAHandshake: vi.fn().mockResolvedValue({ domainBound: false }),
   };
 });
 
@@ -160,5 +161,20 @@ describe('runCheck security-state downgrade cache', () => {
       keyid: ZERO_THUMBPRINT,
       jwkX: ZERO_JWK_X,
     });
+  });
+
+  it('records domainBound from the v2 handshake result', async () => {
+    const mockedPerformPKAHandshake = vi.mocked(performPKAHandshake);
+    mockedPerformPKAHandshake.mockResolvedValueOnce({ domainBound: true });
+    nextDiscovery = discovery({
+      v: 'aid2',
+      uri: 'https://api.example.com/mcp',
+      proto: 'mcp',
+      pka: ZERO_JWK_X,
+    });
+
+    const report = await check();
+
+    expect(report.pka.domainBound).toBe(true);
   });
 });

@@ -165,6 +165,7 @@ function initReport(domain: string, protocol?: string): DoctorReport {
       present: false,
       attempted: false,
       verified: null,
+      domainBound: null,
       kid: null,
       keyid: null,
       alg: null,
@@ -330,10 +331,17 @@ export async function runCheck(domain: string, opts: CheckOptions): Promise<Doct
       try {
         if (record.v === 'aid1') {
           await performPKAHandshake(record.uri, record.pka, record.kid ?? '');
+          report.pka.domainBound = false; // v1 never domain-binds
         } else {
           // Sends AID-Domain so the endpoint can prove/refuse the binding; the domainBound
-          // result is verified but not yet surfaced in the doctor report (deferred follow-up).
-          await performPKAHandshake(record.uri, record.pka, undefined, normalizeDomainHost(domain));
+          // result is captured in the doctor report.
+          const pkaResult = await performPKAHandshake(
+            record.uri,
+            record.pka,
+            undefined,
+            normalizeDomainHost(domain),
+          );
+          report.pka.domainBound = pkaResult.domainBound;
         }
         report.pka.verified = true;
       } catch (e) {

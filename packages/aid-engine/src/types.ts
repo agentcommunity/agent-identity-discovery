@@ -82,6 +82,7 @@ export interface PkaBlock {
   present: boolean;
   attempted: boolean;
   verified: boolean | null;
+  domainBound?: boolean | null;
   kid: string | null;
   keyid: string | null;
   alg: string | null;
