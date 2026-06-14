@@ -163,6 +163,24 @@ describe('runCheck security-state downgrade cache', () => {
     });
   });
 
+  it('detects domain-binding loss when previous was bound and current is unbound', async () => {
+    const mockedPerformPKAHandshake = vi.mocked(performPKAHandshake);
+    // Current handshake returns domainBound:false
+    mockedPerformPKAHandshake.mockResolvedValueOnce({ domainBound: false });
+    nextDiscovery = discovery({
+      v: 'aid2',
+      uri: 'https://api.example.com/mcp',
+      proto: 'mcp',
+      pka: ZERO_JWK_X,
+    });
+
+    // Previous entry was domain-bound with the same key
+    const report = await check(previousAid2({ domainBound: true }));
+
+    expect(report.downgrade.status).toBe('binding_loss');
+    expect(report.record.warnings.some((w) => w.code === 'BINDING_LOSS')).toBe(true);
+  });
+
   it('records domainBound from the v2 handshake result', async () => {
     const mockedPerformPKAHandshake = vi.mocked(performPKAHandshake);
     mockedPerformPKAHandshake.mockResolvedValueOnce({ domainBound: true });

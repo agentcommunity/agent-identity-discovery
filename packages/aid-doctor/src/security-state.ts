@@ -71,6 +71,11 @@ export function applySecurityState(
         code: 'PKA_ADDED',
         message: 'PKA endpoint proof was added since the previous check.',
       },
+      binding_loss: {
+        code: 'BINDING_LOSS',
+        message:
+          'Domain-binding proof was present in the previous check but is now absent (endpoint-proof only).',
+      },
     };
   const warning = warningByStatus[status];
   if (warning) {

@@ -95,6 +95,7 @@ type SecurityChangeStatus =
   | 'pka_removed'
   | 'key_replaced'
   | 'version_downgrade'
+  | 'binding_loss'
   | 'fallback_well_known_tls';
 
 /**
@@ -124,6 +125,13 @@ function classifySecurityChange(
   const currentKey = current.keyid ?? derivePkaKeyid(current.pka)?.keyid ?? current.pka;
   if (previousKey && currentKey && previousKey !== currentKey) {
     return 'key_replaced';
+  }
+
+  // Binding loss is warning-only. Keep it AFTER the fail-eligible branches above so
+  // it can never mask a higher-severity downgrade (key replacement, version drop,
+  // pka removal) — otherwise it would open a downgrade-evasion path.
+  if (previous.domainBound === true && current.domainBound === false) {
+    return 'binding_loss';
   }
 
   return 'no_change';
@@ -372,6 +380,7 @@ export async function runCheck(domain: string, opts: CheckOptions): Promise<Doct
         kid: record.v === 'aid1' ? (record.kid ?? null) : null,
         keyid: keyMaterial?.keyid ?? null,
         jwkX: keyMaterial?.jwkX ?? null,
+        domainBound: report.pka.domainBound ?? null,
         hash: null,
       };
 
@@ -420,6 +429,13 @@ export async function runCheck(domain: string, opts: CheckOptions): Promise<Doct
           report.record.warnings.push({
             code: 'PKA_ADDED',
             message: 'Endpoint proof (PKA) is now present where it was previously absent.',
+          });
+          break;
+        case 'binding_loss':
+          report.record.warnings.push({
+            code: 'BINDING_LOSS',
+            message:
+              'Domain-binding proof was present in the previous check but is now absent (endpoint-proof only).',
           });
           break;
         default:
