@@ -158,10 +158,12 @@ function formatPkaStatus(
     | {
         present?: boolean;
         verified?: boolean | null;
+        domainBound?: boolean;
       }
     | undefined,
 ): string {
   if (!pka?.present) return 'Not present';
+  if (pka.verified === true && pka.domainBound === true) return 'Domain-bound';
   if (pka.verified === true) return 'Verified';
   if (pka.verified === false) return 'Verification failed';
   return 'Present (verification unknown)';

@@ -89,6 +89,22 @@ describe('chat-engine signal builders', () => {
     expect(signal.title.toLowerCase()).toContain('authentication required');
   });
 
+  it('shows Domain-bound in PKA detail when domainBound is true', () => {
+    const result = discoveryOk();
+    if (!result.ok) throw new Error('Expected successful discovery fixture');
+    result.value.metadata.pka = {
+      present: true,
+      verified: true,
+      domainBound: true,
+      keyid: 'abc123',
+    };
+
+    const signal = buildDiscoveryResultSignal('example.com', result);
+    const pkaDetail = signal.details?.find((d) => d.label === 'PKA');
+    expect(pkaDetail).toBeDefined();
+    expect(pkaDetail?.value).toContain('Domain-bound');
+  });
+
   it('builds auth-retry success signal', () => {
     const handshake: HandshakeResult = {
       ok: true,
