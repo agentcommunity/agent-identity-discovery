@@ -64,18 +64,18 @@
     },
     {
       "path": "Reference/discovery_api.md",
-      "bytes": 4617,
-      "sha256": "24adba2661201c9382fcef64f6fb18282419e13a66e34538c834c4c9e00b9576"
+      "bytes": 5685,
+      "sha256": "80ddf2513ea6ef44181cfe5e91c53570f9c6294781d37e2b2419f939b4af80e9"
     },
     {
       "path": "Reference/enterprise_rollout.md",
-      "bytes": 7434,
-      "sha256": "ffde28e51d06864d98643d020dac572f233c433d5ae61114bdc53e95d4641f97"
+      "bytes": 7874,
+      "sha256": "314d77f77bb69f271df2bd6dcee4f0f33d9688a88091d7537f226cd22f659599"
     },
     {
       "path": "Reference/identity_pka.md",
-      "bytes": 7173,
-      "sha256": "660883270d42a1100cf16791f1bec346167d84dac30f11c4d089570b66552b74"
+      "bytes": 8815,
+      "sha256": "2d555653a440fff4408dca0646471794bf4659454c9ae48bb6ca25a768596ef1"
     },
     {
       "path": "Reference/packages.md",
@@ -84,8 +84,8 @@
     },
     {
       "path": "Reference/pka.md",
-      "bytes": 6058,
-      "sha256": "7cd853f3cece732f080e6074f9ed734f366eb4d4dc83ade3f38bc12bb4d7b934"
+      "bytes": 8809,
+      "sha256": "95456fa12bad807148ae55f5745604f9ae7e481f51747c638aba95ed099ed1bf"
     },
     {
       "path": "Reference/protocols.md",
@@ -94,13 +94,13 @@
     },
     {
       "path": "Reference/security.md",
-      "bytes": 9492,
-      "sha256": "5c77427edc89076706666a447a7f4c7dccb67d1a1f139a7bac8fd4089456f7e3"
+      "bytes": 11917,
+      "sha256": "37519eb2c7b93a29d49ba4b71fbcd7cb616408b0ee9f147d8498a74e0881612a"
     },
     {
       "path": "Reference/troubleshooting.md",
-      "bytes": 2814,
-      "sha256": "a13b9fdf70b42723dd8c151aff5bf76ef3db24f576df00a100b020d137c7736d"
+      "bytes": 4049,
+      "sha256": "73b18427e7883f8b6c438aa5babf57e79b5828c8b95d6525b7ed944777189375"
     },
     {
       "path": "Reference/versioning.md",
@@ -124,8 +124,8 @@
     },
     {
       "path": "Tooling/aid_doctor.md",
-      "bytes": 7006,
-      "sha256": "741f3f3a53c65c819c3a52be15f6c32a4a410d1fc1c8f16060998aa09905828c"
+      "bytes": 8371,
+      "sha256": "2791bf862a9937d047977b1859a9ae6c0340fd1e41db3c95608432839fb28ad5"
     },
     {
       "path": "Tooling/aid_engine.md",
@@ -158,5 +158,5 @@
       "sha256": "599a515ee2f1c179d3538459626595141a6d18c97dbbe81f6aac836e3f540814"
     }
   ],
-  "aggregateSha256": "032159df6f38a449bee3669ed8966fb8b7d1e815e6959cef710cf983b6803de7"
+  "aggregateSha256": "4107e33a246b0d091181a1209f2979b80c0001607a23aff14351b12481107ce0"
 }

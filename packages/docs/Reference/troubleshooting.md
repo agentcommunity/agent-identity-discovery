@@ -30,7 +30,7 @@ icon: material/tools
 - 1002 ERR_UNSUPPORTED_PROTO: unsupported `proto`
   - Use one of: `mcp`, `openapi`, `a2a`, `local`.
 - 1003 ERR_SECURITY: security policy violation
-  - DNSSEC failures, invalid local execution, or disallowed scheme.
+  - DNSSEC failures, invalid local execution, disallowed scheme, failed PKA proof, or domain-binding policy rejection (see Domain-binding failures below).
 - 1004 ERR_DNS_LOOKUP_FAILED: DNS/network timeout/failure
   - Retry, try different resolver, increase client timeout.
 - 1005 ERR_FALLBACK_FAILED: .well-known fetch failed/invalid
@@ -45,6 +45,15 @@ For v2 records:
 - Nonce mismatch: response `nonce` does not exactly match the client challenge
 - Timestamp skew: `created`/`expires` is missing, expired, or too far from the client clock
 - Covered fields mismatch: ensure the response signature covers `"@method";req`, `"@target-uri";req`, `"@authority";req`, and `"@status"`
+
+### Domain-binding failures
+
+`domain-binding=require` causes `ERR_SECURITY` in two cases:
+
+- **Unbound proof returned:** the endpoint responded with `tag="aid-pka-v2"` (the base unbound tag) instead of `tag="aid-pka-v2-db"`. The endpoint may not support domain binding. Check whether the server implements the B.7 profile. Under `domain-binding=prefer` (default), an unbound proof is accepted and `domainBound` in the result is `false`.
+- **Endpoint refused with 403:** the endpoint supports domain binding but does not serve the queried domain. This means the DNS record points to a different operator's endpoint — an unauthorized association. Verify that the `uri` in the AID record belongs to the domain's own infrastructure.
+
+To confirm whether an endpoint supports domain binding, send a manual PKA request with `AID-Domain: <domain>` and `tag="aid-pka-v2-db"` in `Accept-Signature`. If the response `Signature-Input` contains `aid-pka` with `tag="aid-pka-v2-db"` and `"aid-domain";req` in the covered components, binding is supported. The `aid-doctor` CLI reports this as `domain-bound` in human output and as `domainBound: true` in JSON.
 
 For legacy v1 compatibility records:
 

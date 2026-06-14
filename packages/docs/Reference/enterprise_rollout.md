@@ -39,6 +39,7 @@ Agree on these values before rollout:
 - TTL during change window
 - DNSSEC expectation
 - PKA requirement
+- domain-binding policy (`prefer` for balanced, `require` for strict)
 - rollback owner
 
 ## Deployment Patterns
@@ -158,12 +159,14 @@ Use `balanced` when you want warnings instead of hard failures.
 - `dnssec`: `prefer`
 - `well-known`: `auto`
 - `downgrade`: `warn`
+- `domain-binding`: `prefer`
 
 Exit criteria:
 
 - PKA is deployed and verifiable where expected
 - DNSSEC is live or the remaining gap is explicitly accepted
 - downgrade warnings are monitored
+- `domainBound` is `true` for all expected PKA endpoints (or gaps are documented)
 
 ### Stage 3: `strict`
 
@@ -173,12 +176,14 @@ Use `strict` only after the organization can support hard failures.
 - `dnssec`: `require`
 - `well-known`: `disable`
 - `downgrade`: `fail`
+- `domain-binding`: `require`
 
 Exit criteria:
 
 - DNSSEC validation works from real client networks
 - PKA rotation runbook has been exercised
 - teams agree on rollback ownership and escalation path
+- all PKA endpoints return `tag="aid-pka-v2-db"` (domain-bound) responses
 
 ## Rollback Guidance
 
@@ -236,6 +241,7 @@ Treat rollback as part of the rollout plan.
 - [ ] endpoint deployed and TLS valid
 - [ ] PKA key pair generated and stored securely if used
 - [ ] DNSSEC plan confirmed
+- [ ] domain-binding policy agreed (`prefer` for balanced, `require` for strict); confirm endpoint returns `tag="aid-pka-v2-db"` before enabling `require`
 
 ### During rollout
 

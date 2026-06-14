@@ -136,6 +136,62 @@ Reject the PKA response when any of these are true:
 - response `Cache-Control: no-store` is missing;
 - Ed25519 verification fails over the reconstructed signature base.
 
+## Domain Binding Profile
+
+The base PKA profile proves endpoint key possession but does not prove the endpoint consents to serve as agent for the queried domain. The domain-binding profile (Appendix B.7) closes that gap.
+
+### AID-Domain header
+
+When `k` is present in an `aid2` record, the client **SHOULD** send:
+
+```http
+AID-Domain: example.com
+```
+
+The value is the queried domain from step 1 of the discovery algorithm: A-label form, lowercased, no trailing dot, no port. This is the same value used in Section 2.3 step 1 of the spec.
+
+### Extended request shape
+
+The client requests the domain-binding tag:
+
+```http
+AID-Domain: example.com
+Accept-Signature: aid-pka=("@method";req "@target-uri";req "@authority";req "aid-domain";req "@status");created;expires;keyid="<jwk-thumbprint>";alg="ed25519";nonce="<client-challenge>";tag="aid-pka-v2-db"
+Cache-Control: no-store
+```
+
+The additional covered component is `"aid-domain";req` — the `aid-domain` request header, per RFC 9421 component identifier rules.
+
+### Server response shape
+
+A server that supports this profile and serves the named domain responds with the Appendix B.3 shape, except the covered components include `"aid-domain";req` and the tag is `aid-pka-v2-db`. A server that does not support domain binding ignores `AID-Domain` and responds with the base tag `aid-pka-v2`, which remains a valid unbound proof.
+
+A server that supports this profile but does not serve the named domain MUST NOT produce a `aid-pka-v2-db` signature for it. It SHOULD respond `403` with no `Signature-Input`. A `403` refusal is a failed endpoint proof, so discovery fails for that domain.
+
+### Domain-binding verifier rules
+
+In addition to the Appendix B.6 checklist:
+
+1. A response with `tag="aid-pka-v2-db"` MUST cover `"aid-domain";req`, constructed from the exact `AID-Domain` value the client sent. A response with `tag="aid-pka-v2"` MUST NOT cover `aid-domain`.
+2. A client that did not send `AID-Domain` MUST reject a `tag="aid-pka-v2-db"` response.
+
+### domainBound indicator
+
+Clients that request domain binding MUST expose a boolean `domainBound` field in PKA state:
+
+- `true` when a valid `tag="aid-pka-v2-db"` proof was verified for the queried domain.
+- `false` when the verified proof used `tag="aid-pka-v2"` (unbound).
+
+### Rejection checklist additions
+
+Add these checks when `AID-Domain` was sent:
+
+- `tag` is `aid-pka-v2-db` but `"aid-domain";req` is not in the covered components — reject.
+- `tag` is `aid-pka-v2-db` but the client did not send `AID-Domain` — reject.
+- `domain-binding=require` is active and the verified tag is `aid-pka-v2` (unbound) — fail with `ERR_SECURITY`.
+
+See [Specification Appendix B.7](../specification.md#b7-domain-binding) for the normative text.
+
 ## Canonical Test Vector
 
 The repository ships a canonical vector at `protocol/pka_vectors.json` with id `v2-rfc9421-response-signature`. It includes the `aid2` record, `k`, derived JWK thumbprint, nonce, request headers, response headers, signature base, and Ed25519 signature.

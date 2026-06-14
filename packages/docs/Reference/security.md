@@ -42,15 +42,16 @@ flowchart LR
     style D fill:#fce4ec
 ```
 
-| Layer           | Protects Against                 | Required?           |
-| --------------- | -------------------------------- | ------------------- |
-| **DNS TXT**     | Misdirection                     | Yes (core protocol) |
-| **DNSSEC**      | Record tampering in transit      | Recommended         |
-| **TLS (HTTPS)** | Eavesdropping, MitM on transport | Required for remote |
-| **PKA**         | Server impersonation             | Optional            |
+| Layer              | Protects Against                               | Required?                                                                                          |
+| ------------------ | ---------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| **DNS TXT**        | Misdirection                                   | Yes (core protocol)                                                                                |
+| **DNSSEC**         | Record tampering in transit                    | Recommended                                                                                        |
+| **TLS (HTTPS)**    | Eavesdropping, MitM on transport               | Required for remote                                                                                |
+| **PKA**            | Endpoint impersonation                         | Optional                                                                                           |
+| **Domain Binding** | Unauthorized association of endpoint to domain | Optional-but-default (v2 clients SHOULD send `AID-Domain`); only `domain-binding=require` enforces |
 
 **Minimum viable security:** DNS + TLS (every remote endpoint).
-**Recommended:** DNS + DNSSEC + TLS + PKA.
+**Recommended:** DNS + DNSSEC + TLS + PKA + domain binding.
 
 ## DNSSEC
 
@@ -130,6 +131,24 @@ Internationalized Domain Names (IDNs) can be used for homoglyph attacks (e.g., `
 
 **For clients:** Warn users when a domain contains mixed scripts or known confusable characters. Display both the Unicode and Punycode forms in security prompts.
 
+## Domain Binding
+
+PKA proves endpoint key possession. It does not by itself prove the endpoint consents to be the agent for the queried domain — any domain can publish another operator's endpoint URI and key (_unauthorized association_). The domain-binding profile in [Appendix B.7](../specification.md#b7-domain-binding) closes this gap.
+
+### How it works
+
+v2 clients SHOULD send the `AID-Domain: <queried-domain>` header on every PKA request (default behavior). The endpoint includes `"aid-domain";req` in its response signature and uses tag `aid-pka-v2-db` to signal it consents to serve as the agent for that domain. The discovery result reports `domainBound: true` for a verified bound proof and `domainBound: false` for a verified unbound proof.
+
+### The honesty caveat
+
+Merely sending `AID-Domain` does not prevent an attacker-controlled endpoint from ignoring the header and returning a valid unbound proof (`tag="aid-pka-v2"`). An unbound proof still passes verification. The mitigation takes effect only when the client enforces domain binding by policy.
+
+### Best practices
+
+- **Send `AID-Domain` by default.** v2 clients SHOULD send it when `k` is present. This is the default; explicitly set `domain-binding=off` only if your environment prohibits it.
+- **Use `domain-binding=require` for strict enforcement.** This causes discovery to fail with `ERR_SECURITY` when the endpoint returns an unbound proof or a `403` refusal. Compose with `pka=require` for the strongest posture: `pka=require` fails when `k` is absent; `domain-binding=require` then enforces binding on the resulting proof.
+- **Monitor `domainBound` in logs.** Under `domain-binding=prefer` (default), an unbound result is accepted but logged. A persistent `domainBound: false` from an endpoint you expect to support binding indicates a server-side configuration gap.
+
 ## PKA Key Management
 
 Public Key Attestation adds cryptographic endpoint proof. Proper key management is essential.
@@ -183,6 +202,9 @@ Use this checklist when deploying or auditing an AID record.
 - [ ] Warn on PKA downgrade (key previously present, now absent)
 - [ ] Respect DNS TTL for caching
 - [ ] Return appropriate error codes (`ERR_SECURITY`, `ERR_INVALID_TXT`, etc.)
+- [ ] Send `AID-Domain` by default when `k` is present (use `domain-binding=off` to opt out)
+- [ ] Expose `domainBound` in PKA result state
+- [ ] Use `domain-binding=require` for environments that must enforce endpoint consent
 
 Use the [aid-doctor CLI](../Tooling/aid_doctor.md) to automate validation and security checks.
 
