@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { runCheck } from '@agentcommunity/aid-engine';
 import { handleProtocol } from '@/lib/protocols';
 import type { ProtocolToken } from '@/lib/protocols';
 import {
@@ -7,6 +6,7 @@ import {
   parseHandshakeRequestBody,
   type AuthCredentials,
 } from '@/lib/api/handshake-validation';
+import { getSecurityInfo } from '@/lib/api/handshake-security';
 
 export const runtime = 'nodejs';
 
@@ -22,39 +22,6 @@ const safeHostFromUri = (uri: string): string => {
     return new URL(uri).host;
   } catch {
     return uri.split('/')[0] || uri;
-  }
-};
-
-const getSecurityInfo = async (hostname: string): Promise<Record<string, unknown> | undefined> => {
-  try {
-    if (isPrivateHost(hostname)) {
-      return undefined;
-    }
-
-    const report = await runCheck(hostname, {
-      timeoutMs: 4000,
-      allowFallback: true,
-      wellKnownTimeoutMs: 1500,
-      showDetails: true,
-    });
-
-    return {
-      dnssec: report.dnssec.present,
-      pka: {
-        present: report.pka.present,
-        attempted: report.pka.attempted,
-        verified: report.pka.verified,
-        keyid: report.pka.keyid,
-        alg: report.pka.alg,
-        createdSkewSec: report.pka.createdSkewSec,
-        covered: report.pka.covered,
-      },
-      tls: report.tls,
-      warnings: report.record.warnings,
-      errors: report.record.errors,
-    };
-  } catch {
-    return undefined;
   }
 };
 
