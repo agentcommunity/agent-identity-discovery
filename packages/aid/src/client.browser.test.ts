@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as browser from './browser.js';
+import * as pkaModule from './pka.js';
 
 // We want to test the `discover` export from browser.ts, but mock the `queryTxtRecordsDoH`
 // function that it calls internally.
@@ -360,6 +361,44 @@ describe('Browser client', () => {
         'https://example.com/.well-known/agent',
         expect.any(Object),
       );
+    });
+  });
+
+  describe('domain-binding policy', () => {
+    it('rejects with ERR_SECURITY on DNS path when domainBindingPolicy is require and proof is unbound', async () => {
+      // Stub performPKAHandshake to return an unbound proof (domainBound: false)
+      vi.spyOn(pkaModule, 'performPKAHandshake').mockResolvedValue({ domainBound: false });
+
+      g.fetch = vi.fn(async (url: string) => {
+        const target = url.toString();
+        if (target.startsWith('https://cloudflare-dns.com')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              Status: 0,
+              AD: false,
+              Answer: [
+                {
+                  name: '_agent.example.com',
+                  type: 16,
+                  TTL: 300,
+                  // aid2 record with pka field so the handshake path is exercised
+                  data: '"v=aid2;u=https://api.example.com/mcp;p=mcp;k=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"',
+                },
+              ],
+            }),
+          };
+        }
+        return { ok: false, status: 404, json: async () => ({}) };
+      });
+
+      await expect(
+        browser.discover('example.com', {
+          wellKnownFallback: false,
+          domainBindingPolicy: 'require',
+        }),
+      ).rejects.toMatchObject({ errorCode: 'ERR_SECURITY' });
     });
   });
 });
