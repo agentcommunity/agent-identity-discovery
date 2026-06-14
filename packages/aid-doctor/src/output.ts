@@ -31,6 +31,12 @@ function generateActionableSuggestions(report: DoctorReport): string[] {
     suggestions.push(`${icon} ${chalk.bold('Add endpoint proof:')} ${ERROR_MESSAGES.ADD_PKA}`);
   }
 
+  if (pka.present && pka.verified && pka.domainBound === false) {
+    suggestions.push(
+      `${icon} ${chalk.bold('Enable domain binding:')} Your endpoint proof is valid but not domain-bound. Configure your endpoint to echo the AID-Domain header in its HTTP Message Signature to prove exclusive ownership of this domain's identity.`,
+    );
+  }
+
   if (tls.checked && tls.valid && tls.daysRemaining !== null && tls.daysRemaining < 21) {
     suggestions.push(`${icon} ${chalk.bold('Renew TLS certificate:')} ${ERROR_MESSAGES.RENEW_TLS}`);
   }
@@ -109,7 +115,15 @@ export function formatCheckResult(report: DoctorReport): string {
         record.parsed?.v === 'aid2'
           ? `keyid=${derivePkaKeyid(record.parsed.pka ?? null)?.keyid ?? 'unknown'}`
           : `legacy kid=${pka.kid ?? record.parsed?.kid ?? 'unknown'}`;
-      lines.push(`[5/6] PKA handshake ... ${icons.ok} Verified (alg=${pka.alg}, ${keyLabel})`);
+      const bindingLabel =
+        pka.domainBound === true
+          ? ', domain-bound'
+          : pka.domainBound === false
+            ? ', endpoint-proof only'
+            : '';
+      lines.push(
+        `[5/6] PKA handshake ... ${icons.ok} Verified (alg=${pka.alg}, ${keyLabel}${bindingLabel})`,
+      );
     } else {
       const reason =
         record.errors.find((e) => e.message.includes('PKA'))?.message ?? 'Verification failed';

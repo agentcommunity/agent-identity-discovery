@@ -559,6 +559,38 @@ describe('AID Doctor CLI', () => {
       expect(output).toContain('💡 Renew TLS certificate');
     });
 
+    it('shows "domain-bound" when domainBound is true', () => {
+      const out = formatCheckResult({
+        ...makeReport(),
+        pka: { ...makeReport().pka, present: true, verified: true, domainBound: true },
+      });
+      expect(out).toContain('domain-bound');
+    });
+
+    it('shows "endpoint-proof only" when domainBound is false', () => {
+      const out = formatCheckResult({
+        ...makeReport(),
+        pka: { ...makeReport().pka, present: true, verified: true, domainBound: false },
+      });
+      expect(out).toContain('endpoint-proof only');
+    });
+
+    it('shows no binding label when domainBound is null/absent', () => {
+      const report = makeReport();
+      // makeReport default: pka.domainBound not set (undefined)
+      const out = formatCheckResult(report);
+      expect(out).not.toContain('domain-bound');
+      expect(out).not.toContain('endpoint-proof only');
+    });
+
+    it('suggests enabling domain binding when endpoint-proof only', () => {
+      const out = formatCheckResult({
+        ...makeReport(),
+        pka: { ...makeReport().pka, present: true, verified: true, domainBound: false },
+      });
+      expect(out).toContain('Enable domain binding');
+    });
+
     it('should suggest canonical short keys when long TXT keys are detected', () => {
       const report: DoctorReport = {
         domain: 'example.com',
