@@ -1,5 +1,6 @@
 import { type AidRecord, type AidSpecVersion } from './constants.js';
 import { AidError } from './parser.js';
+import type { PKAHandshakeResult } from './pka.js';
 
 let nodeWebcrypto: unknown;
 try {
@@ -15,6 +16,7 @@ export type DnssecPolicy = 'off' | 'prefer' | 'require';
 export type PkaPolicy = 'if-present' | 'require';
 export type DowngradePolicy = 'off' | 'warn' | 'fail';
 export type WellKnownPolicy = 'auto' | 'disable';
+export type DomainBindingPolicy = 'off' | 'prefer' | 'require';
 
 export interface PreviousSecurityState {
   domain?: string;
@@ -38,6 +40,7 @@ export interface SecurityPolicyOptions {
   pkaPolicy?: PkaPolicy;
   downgradePolicy?: DowngradePolicy;
   wellKnownPolicy?: WellKnownPolicy;
+  domainBindingPolicy?: DomainBindingPolicy;
   previousSecurity?: PreviousSecurityState;
 }
 
@@ -56,6 +59,11 @@ export interface DiscoverySecurity {
   pka: {
     policy: PkaPolicy;
     present: boolean;
+  };
+  domainBinding: {
+    policy: DomainBindingPolicy;
+    checked: boolean;
+    bound: boolean | null;
   };
   wellKnown: {
     policy: WellKnownPolicy;
@@ -76,6 +84,7 @@ export interface ResolvedSecurityPolicy {
   pkaPolicy: PkaPolicy;
   downgradePolicy: DowngradePolicy;
   wellKnownPolicy: WellKnownPolicy;
+  domainBindingPolicy: DomainBindingPolicy;
   previousSecurity?: PreviousSecurityState;
 }
 
@@ -85,6 +94,7 @@ export function resolveSecurityPolicy(options: {
   pkaPolicy?: PkaPolicy;
   downgradePolicy?: DowngradePolicy;
   wellKnownPolicy?: WellKnownPolicy;
+  domainBindingPolicy?: DomainBindingPolicy;
   previousSecurity?: PreviousSecurityState;
   wellKnownFallback?: boolean;
 }): ResolvedSecurityPolicy {
@@ -94,6 +104,7 @@ export function resolveSecurityPolicy(options: {
     pkaPolicy: 'if-present',
     downgradePolicy: 'off',
     wellKnownPolicy: options.wellKnownFallback === false ? 'disable' : 'auto',
+    domainBindingPolicy: 'prefer',
     ...(options.previousSecurity ? { previousSecurity: options.previousSecurity } : {}),
   };
 
@@ -104,6 +115,7 @@ export function resolveSecurityPolicy(options: {
       pkaPolicy: options.pkaPolicy ?? defaultPolicy.pkaPolicy,
       downgradePolicy: options.downgradePolicy ?? defaultPolicy.downgradePolicy,
       wellKnownPolicy: options.wellKnownPolicy ?? defaultPolicy.wellKnownPolicy,
+      domainBindingPolicy: options.domainBindingPolicy ?? defaultPolicy.domainBindingPolicy,
     };
   }
 
@@ -129,6 +141,7 @@ export function resolveSecurityPolicy(options: {
     options.pkaPolicy !== undefined ||
     options.downgradePolicy !== undefined ||
     options.wellKnownPolicy !== undefined ||
+    options.domainBindingPolicy !== undefined ||
     options.wellKnownFallback === false;
 
   return {
@@ -139,6 +152,8 @@ export function resolveSecurityPolicy(options: {
     wellKnownPolicy:
       options.wellKnownPolicy ??
       (options.wellKnownFallback === false ? 'disable' : preset.wellKnownPolicy),
+    domainBindingPolicy:
+      options.domainBindingPolicy ?? (preset.mode === 'strict' ? 'require' : 'prefer'),
     ...(options.previousSecurity ? { previousSecurity: options.previousSecurity } : {}),
   };
 }
@@ -157,6 +172,11 @@ export function createDiscoverySecurity(
     pka: {
       policy: policy.pkaPolicy,
       present: false,
+    },
+    domainBinding: {
+      policy: policy.domainBindingPolicy,
+      checked: false,
+      bound: null,
     },
     wellKnown: {
       policy: policy.wellKnownPolicy,
@@ -377,6 +397,23 @@ export function enforceDnssecPolicy(
     code: 'DNSSEC_PREFERRED',
     message,
   });
+}
+
+export function enforceDomainBindingPolicy(
+  security: DiscoverySecurity,
+  queryName: string,
+  pkaResult: PKAHandshakeResult | undefined,
+): void {
+  if (pkaResult === undefined) return; // no key / no proof — nothing to evaluate
+  security.domainBinding.checked = true;
+  if (security.domainBinding.policy === 'off') {
+    security.domainBinding.bound = null; // binding not requested
+    return;
+  }
+  security.domainBinding.bound = pkaResult.domainBound;
+  if (security.domainBinding.policy === 'require' && !pkaResult.domainBound) {
+    throw new AidError('ERR_SECURITY', `Domain binding required but not attested for ${queryName}`);
+  }
 }
 
 export function enforceWellKnownPolicy(security: DiscoverySecurity, queryName: string): void {

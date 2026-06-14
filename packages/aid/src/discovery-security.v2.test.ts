@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   createDiscoverySecurity,
   enforceDowngradePolicy,
+  enforceDomainBindingPolicy,
   resolveSecurityPolicy,
 } from './discovery-security.js';
 
@@ -95,5 +96,49 @@ describe('AID v2 discovery security state', () => {
     expect(security.downgrade.reason).toBe('DNS record unavailable; using well-known-tls trust');
     expect(security.warnings.map((warning) => warning.code)).toEqual(['DOWNGRADE_DETECTED']);
     warn.mockRestore();
+  });
+});
+
+describe('enforceDomainBindingPolicy', () => {
+  const mk = (mode: 'off' | 'prefer' | 'require') =>
+    createDiscoverySecurity(resolveSecurityPolicy({ domainBindingPolicy: mode }), false);
+
+  it('off: does not throw and leaves bound null even on unbound proof', () => {
+    const s = mk('off');
+    enforceDomainBindingPolicy(s, 'example.com', { domainBound: false });
+    expect(s.domainBinding.policy).toBe('off');
+    expect(s.domainBinding.bound).toBeNull();
+  });
+
+  it('prefer: records bound=false on unbound proof, does not throw', () => {
+    const s = mk('prefer');
+    enforceDomainBindingPolicy(s, 'example.com', { domainBound: false });
+    expect(s.domainBinding.bound).toBe(false);
+  });
+
+  it('prefer: records bound=true on bound proof', () => {
+    const s = mk('prefer');
+    enforceDomainBindingPolicy(s, 'example.com', { domainBound: true });
+    expect(s.domainBinding.bound).toBe(true);
+  });
+
+  it('require: throws ERR_SECURITY on unbound proof', () => {
+    const s = mk('require');
+    expect(() => enforceDomainBindingPolicy(s, 'example.com', { domainBound: false })).toThrow(
+      'Domain binding required',
+    );
+  });
+
+  it('require: passes on bound proof', () => {
+    const s = mk('require');
+    expect(() => enforceDomainBindingPolicy(s, 'example.com', { domainBound: true })).not.toThrow();
+  });
+
+  it('no proof (undefined) is a no-op in all modes', () => {
+    for (const mode of ['off', 'prefer', 'require'] as const) {
+      const s = mk(mode);
+      expect(() => enforceDomainBindingPolicy(s, 'example.com', undefined)).not.toThrow();
+      expect(s.domainBinding.checked).toBe(false);
+    }
   });
 });
