@@ -591,6 +591,19 @@ describe('AID Doctor CLI', () => {
       expect(out).toContain('Enable domain binding');
     });
 
+    it('does not show binding label or domain-binding suggestion for verified aid1 record with domainBound=false', () => {
+      const out = formatCheckResult({
+        ...makeReport(),
+        record: {
+          ...makeReport().record,
+          parsed: { v: 'aid1', uri: 'https://a.co', proto: 'mcp' },
+        },
+        pka: { ...makeReport().pka, present: true, verified: true, domainBound: false },
+      });
+      expect(out).not.toContain('endpoint-proof only');
+      expect(out).not.toContain('Enable domain binding');
+    });
+
     it('should suggest canonical short keys when long TXT keys are detected', () => {
       const report: DoctorReport = {
         domain: 'example.com',
