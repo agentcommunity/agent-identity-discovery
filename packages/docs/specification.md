@@ -205,7 +205,7 @@ PKA does not prove:
 - that a key change is cryptographically continuous with a previous key;
 - that the endpoint consents to serve as the agent for the queried domain.
 
-Because the response signature binds only the endpoint's own request context, any domain can publish a record containing another operator's endpoint URI and public key, and the endpoint proof still verifies. This _unauthorized association_ does not let the publishing domain impersonate the endpoint, but it falsely implies a relationship between the domain and the endpoint. Clients that need the endpoint's consent to the association use the optional domain-binding profile in Appendix B.7.
+Because the response signature binds only the endpoint's own request context, any domain can publish a record containing another operator's endpoint URI and public key, and the endpoint proof still verifies. This _unauthorized association_ does not let the publishing domain impersonate the endpoint, but it falsely implies a relationship between the domain and the endpoint. Clients that need the endpoint's consent to the association use the domain-binding profile in Appendix B.7; v2 clients **SHOULD** request this by default.
 
 ### **3.2. Threat Model**
 
@@ -221,7 +221,7 @@ AID's security model addresses the following threat landscape.
 
 - **DNS spoofing or cache poisoning:** DNSSEC validation, when available.
 - **Endpoint impersonation:** PKA endpoint proof with Ed25519 HTTP Message Signatures.
-- **Unauthorized association:** the optional domain-binding profile (Appendix B.7). This mitigation applies only when a client **requires** domain binding; merely requesting it does not stop an attacker-controlled endpoint from returning a valid unbound proof.
+- **Unauthorized association:** the domain-binding profile (Appendix B.7), which v2 clients SHOULD request by default. This mitigation applies only when a client **requires** domain binding; merely requesting it does not stop an attacker-controlled endpoint from returning a valid unbound proof.
 - **PKA removal or key replacement:** Returning clients can detect changes when they retain previous security state.
 - **Version downgrade:** Returning clients can detect `aid2` to `aid1` downgrade when they retain previous version state.
 - **Command injection in local agents:** Local execution safeguards.
@@ -482,9 +482,9 @@ A verifier accepts a v2 PKA response only when:
 
 ---
 
-### **B.7. Domain Binding (Optional Profile)**
+### **B.7. Domain Binding**
 
-This optional profile lets an endpoint prove that it consents to serve as the agent for the queried domain, addressing the unauthorized-association gap described in Section 3.1 (What PKA Proves).
+This profile lets an endpoint prove that it consents to serve as the agent for the queried domain, addressing the unauthorized-association gap described in Section 3.1 (What PKA Proves). When `k` is present in an `aid2` record, clients **SHOULD** request domain binding by default (see Section 2.3). The domain-binding indicator in the discovery result is the expected outcome for well-configured v2 deployments; clients that need a hard enforcement boundary use `domain-binding=require` in enterprise policy (Section 3.3).
 
 A client requesting domain binding sends the queried domain in the `AID-Domain` request header and requests an extended response signature:
 
@@ -509,6 +509,12 @@ Verifier rules, in addition to Appendix B.6:
 4. Requesting domain binding does not by itself mitigate unauthorized association, because an attacker-controlled endpoint can ignore `AID-Domain` and return a valid unbound proof. A client gains the mitigation only when it **requires** domain binding and rejects unbound proofs by local policy.
 
 Domain binding is a statement by the endpoint that it serves the named domain. It does not prove authorization, delegation, or organizational identity.
+
+#### Trajectory
+
+In AID v2, domain binding is optional-but-default: clients **SHOULD** send `AID-Domain`, and an unbound proof (`tag="aid-pka-v2"`) remains a valid outcome unless local policy requires binding (`domain-binding=require`, Section 3.3).
+
+A future major version (`aid3`) is expected to make sending `AID-Domain` **REQUIRED** for clients performing PKA and to make rejecting unbound proofs the baseline. Establishing high adoption while the installed base is small is intended to minimize switching cost at that transition. Implementations that already send `AID-Domain` by default require no change at `aid3`.
 
 ---
 
