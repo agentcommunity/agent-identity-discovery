@@ -122,4 +122,113 @@ describe('PKA domain binding integration', () => {
       errorCode: 'ERR_SECURITY',
     });
   });
+
+  it('require policy fails when the endpoint returns an unbound proof', async () => {
+    const kp = await nodeWebcrypto.subtle.generateKey('Ed25519', true, ['sign', 'verify']);
+    const rawPub = new Uint8Array(await nodeWebcrypto.subtle.exportKey('raw', kp.publicKey));
+    const x = b64url(rawPub);
+    const keyid = await jwkThumbprint(x);
+
+    g.fetch = vi.fn(async (url: string, init?: { headers?: Record<string, string> }) => {
+      if (url.includes('/.well-known/agent')) {
+        return {
+          ok: true,
+          status: 200,
+          headers: {
+            get: (n: string) => (n.toLowerCase() === 'content-type' ? 'application/json' : null),
+          },
+          text: async () =>
+            JSON.stringify({ v: 'aid2', u: 'https://api.example.com/mcp', p: 'mcp', k: x }),
+        };
+      }
+      const created = Math.floor(Date.now() / 1000);
+      const expires = created + 60;
+      const accept = init?.headers?.['Accept-Signature'] ?? '';
+      const nonce = /nonce="([^"]+)"/.exec(accept)?.[1] ?? '';
+      const params = `("@method";req "@target-uri";req "@authority";req "@status");created=${created};expires=${expires};keyid="${keyid}";alg="ed25519";nonce="${nonce}";tag="aid-pka-v2"`;
+      const base = [
+        `"@method";req: GET`,
+        `"@target-uri";req: https://api.example.com/mcp`,
+        `"@authority";req: api.example.com`,
+        `"@status": 200`,
+        `"@signature-params": ${params}`,
+      ].join('\n');
+      const sig = new Uint8Array(
+        await nodeWebcrypto.subtle.sign('Ed25519', kp.privateKey, new TextEncoder().encode(base)),
+      );
+      return {
+        ok: true,
+        status: 200,
+        headers: {
+          get: (name: string) => {
+            const k = name.toLowerCase();
+            if (k === 'signature-input') return `aid-pka=${params}`;
+            if (k === 'signature') return `aid-pka=:${Buffer.from(sig).toString('base64')}:`;
+            if (k === 'cache-control') return 'no-store';
+            return null;
+          },
+        },
+        text: async () => '',
+      };
+    });
+
+    await expect(
+      discover('example.com', { wellKnownFallback: true, domainBindingPolicy: 'require' }),
+    ).rejects.toMatchObject({ errorCode: 'ERR_SECURITY' });
+  });
+
+  it('off policy does not send the AID-Domain header', async () => {
+    const kp = await nodeWebcrypto.subtle.generateKey('Ed25519', true, ['sign', 'verify']);
+    const rawPub = new Uint8Array(await nodeWebcrypto.subtle.exportKey('raw', kp.publicKey));
+    const x = b64url(rawPub);
+    const keyid = await jwkThumbprint(x);
+    let sawAidDomain: string | undefined = 'UNSET';
+
+    g.fetch = vi.fn(async (url: string, init?: { headers?: Record<string, string> }) => {
+      if (url.includes('/.well-known/agent')) {
+        return {
+          ok: true,
+          status: 200,
+          headers: {
+            get: (n: string) => (n.toLowerCase() === 'content-type' ? 'application/json' : null),
+          },
+          text: async () =>
+            JSON.stringify({ v: 'aid2', u: 'https://api.example.com/mcp', p: 'mcp', k: x }),
+        };
+      }
+      sawAidDomain = init?.headers?.['AID-Domain'];
+      const created = Math.floor(Date.now() / 1000);
+      const expires = created + 60;
+      const accept = init?.headers?.['Accept-Signature'] ?? '';
+      const nonce = /nonce="([^"]+)"/.exec(accept)?.[1] ?? '';
+      const params = `("@method";req "@target-uri";req "@authority";req "@status");created=${created};expires=${expires};keyid="${keyid}";alg="ed25519";nonce="${nonce}";tag="aid-pka-v2"`;
+      const base = [
+        `"@method";req: GET`,
+        `"@target-uri";req: https://api.example.com/mcp`,
+        `"@authority";req: api.example.com`,
+        `"@status": 200`,
+        `"@signature-params": ${params}`,
+      ].join('\n');
+      const sig = new Uint8Array(
+        await nodeWebcrypto.subtle.sign('Ed25519', kp.privateKey, new TextEncoder().encode(base)),
+      );
+      return {
+        ok: true,
+        status: 200,
+        headers: {
+          get: (name: string) => {
+            const k = name.toLowerCase();
+            if (k === 'signature-input') return `aid-pka=${params}`;
+            if (k === 'signature') return `aid-pka=:${Buffer.from(sig).toString('base64')}:`;
+            if (k === 'cache-control') return 'no-store';
+            return null;
+          },
+        },
+        text: async () => '',
+      };
+    });
+
+    await discover('example.com', { wellKnownFallback: true, domainBindingPolicy: 'off' });
+    expect(sawAidDomain).toBeUndefined();
+  });
 });

@@ -10,6 +10,7 @@ import { performPKAHandshake, type PKAHandshakeResult } from './pka.js';
 import {
   type DiscoverySecurity,
   type DnssecPolicy,
+  type DomainBindingPolicy,
   type DowngradePolicy,
   type PkaPolicy,
   type PreviousSecurityState,
@@ -17,6 +18,7 @@ import {
   type WellKnownPolicy,
   createDiscoverySecurity,
   enforceDnssecPolicy,
+  enforceDomainBindingPolicy,
   enforceDowngradePolicy,
   enforcePkaPolicy,
   enforceWellKnownPolicy,
@@ -44,6 +46,8 @@ export interface DiscoveryOptions {
   pkaPolicy?: PkaPolicy;
   /** Downgrade handling when previous security state is supplied. */
   downgradePolicy?: DowngradePolicy;
+  /** Domain-binding enforcement for v2 PKA proofs. */
+  domainBindingPolicy?: DomainBindingPolicy;
   /** `.well-known` fallback policy. */
   wellKnownPolicy?: WellKnownPolicy;
   /** Previously observed PKA/KID state for downgrade detection. */
@@ -279,7 +283,9 @@ async function fetchWellKnown(
     let pkaResult: PKAHandshakeResult | undefined;
     if (record.pka) {
       try {
-        pkaResult = await performPKAHandshakeForRecord(record, normalizeDomain(domain));
+        const bindingDomain =
+          policy.domainBindingPolicy === 'off' ? undefined : normalizeDomain(domain);
+        pkaResult = await performPKAHandshakeForRecord(record, bindingDomain);
       } catch (pkaError) {
         // Preserve ERR_SECURITY errors from PKA verification
         if (pkaError instanceof AidError && pkaError.errorCode === 'ERR_SECURITY') {
@@ -290,6 +296,7 @@ async function fetchWellKnown(
     }
     enforcePkaPolicy(record, url, security);
     await enforceDowngradePolicy(record, url, policy, security);
+    enforceDomainBindingPolicy(security, url, pkaResult);
     return {
       record,
       raw: text.trim(),
@@ -422,13 +429,13 @@ export async function discover(
         }
 
         const result = selectedRecords[0];
-        const pkaResult = await performPKAHandshakeForRecord(
-          result.record,
-          normalizeDomain(domain),
-        );
+        const bindingDomain =
+          policy.domainBindingPolicy === 'off' ? undefined : normalizeDomain(domain);
+        const pkaResult = await performPKAHandshakeForRecord(result.record, bindingDomain);
         const security = createDiscoverySecurity(policy, false);
         enforcePkaPolicy(result.record, queryName, security);
         await enforceDowngradePolicy(result.record, queryName, policy, security);
+        enforceDomainBindingPolicy(security, queryName, pkaResult);
         if (policy.dnssecPolicy !== 'off') {
           const validated = await queryDnssecStatus(queryName, timeout);
           enforceDnssecPolicy(security, queryName, validated);
