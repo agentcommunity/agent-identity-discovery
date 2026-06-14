@@ -115,6 +115,24 @@ describe('aid-doctor cache migration', () => {
 
     expect(migrateCacheFile(current)).toEqual(current);
   });
+
+  it('migrates a v2 cache file to v3 without dropping entries, backfilling domainBound:null', () => {
+    const legacy = {
+      schemaVersion: 2,
+      entries: {
+        'example.com|mcp': {
+          lastSeen: '2026-06-01',
+          pka: 'ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ',
+          kid: null,
+        },
+      },
+    };
+    const migrated = migrateCacheFile(legacy as any);
+    expect(migrated.schemaVersion).toBe(3);
+    const entries = Object.values(migrated.entries);
+    expect(entries).toHaveLength(1); // entry survived migration — guards against the data-loss path
+    expect(entries[0].domainBound ?? null).toBeNull();
+  });
 });
 
 describe('aid-doctor security state', () => {
@@ -180,5 +198,44 @@ describe('aid-doctor security state', () => {
     expect(classifySecurityChange(undefined, { ...base, trustSource: 'well-known-tls' })).toBe(
       'fallback_well_known_tls',
     );
+  });
+
+  it('classifies a binding loss when key/version are unchanged', () => {
+    const base = {
+      lastSeen: '2026-05-01T00:00:00.000Z',
+      pka: 'ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ',
+      keyid: 'WWpn_pfHui9YKR4CZtQsDGMu7_Gch2zYChfSvnxgtPk',
+      jwkX: 'ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ',
+      kid: null,
+      version: 'aid2',
+      trustSource: 'dns' as const,
+    };
+    const prev = { ...base, domainBound: true } as any;
+    const cur = { ...base, domainBound: false } as any;
+    expect(classifySecurityChange(prev, cur)).toBe('binding_loss');
+  });
+
+  it('prefers key_replaced over binding_loss when both change', () => {
+    const base = {
+      lastSeen: '2026-05-01T00:00:00.000Z',
+      kid: null,
+      version: 'aid2',
+      trustSource: 'dns' as const,
+    };
+    const prev = {
+      ...base,
+      pka: 'AAAA',
+      keyid: 'A',
+      jwkX: 'AAAA',
+      domainBound: true,
+    } as any;
+    const cur = {
+      ...base,
+      pka: 'BBBB',
+      keyid: 'B',
+      jwkX: 'BBBB',
+      domainBound: false,
+    } as any;
+    expect(classifySecurityChange(prev, cur)).toBe('key_replaced'); // higher-severity, fail-eligible status wins
   });
 });

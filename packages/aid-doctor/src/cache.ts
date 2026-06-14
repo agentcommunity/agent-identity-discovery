@@ -4,7 +4,7 @@ import os from 'node:os';
 import { createHash } from 'node:crypto';
 import type { DoctorReport } from '@agentcommunity/aid-engine';
 
-export const CACHE_SCHEMA_VERSION = 2;
+export const CACHE_SCHEMA_VERSION = 3;
 
 export type CacheTrustSource = 'dns' | 'well-known-tls';
 export type SecurityChangeStatus =
@@ -14,6 +14,7 @@ export type SecurityChangeStatus =
   | 'pka_removed'
   | 'key_replaced'
   | 'version_downgrade'
+  | 'binding_loss'
   | 'fallback_well_known_tls';
 
 export interface CacheEntry {
@@ -24,6 +25,7 @@ export interface CacheEntry {
   kid: string | null;
   keyid?: string | null;
   jwkX?: string | null;
+  domainBound?: boolean | null;
   hash?: string | null;
 }
 
@@ -31,8 +33,6 @@ export interface CacheShape {
   schemaVersion: typeof CACHE_SCHEMA_VERSION;
   entries: Record<string, CacheEntry>;
 }
-
-type LegacyCacheShape = Record<string, CacheEntry>;
 
 function cachePath(): string {
   return path.join(os.homedir(), '.aid', 'cache.json');
@@ -119,6 +119,7 @@ function migrateEntry(entry: CacheEntry): CacheEntry {
     trustSource: entry.trustSource ?? 'dns',
     keyid: entry.keyid ?? keyMaterial?.keyid ?? null,
     jwkX: entry.jwkX ?? keyMaterial?.jwkX ?? null,
+    domainBound: entry.domainBound ?? null,
   };
 }
 
@@ -138,7 +139,16 @@ export function migrateCacheFile(raw: unknown): CacheShape {
     return { schemaVersion: CACHE_SCHEMA_VERSION, entries };
   }
 
-  for (const [domain, entry] of Object.entries(raw as LegacyCacheShape)) {
+  // A wrapped-but-stale file (older schemaVersion) must be migrated by descending
+  // into its nested `entries` map. Iterating the top-level object and skipping the
+  // `entries` key would silently DROP every entry on a schema bump.
+  const wrapped = raw as Partial<CacheShape>;
+  const source: Record<string, unknown> =
+    wrapped.entries && typeof wrapped.entries === 'object'
+      ? (wrapped.entries as Record<string, unknown>)
+      : (raw as Record<string, unknown>);
+
+  for (const [domain, entry] of Object.entries(source)) {
     if (domain === 'schemaVersion' || domain === 'entries') continue;
     if (isCacheEntry(entry)) {
       entries[domain] = migrateEntry(entry);
@@ -159,6 +169,7 @@ export function buildCacheEntryFromReport(report: DoctorReport, now = new Date()
     kid: record?.v === 'aid1' ? (record.kid ?? null) : null,
     keyid: keyMaterial?.keyid ?? null,
     jwkX: keyMaterial?.jwkX ?? null,
+    domainBound: report.pka.domainBound ?? null,
     hash: report.cacheEntry?.hash ?? null,
   };
 }
@@ -186,6 +197,13 @@ export function classifySecurityChange(
   const currentKey = current.keyid ?? current.pka;
   if (previousKey && currentKey && previousKey !== currentKey) {
     return 'key_replaced';
+  }
+
+  // Binding loss is warning-only. Keep it AFTER the fail-eligible branches above so
+  // it can never mask a higher-severity downgrade (key replacement, version drop,
+  // pka removal) — otherwise it would open a downgrade-evasion path.
+  if (previous.domainBound === true && current.domainBound === false) {
+    return 'binding_loss';
   }
 
   return 'no_change';
