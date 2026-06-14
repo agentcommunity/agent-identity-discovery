@@ -196,3 +196,92 @@ describe('runCheck security-state downgrade cache', () => {
     expect(report.pka.domainBound).toBe(true);
   });
 });
+
+describe('runCheck domain-binding policy', () => {
+  const mockedPerformPKAHandshake = vi.mocked(performPKAHandshake);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function aid2Discovery() {
+    return discovery({
+      v: 'aid2',
+      uri: 'https://api.example.com/mcp',
+      proto: 'mcp',
+      pka: ZERO_JWK_X,
+    });
+  }
+
+  it('require domain-binding fails the PKA step on an unbound v2 proof', async () => {
+    mockedPerformPKAHandshake.mockResolvedValueOnce({ domainBound: false });
+    nextDiscovery = aid2Discovery();
+
+    const report = await runCheck('example.com', {
+      timeoutMs: 1,
+      allowFallback: true,
+      wellKnownTimeoutMs: 1,
+      checkDowngrade: true,
+      domainBindingPolicy: 'require',
+    });
+
+    expect(report.pka.verified).toBe(false);
+    expect(report.exitCode).not.toBe(0); // failing exit code set
+    // A rejected record must not be persisted as verified.
+    expect(report.cacheEntry).toBeNull();
+  });
+
+  it('require domain-binding does NOT fail on a bound v2 proof', async () => {
+    mockedPerformPKAHandshake.mockResolvedValueOnce({ domainBound: true });
+    nextDiscovery = aid2Discovery();
+
+    const report = await runCheck('example.com', {
+      timeoutMs: 1,
+      allowFallback: true,
+      wellKnownTimeoutMs: 1,
+      checkDowngrade: true,
+      domainBindingPolicy: 'require',
+    });
+
+    expect(report.pka.verified).toBe(true);
+    expect(report.exitCode).toBe(0);
+  });
+
+  it('off domain-binding does not pass a domain to the handshake (suppresses AID-Domain)', async () => {
+    mockedPerformPKAHandshake.mockResolvedValueOnce({ domainBound: false });
+    nextDiscovery = aid2Discovery();
+
+    await runCheck('example.com', {
+      timeoutMs: 1,
+      allowFallback: true,
+      wellKnownTimeoutMs: 1,
+      domainBindingPolicy: 'off',
+    });
+
+    // performPKAHandshake(uri, pka, kid, domain) — 4th arg must be undefined when policy is 'off'
+    expect(mockedPerformPKAHandshake).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      undefined,
+      undefined,
+    );
+  });
+
+  it('prefer (default) domain-binding passes the normalized domain to the handshake', async () => {
+    mockedPerformPKAHandshake.mockResolvedValueOnce({ domainBound: false });
+    nextDiscovery = aid2Discovery();
+
+    await runCheck('example.com', {
+      timeoutMs: 1,
+      allowFallback: true,
+      wellKnownTimeoutMs: 1,
+    });
+
+    expect(mockedPerformPKAHandshake).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      undefined,
+      'example.com',
+    );
+  });
+});

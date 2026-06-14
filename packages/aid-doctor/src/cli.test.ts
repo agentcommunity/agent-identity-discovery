@@ -185,6 +185,51 @@ describe('AID Doctor CLI', () => {
       expect(processExitSpy).toHaveBeenCalledWith(0);
     });
 
+    it('maps --domain-binding to domainBindingPolicy for the check command', async () => {
+      const runCheck = vi.fn().mockResolvedValue(makeReport());
+      const { createCliProgram } = await importCliWithMocks(runCheck);
+      const program = createCliProgram();
+
+      await program.parseAsync(['check', 'example.com', '--domain-binding', 'require'], {
+        from: 'user',
+      });
+
+      expect(runCheck).toHaveBeenCalledWith(
+        'example.com',
+        expect.objectContaining({ domainBindingPolicy: 'require' }),
+      );
+      expect(processExitSpy).toHaveBeenCalledWith(0);
+    });
+
+    it('defaults domainBindingPolicy to prefer for the check command', async () => {
+      const runCheck = vi.fn().mockResolvedValue(makeReport());
+      const { createCliProgram } = await importCliWithMocks(runCheck);
+      const program = createCliProgram();
+
+      await program.parseAsync(['check', 'example.com'], { from: 'user' });
+
+      expect(runCheck).toHaveBeenCalledWith(
+        'example.com',
+        expect.objectContaining({ domainBindingPolicy: 'prefer' }),
+      );
+    });
+
+    it('maps --domain-binding to domainBindingPolicy for the json command', async () => {
+      const runCheck = vi.fn().mockResolvedValue(makeReport());
+      const { createCliProgram } = await importCliWithMocks(runCheck);
+      const program = createCliProgram();
+
+      await program.parseAsync(['json', 'example.com', '--domain-binding', 'off'], {
+        from: 'user',
+      });
+
+      expect(runCheck).toHaveBeenCalledWith(
+        'example.com',
+        expect.objectContaining({ domainBindingPolicy: 'off' }),
+      );
+      expect(processExitSpy).toHaveBeenCalledWith(0);
+    });
+
     it('renders the strict PKA check path with the derived v2 keyid', async () => {
       const runCheck = vi.fn().mockResolvedValue(makeReport());
       const { createCliProgram } = await importCliWithMocks(runCheck);

@@ -140,6 +140,7 @@ export interface CheckOptions {
   pkaPolicy?: PkaPolicy;
   downgradePolicy?: DowngradePolicy;
   wellKnownPolicy?: WellKnownPolicy;
+  domainBindingPolicy?: 'off' | 'prefer' | 'require';
   previousSecurity?: PreviousSecurityState;
   showDetails?: boolean;
   dumpWellKnownPath?: string | null;

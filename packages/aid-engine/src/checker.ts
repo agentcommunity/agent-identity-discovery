@@ -341,15 +341,28 @@ export async function runCheck(domain: string, opts: CheckOptions): Promise<Doct
           await performPKAHandshake(record.uri, record.pka, record.kid ?? '');
           report.pka.domainBound = false; // v1 never domain-binds
         } else {
-          // Sends AID-Domain so the endpoint can prove/refuse the binding; the domainBound
-          // result is captured in the doctor report.
+          // Domain-binding policy:
+          //  - 'off'    -> suppress AID-Domain (no domain passed; binding never attested)
+          //  - others   -> send AID-Domain so the endpoint can prove/refuse the binding
+          const bindingDomain =
+            opts.domainBindingPolicy === 'off' ? undefined : normalizeDomainHost(domain);
           const pkaResult = await performPKAHandshake(
             record.uri,
             record.pka,
             undefined,
-            normalizeDomainHost(domain),
+            bindingDomain,
           );
           report.pka.domainBound = pkaResult.domainBound;
+          // 'require' rejects an endpoint-proof-only (unbound) record. Throwing the
+          // existing PKA-failure error reuses the catch below: it sets verified=false,
+          // pushes the standard error, and assigns the same failing exit code BEFORE the
+          // downgrade/cache block runs — so a rejected record is never persisted as verified.
+          if (opts.domainBindingPolicy === 'require' && pkaResult.domainBound === false) {
+            throw new AidError(
+              'ERR_SECURITY',
+              'Domain binding required but the endpoint returned an unbound (endpoint-proof only) proof.',
+            );
+          }
         }
         report.pka.verified = true;
       } catch (e) {
