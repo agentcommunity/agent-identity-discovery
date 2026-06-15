@@ -141,9 +141,11 @@ function constructQueryName(domain: string, protocol?: string, useUnderscore = f
 }
 
 function looksLikeAidRecord(raw: string): boolean {
-  return new RegExp(String.raw`(?:^|;)\s*(?:v|version)\s*=\s*aid[0-9]+(?:\s*(?:;|$))`, 'i').test(
-    raw,
-  );
+  // Match only the canonical `v` key. `version` is not a spec field and the
+  // parser does not consume it, so gating on `version=aidN` would classify a
+  // record as AID-like that the parser then rejects, suppressing the
+  // well-known fallback for an effectively non-AID record.
+  return new RegExp(String.raw`(?:^|;)\s*v\s*=\s*aid[0-9]+(?:\s*(?:;|$))`, 'i').test(raw);
 }
 
 async function performPKAHandshakeForRecord(

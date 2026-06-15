@@ -72,43 +72,14 @@ function constructQueryName(domain: string, protocol?: string, useUnderscore = f
 }
 
 function looksLikeAidRecord(raw: string): boolean {
-  const pattern = new RegExp(
-    String.raw`(?:^|;)\s*(?:v|version)\s*=\s*aid[0-9]+(?:\s*(?:;|$))`,
-    'i',
-  );
+  // Match only the canonical `v` key. `version` is not a spec field and the
+  // parser does not consume it (parseRawRecord handles `v` only), so gating on
+  // `version=aidN` would classify a record as AID-like that the parser then
+  // rejects with a confusing "Missing required field: v" and suppresses the
+  // well-known fallback.
+  const pattern = new RegExp(String.raw`(?:^|;)\s*v\s*=\s*aid[0-9]+(?:\s*(?:;|$))`, 'i');
   return pattern.test(raw);
 }
-
-/**
- * Build a canonical RawAidRecord from JSON that may include alias keys
- */
-/*
-function canonicalizeRaw(json: Record<string, unknown>): RawAidRecord {
-  const out: RawAidRecord = {};
-  const getStr = (k: string) =>
-    typeof json[k] === 'string' ? (json[k] as string).trim() : undefined;
-  // Only set fields when defined to comply with exactOptionalPropertyTypes
-  const v = getStr('v');
-  if (v !== undefined) out.v = v;
-  const uri = getStr('uri') ?? getStr('u');
-  if (uri !== undefined) out.uri = uri;
-  const proto = getStr('proto') ?? getStr('p');
-  if (proto !== undefined) out.proto = proto;
-  const auth = getStr('auth') ?? getStr('a');
-  if (auth !== undefined) out.auth = auth;
-  const desc = getStr('desc') ?? getStr('s');
-  if (desc !== undefined) out.desc = desc;
-  const docs = getStr('docs') ?? getStr('d');
-  if (docs !== undefined) out.docs = docs;
-  const dep = getStr('dep') ?? getStr('e');
-  if (dep !== undefined) out.dep = dep;
-  const pka = getStr('pka') ?? getStr('k');
-  if (pka !== undefined) out.pka = pka;
-  const kid = getStr('kid') ?? getStr('i');
-  if (kid !== undefined) out.kid = kid;
-  return out;
-}
-*/
 
 // Minimal fetch/response types to avoid DOM lib dependency
 type HeadersLike = { get(name: string): string | null };
