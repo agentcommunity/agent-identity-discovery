@@ -3,7 +3,7 @@
 > Generated 2026-06-14 · branch `feat/pka-domain-binding` (PR #145) · 15-stream Opus review + adversarial verification + completeness critics.
 > Run `wf_e6c2dbb4-911` · 178 agents · 354 distinct files reviewed.
 
-> **Resolution (2026-06-14):** the **1 critical + 9 high + 44 medium** findings (combined across both rounds) were fixed on this branch via 12 isolated per-package fix streams + 1 dedicated cross-SDK parity task, each with tests; verified green across all 6 SDKs + `build`/`test`/`lint`/`test:parity`/`docs:verify`. The **low/info** findings (72 low, 20 info) were left as documented backlog. See the commits on this branch.
+> **Resolution (2026-06-14):** the **1 critical + 9 high + 44 medium** findings were fixed via 12 isolated per-package fix streams + 1 dedicated cross-SDK parity task (commits `4c8cf3ce..f67ab606`). The **72 low + 20 info** were then fixed via a second 14-stream wave (commits `b645ee66..3b110eae`) — ~89 of 92 closed. **Three deliberately deferred:** (1) `RBT-02` — enabling `exactOptionalPropertyTypes` on `packages/web` surfaces 43 pre-existing errors in unrelated UI components (disproportionate to a low finding); (2) `go-6` CI half — adding a `gofmt`/`go vet` gate to `.github/workflows/ci-go.yml` (the code-formatting half was done); (3) `test-gap-1` — an e2e test-coverage gap in `packages/e2e-tests/src/pka_e2e.ts`. All work verified green across all 6 SDKs + `build`/`test`/`lint`/`test:parity`/`docs:verify`.
 
 ## Authoritative counts (deterministic, from verifier verdicts)
 
