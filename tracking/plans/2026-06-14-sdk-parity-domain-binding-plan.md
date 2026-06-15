@@ -10,6 +10,8 @@
 
 **Scope check / phasing:** This is 5 independent subsystems. They share one contract but compile/test independently, so this is one plan with one phase per SDK (each phase produces a working, tested SDK on its own) plus a final docs+release phase. Recommended order (easiest→hardest): **Go → Python → Rust → .NET → Java**. Each phase is independently shippable; you may stop after any phase.
 
+**Validation:** Stress-tested by two independent clean-context reviewers (contract-correctness/cross-SDK-consistency + executability-vs-real-code). Reviewer 1 empirically verified the domain-bound vector signature and confirmed the canonicalization-parity risk is neutralized (every SDK canonicalizes inside the handshake, so header and rebuilt sig-base always match). Revised to fix every Critical/Important finding: three missed compile/test breaks (Rust `well_known.rs:84/86`, .NET `DiscoveryV2Tests.cs` reflection helper, Java's `gradlew` lives at repo root as `:aid-java`), the Go `resolve`-closure boundary, the Java `discover → parseSingleValid → selectValidRecord` chain, the canonicalize-once + strip-exactly-one-dot + anchored-charset parity rules, and the Rust verification-only-surfacing decision (documented in the changeset). One reviewer claim — "spec has no Appendix B.7" — was a false positive (it read the main checkout on a different branch; our branch's spec has B.7).
+
 ---
 
 ## The Shared Recipe (every SDK does these 8 things)
@@ -23,7 +25,9 @@
 7. **Surface `domainBound`** on the discovery result (shape varies per SDK — see each phase).
 8. **Tests:** add the two shared vectors as a pass test (`domainBound==true`, `AID-Domain` header sent) and a fail test (db tag without `aid-domain` coverage → ERR_SECURITY).
 
-**Canonicalization parity:** mirror TS `canonicalizeAidDomain` (`packages/aid/src/pka.ts:98-105`): trim → ASCII-lowercase → strip one trailing `.` → reject empty or chars outside `[a-z0-9.:[\]_-]`. Use each SDK's existing constant-time lowercase helper where present, not the locale-aware one.
+**Canonicalization parity:** mirror TS `canonicalizeAidDomain` (`packages/aid/src/pka.ts:98-105`): trim → ASCII-lowercase → strip one trailing `.` → reject empty or chars outside `[a-z0-9.:[\]_-]`. Use each SDK's existing constant-time lowercase helper where present, not the locale-aware one. **Two parity pitfalls (the shared `example.com` vector won't catch either — get them right per SDK):** (a) strip **exactly one** trailing dot (TS slices one — `example.com..` → `example.com.`); do NOT use rstrip-all / `trim_end_matches('.')`. (b) the charset check must be **anchored/full-match** (TS uses `^...+$`); Python MUST use `re.fullmatch` (not `re.match`/`search`), Java `matches(...)` (which is implicitly anchored), Rust `chars().all(...)`, Go a full-string loop, .NET `Regex.IsMatch` with `^...$`.
+
+**Canonicalize once, thread the SAME value to both the header and the signature base.** This is the load-bearing correctness rule (the verifier rebuilds the `aid-domain` sig-base line from its own canonical domain). In each SDK's handshake, compute `canonical = canonicalize(domain)` ONCE, then use `canonical` for BOTH the `AID-Domain` request header AND the value passed into the signature-base builder. Never send `canonical` in the header but pass the raw `domain` to the base (verification would fail for any not-already-canonical host).
 
 **Backward-compat invariant (all SDKs):** when no domain is passed, behavior is byte-identical to today (4 components, tag `aid-pka-v2`, no `AID-Domain` header). Existing vector tests stay green.
 
@@ -64,7 +68,7 @@ func validateV2CoveredSet(covered []v2CoveredItem, isDomainBound bool) error {
     return nil
 }
 ```
-- [ ] **Step 5: Reorder `parseV2SignatureHeaders`** (pka.go ~360-387): remove the early `validateV2CoveredSet(covered)` call (line 372); after the params block extracts `tag`, call `validateV2CoveredSet(covered, parsed.tag == "aid-pka-v2-db")`. (The tag local is the value compared at the existing tag check.)
+- [ ] **Step 5: Reorder `parseV2SignatureHeaders`** (pka.go ~360-387): remove the early `validateV2CoveredSet(covered)` call (it's at **line 371**); after the params block extracts `tag`, call `validateV2CoveredSet(covered, parsed.tag == "aid-pka-v2-db")`. (The tag local is the value compared at the existing tag check.)
 - [ ] **Step 6: Run — expect PASS** for the new test; **Step 7: Commit** `feat(aid-go): tag-aware v2 covered-set validation for domain binding`.
 
 ### Task G2: thread the domain through the handshake + sign the aid-domain line
@@ -128,7 +132,7 @@ case "aid-domain":
 
 - [ ] **Step 1: Add the fail-vector test** — `TestPKAV2DomainBoundMissingCoverageRejected` loads `v2-db-missing-aid-domain-coverage`, mocks the response, and expects `performPKAHandshake(..., vector.Domain, ...)` → `ERR_SECURITY` (db tag, 4 covered items → validateV2CoveredSet fails).
 - [ ] **Step 2: Run — expect FAIL** until discovery wiring compiles (the result-struct change ripples).
-- [ ] **Step 3: Add `DiscoveryResult`** to discover.go (`Record AidRecord; TTL uint32; DomainBound bool`); change `DiscoverWithOptions` to return `(DiscoveryResult, error)`; at the two `performPKAHandshake` call sites (lines 88, 133) pass `alabel` (canonicalize/lowercase first via `asciiToLower(alabel)` since `idna.ToASCII` may preserve case) and put `pkaResult.DomainBound` on the result. Non-PKA returns set `DomainBound:false`.
+- [ ] **Step 3: Add `DiscoveryResult`** to discover.go (`Record AidRecord; TTL uint32; DomainBound bool`); change `DiscoverWithOptions` to return `(DiscoveryResult, error)`; at the two `performPKAHandshake` call sites (lines 88, 133) pass `alabel` (passing raw `alabel` is fine — the handshake's `canonicalizeAidDomain` lowercases anyway; `asciiToLower(alabel)` is harmless belt-and-suspenders) and put `pkaResult.DomainBound` on the result. Non-PKA returns set `DomainBound:false`. **Note the closure boundary:** the PKA call at line 88 lives inside the nested `resolve` closure (defined ~line 50) which currently returns `(AidRecord, uint32, error)`; you must rework `resolve` to return `(DiscoveryResult, error)` (or capture `DomainBound` out of it) — this is the one non-mechanical edit in Phase 1. The closure is invoked ~line 109.
 - [ ] **Step 4: Keep `Discover()` backward-compatible**: `func Discover(domain string, timeout time.Duration) (AidRecord, uint32, error)` wraps `DiscoverWithOptions` and returns `res.Record, res.TTL, err`.
 - [ ] **Step 5: Mechanical sweep of `discover_test.go`** — `res, err := DiscoverWithOptions(...)` with `res.Record`.
 - [ ] **Step 6: Run full Go suite — expect PASS**: `cd packages/aid-go && go test ./... -count=1`; **Step 7: Commit** `feat(aid-go): thread queried domain through discovery, expose DomainBound`.
@@ -177,7 +181,7 @@ case "aid-domain":
 
 # PHASE 3 — Rust (`packages/aid-rs`)
 
-> Effort: M. Feature-gated `handshake` (the whole `src/pka.rs` is `#[cfg(feature = "handshake")]`). Result surfacing: `domain_bound` is discarded at the `?` boundary in discover.rs (AidRecord has no field) — keep it least-breaking; `perform_pka_handshake` returns `Result<bool, AidError>`. The inline `v2_vector(id)` helper already loads shared vectors; the two db tests are plain `#[test]` (no mock server). Verify: `cargo test --features handshake --manifest-path packages/aid-rs/Cargo.toml`.
+> Effort: M. Feature-gated `handshake` (the whole `src/pka.rs` is `#[cfg(feature = "handshake")]`). **Result-surfacing decision (deliberate):** Rust ships VERIFICATION-ONLY parity in this phase — it sends `AID-Domain`, verifies/rejects `aid-pka-v2-db` identically to the others, and `perform_pka_handshake` returns `Result<bool, AidError>`, but discovery DISCARDS the bool at the `?` boundary (Rust's `discover` returns `AidRecord`, which has no `domain_bound` field; adding a `DiscoveryResult` wrapper ripples through `well_known.rs` too). This is a documented gap vs the other four SDKs — call it out in the Phase 6 changeset ("Rust: verification parity; `domainBound` discovery surfacing is a fast-follow"). If you instead choose to surface it, add a `DiscoveryResult` wrapper and thread it through BOTH `discover.rs` and `well_known.rs`. The inline `v2_vector(id)` helper already loads shared vectors; the two db tests are plain `#[test]` (no mock server). Verify: `cargo test --features handshake --manifest-path packages/aid-rs/Cargo.toml`.
 
 ### Task R1: whitelist + tag-aware validation + parse-order fix
 
@@ -192,7 +196,7 @@ case "aid-domain":
 
 ### Task R2: handshake domain + sig base + result + discovery
 
-**Files:** Modify `packages/aid-rs/src/pka.rs`, `src/lib.rs`, `src/discover.rs`, `tests/pka_test.rs`
+**Files:** Modify `packages/aid-rs/src/pka.rs`, `src/lib.rs`, `src/discover.rs`, `src/well_known.rs`, `tests/pka_test.rs`
 
 - [ ] **Step 1: Failing pass-vector inline test** `verifies_v2_db_domain_bound_vector` (loads the pass vector; parses headers; builds `build_v2_signature_base(&parsed, target_uri, authority, status, Some("example.com"))`; compares to `vector["signature_base"]`; Ed25519-verifies).
 - [ ] **Step 2: Run — expect FAIL.**
@@ -201,7 +205,10 @@ case "aid-domain":
 - [ ] **Step 5: `build_v2_signature_base(parsed, target_uri, authority, status, domain: Option<&str>)`** (pka.rs:546): `"aid-domain"` arm pushes `format!("\"aid-domain\";req: {}", d)` (Some) else returns empty Vec (fail-closed). Update the existing caller to pass `None`.
 - [ ] **Step 6: `perform_v2_pka_handshake_with_controls(..., domain: Option<&str>) -> Result<bool, AidError>`** (pka.rs:578): canonicalize; re-bind builder `req = req.header("AID-Domain", d)` when Some; dual-tag check + reject `is_domain_bound && canonical_domain.is_none()`; pass `canonical_domain.as_deref()` to sig base; return `Ok(is_domain_bound)`.
 - [ ] **Step 7: Thread through** `perform_pka_handshake_with_controls(..., domain)` (pka.rs:648, v1 → `Ok(false)`) and public `perform_pka_handshake(uri, pka, kid, timeout, domain: Option<&str>) -> Result<bool, AidError>` (pka.rs:644 + re-export `src/lib.rs:15`).
-- [ ] **Step 8: discover.rs** (lines 131-141): pass `Some(&alabel)` for v2, `None` for v1; discard the bool via `?` (note in a comment that `domain_bound` isn't surfaced on `AidRecord` yet — follow-up).
+- [ ] **Step 8: ALL handshake call sites** — the public `perform_pka_handshake` signature change breaks every caller under `--features handshake`. There are FOUR call sites, not two:
+  - `src/discover.rs` (lines 131-141): pass `Some(&alabel)` for v2, `None` for v1; discard the bool via `?`.
+  - `src/well_known.rs` (line 84 v1 → add `None`; line 86 v2 → add `Some(domain)` — `domain: &str` is in scope at `fetch_well_known` ~line 33); discard via `?`.
+  Without the `well_known.rs` fixups the crate won't compile under the `handshake` feature (which the tests require).
 - [ ] **Step 9: Fix `tests/pka_test.rs` call sites** (lines 58, 95, 128): add `None` 5th arg; `assert!(res.is_err())` checks remain valid.
 - [ ] **Step 10: Run full — expect PASS**: `cargo test --features handshake --manifest-path packages/aid-rs/Cargo.toml`; **Step 11: Commit** `feat(aid-rs): send AID-Domain and verify domain-bound PKA responses`.
 
@@ -234,20 +241,21 @@ case "aid-domain":
 - [ ] **Step 6: `PerformV2HandshakeAsync(uri, pka, timeout, string? domain = null) : Task<bool>`** (Handshake.cs:209): canonicalize; `TryAddWithoutValidation("AID-Domain", canonicalDomain)` when set; `BuildAcceptSignatureV2(..., canonicalDomain is not null)`; dual-tag check + reject `isDomainBound && canonicalDomain is null`; pass `canonicalDomain` to sig base; `return isDomainBound`.
 - [ ] **Step 7: `public PerformHandshakeAsync(..., string? domain = null) : Task<bool>`** (Handshake.cs:162): v1 → `false`.
 - [ ] **Step 8: Discovery.cs**: add `public bool DomainBound { get; init; }` to `DiscoveryResult` (line 16); `ParseSingleValid` returns `(AidRecord, bool)` and threads `queriedDomain`; `DiscoverAsync` passes `alabel` and sets `DomainBound` on the result. Well-known path leaves `DomainBound` default false.
-- [ ] **Step 9: Run full — expect PASS**: `dotnet test packages/aid-dotnet/AidDiscovery.sln`; **Step 10: Commit** `feat(aid-dotnet): send AID-Domain, verify domain-bound, expose DomainBound`.
+- [ ] **Step 9: Fix the reflection test that calls `ParseSingleValid`** — `packages/aid-dotnet/tests/DiscoveryV2Tests.cs:7-19` invokes `ParseSingleValid` by reflection, passes 3 args, and casts the result to `(AidRecord)`. After Step 8 it returns a `ValueTuple` and takes a 4th param, so the cast throws `InvalidCastException` and the arg count throws `TargetParameterCountException` (breaking the 5 tests at lines ~29/42/55/68/81). Update the helper: pass the new 4th `queriedDomain` arg (use `"example.com"` or the query host the tests use) and unpack `((AidRecord, bool))method.Invoke(...)!).Item1`.
+- [ ] **Step 10: Run full — expect PASS**: `dotnet test packages/aid-dotnet/AidDiscovery.sln`; **Step 11: Commit** `feat(aid-dotnet): send AID-Domain, verify domain-bound, expose DomainBound`.
 
 ---
 
 # PHASE 5 — Java (`packages/aid-java`)
 
-> Effort: M-L (logic is M; the L is the many existing-test call-site overloads). **Good news:** `AidV2Test.loadPkaVector` ALREADY reads `protocol/pka_vectors.json` (only the unrelated `HandshakeTest`/`vectors.json` is disconnected — leave it alone). Same validation-order fix as .NET. Result surfacing: add `domainBound` to `DiscoveryResult` (+ backward-compatible constructors). Verify: `cd packages/aid-java && ./gradlew test --tests "org.agentcommunity.aid.AidV2Test"`.
+> Effort: M-L (logic is M; the L is the many existing-test call-site overloads). **Good news:** `AidV2Test.loadPkaVector` ALREADY reads `protocol/pka_vectors.json` (only the unrelated `HandshakeTest`/`vectors.json` is disconnected — leave it alone). Same validation-order fix as .NET. Result surfacing: add `domainBound` to `DiscoveryResult` (+ backward-compatible constructors). **Verify command:** there is NO `gradlew` wrapper inside `packages/aid-java/`; the wrapper is at the repo root and the module is registered as `:aid-java` (`settings.gradle`). Run from the **repo root**: `./gradlew :aid-java:test` (or scoped: `./gradlew :aid-java:test --tests "org.agentcommunity.aid.AidV2Test"`).
 
 ### Task J1: constants + whitelist-via-expected + validation-order fix + tag-aware
 
 **Files:** Modify `packages/aid-java/.../Handshake.java`; Test `.../AidV2Test.java`
 
 - [ ] **Step 1: Failing fail-vector test** `rejectsAid2DbTagWithoutAidDomainCoverage` (loads `v2-db-missing-aid-domain-coverage`; calls the new 7-arg `verifyV2Response(..., domain)`; asserts `AidError` `ERR_SECURITY`, message contains "required fields").
-- [ ] **Step 2: Run — expect FAIL**: `./gradlew test --tests "org.agentcommunity.aid.AidV2Test.rejectsAid2DbTagWithoutAidDomainCoverage"`
+- [ ] **Step 2: Run — expect FAIL** (from repo root): `./gradlew :aid-java:test --tests "org.agentcommunity.aid.AidV2Test.rejectsAid2DbTagWithoutAidDomainCoverage"`
 - [ ] **Step 3: Add constants** `AID_PKA_TAG_V2`/`AID_PKA_TAG_V2_DB`.
 - [ ] **Step 4: `validateV2CoveredSet(covered, String tag)`** (Handshake.java:543): `boolean domainBound = AID_PKA_TAG_V2_DB.equals(tag); int expectedSize = domainBound ? 5 : 4;` + conditional `expected.put("aid-domain", true)`.
 - [ ] **Step 5: Reorder `parseV2SignatureHeaders`** (Handshake.java:376): delete the early `validateV2CoveredSet(covered)`; after `tag` is extracted (line 384), call `validateV2CoveredSet(covered, tag)`.
@@ -273,9 +281,9 @@ case "aid-domain":
 
 - [ ] **Step 1:** add a discovery-level test if the harness allows (else rely on J2's handshake tests + the wiring compile).
 - [ ] **Step 2: Run — expect FAIL/compile error** until wiring lands.
-- [ ] **Step 3: `DiscoveryResult`** (Discovery.java:27) gains `boolean domainBound` (4-arg ctor + 3-arg delegating ctor with `false`). `ParsedRecordWithTtl` (line 68) gains `boolean domainBound` (+ 2-arg delegating ctor). `selectValidRecord(..., String domain)` (line 116) threads `alabel` into `performHandshake` and captures the returned bool; add a 4-arg overload delegating with `null`. `discover` (line 179) passes `alabel`, builds `DiscoveryResult` with `p.domainBound`. Well-known path → `false`.
-- [ ] **Step 4: Fix existing `ParsedRecordWithTtl`/`selectValidRecord` call sites** in AidV2Test (use the delegating overloads).
-- [ ] **Step 5: Run full Java suite — expect PASS**: `cd packages/aid-java && ./gradlew test`; **Step 6: Commit** `feat(aid-java): thread queried domain through discovery, expose domainBound`.
+- [ ] **Step 3: `DiscoveryResult`** (Discovery.java:27) gains `boolean domainBound` (4-arg ctor + 3-arg delegating ctor with `false`). `ParsedRecordWithTtl` (line 68) gains `boolean domainBound` (+ 2-arg delegating ctor). **Thread through the FULL chain — `discover` does NOT call `selectValidRecord` directly:** `discover` (line 191) → `parseSingleValid` (line 171) → `selectValidRecord` (line 116). So `parseSingleValid` (currently `(answers, timeout, queryName)`) ALSO needs a `String domain` parameter to bridge `alabel` from `discover` to `selectValidRecord`. Edit all three: `selectValidRecord(..., String domain)` threads `domain` into `performHandshake` and captures the returned bool onto `ParsedRecordWithTtl`; add a 4-arg `selectValidRecord` overload delegating with `null`; `parseSingleValid(..., String domain)` forwards it; `discover` passes `alabel` (in scope at line 181) and builds `DiscoveryResult` with `p.domainBound`. Well-known path → `false`.
+- [ ] **Step 4: Fix existing `ParsedRecordWithTtl`/`selectValidRecord`/`parseSingleValid` call sites** in AidV2Test (use the delegating overloads / pass `null`).
+- [ ] **Step 5: Run full Java suite — expect PASS** (from repo root): `./gradlew :aid-java:test`; **Step 6: Commit** `feat(aid-java): thread queried domain through discovery, expose domainBound`.
 
 ---
 
@@ -299,13 +307,13 @@ case "aid-domain":
 '@agentcommunity/aid': patch
 ---
 
-All official SDKs (Go, Python, Rust, .NET, Java) now reach parity with the TypeScript SDK's PKA domain-binding profile: they send `AID-Domain` by default for v2 PKA, verify the `aid-pka-v2-db` tag and `"aid-domain";req` covered component, and surface a `domainBound` result. Unbound `aid-pka-v2` proofs remain valid.
+All official SDKs (Go, Python, Rust, .NET, Java) now reach parity with the TypeScript SDK's PKA domain-binding profile: they send `AID-Domain` by default for v2 PKA, verify the `aid-pka-v2-db` tag and `"aid-domain";req` covered component, and surface a `domainBound` result (Rust verifies and rejects identically; surfacing `domainBound` through Rust discovery is a fast-follow). Unbound `aid-pka-v2` proofs remain valid.
 ```
 (If the Go/Py/Rust/.NET/Java packages have their own version files — `aid-go` go.mod, `aid-py` pyproject, etc. — bump those per each ecosystem's release convention instead of/in addition to the changeset; check `.changeset/config.json` ignore list and each package's release tooling.)
 - [ ] **Step 2: Full verification:**
   - `pnpm build && pnpm test && pnpm lint` — green.
   - `pnpm test:parity` — TS+Go+Python parity now EXERCISES the v2-db vectors in Go and Python (previously inert). Must be green.
-  - Per-SDK suites not in the parity harness: `cargo test --features handshake --manifest-path packages/aid-rs/Cargo.toml`; `dotnet test packages/aid-dotnet/AidDiscovery.sln`; `cd packages/aid-java && ./gradlew test`.
+  - Per-SDK suites not in the parity harness (from repo root): `cargo test --features handshake --manifest-path packages/aid-rs/Cargo.toml`; `dotnet test packages/aid-dotnet/AidDiscovery.sln`; `./gradlew :aid-java:test`.
 - [ ] **Step 3: Commit** `chore: changeset for non-TS SDK domain-binding parity`.
 
 ---
