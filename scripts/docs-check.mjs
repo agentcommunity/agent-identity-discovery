@@ -5,15 +5,12 @@ import path from 'node:path';
 
 const DOCS_PREFIX = 'https://docs.agentcommunity.org/aid';
 const REFERENCE_FILES = [
-  'README.md',
-  'packages/web/src/components/layout/footer.tsx',
-  'packages/web/src/components/layout/header.tsx',
-  'packages/web/src/components/landing/hero.tsx',
-  'packages/web/src/components/landing/identity.tsx',
-  'packages/web/src/components/landing/quick-start.tsx',
-  'packages/web/src/components/landing/showcase.tsx',
-  'packages/web/src/components/landing/solution.tsx',
-  'packages/web/src/components/workbench/v11-fields/security-fields.tsx',
+  'packages/aid/README.md',
+  'packages/aid-doctor/README.md',
+  'packages/aid-conformance/README.md',
+  'packages/aid-engine/README.md',
+  'packages/aid-rs/README.md',
+  'packages/web/src/lib/docs/markdown.ts',
 ];
 
 const REQUIRED_DOCS = [
@@ -665,6 +662,11 @@ const findMissingLinks = async (repoRoot) => {
 
   for (const relativeFile of REFERENCE_FILES) {
     const absoluteFile = path.join(repoRoot, relativeFile);
+    if (!(await fileExists(absoluteFile))) {
+      throw new Error(
+        `REFERENCE_FILES entry not found: ${relativeFile} — update REFERENCE_FILES in scripts/docs-check.mjs`,
+      );
+    }
     const content = await fs.readFile(absoluteFile, 'utf8');
     const links = extractDocLinks(content);
 

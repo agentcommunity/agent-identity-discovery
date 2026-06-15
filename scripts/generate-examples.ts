@@ -158,22 +158,39 @@ export interface Example {
     })),
   );
 
+  const KNOWN_CATEGORIES = new Set([
+    'tutorials',
+    'reference',
+    'real_world',
+    'protocols',
+    'error_cases',
+  ]);
+  const unknownCategories = allExamples.filter((ex) => !KNOWN_CATEGORIES.has(ex.category));
+  if (unknownCategories.length > 0) {
+    throw new Error(
+      `Unknown example categories (update KNOWN_CATEGORIES in scripts/generate-examples.ts):\n` +
+        unknownCategories.map((ex) => `  ${ex.name}: "${ex.category}"`).join('\n'),
+    );
+  }
+
   const tutorialExamples = allExamples.filter((ex) => ex.category === 'tutorials');
   const referenceExamples = allExamples.filter((ex) => ex.category === 'reference');
   const realWorldExamples = allExamples.filter((ex) => ex.category === 'real_world');
   const protocolExamples = allExamples.filter((ex) => ex.category === 'protocols');
   const otherExamples = allExamples.filter((ex) => ex.category === 'error_cases');
 
+  const escapeSingleQuoted = (value: string) => value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
   function formatExampleArray(examples: FormattedExample[]): string {
     return examples
       .map(
         (ex) => `  {
-    title: '${ex.name}',
-    label: '${ex.name}',
-    domain: '${ex.domain}',
-    icon: '${ex.icon}',
-    content: '${ex.record.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}',
-    category: '${ex.category}',
+    title: '${escapeSingleQuoted(ex.name)}',
+    label: '${escapeSingleQuoted(ex.name)}',
+    domain: '${escapeSingleQuoted(ex.domain)}',
+    icon: '${escapeSingleQuoted(ex.icon)}',
+    content: '${escapeSingleQuoted(ex.record)}',
+    category: '${escapeSingleQuoted(ex.category)}',
   }`,
       )
       .join(',\n');
@@ -230,19 +247,13 @@ try {
 
   // Use project's prettier configuration for consistency
   const prettierOptions = await prettier.resolveConfig(process.cwd());
-  let webFormatted: string;
-  try {
-    webFormatted = await prettier.format(webContent, {
-      semi: prettierOptions?.semi ?? true,
-      singleQuote: prettierOptions?.singleQuote ?? true,
-      trailingComma: (prettierOptions?.trailingComma as 'all' | 'es5' | 'none') ?? 'all',
-      printWidth: prettierOptions?.printWidth ?? 100,
-      parser: 'typescript',
-    });
-  } catch {
-    console.warn('⚠️ Prettier formatting (Web examples) failed. Writing unformatted output.');
-    webFormatted = webContent;
-  }
+  const webFormatted = await prettier.format(webContent, {
+    semi: prettierOptions?.semi ?? true,
+    singleQuote: prettierOptions?.singleQuote ?? true,
+    trailingComma: (prettierOptions?.trailingComma as 'all' | 'es5' | 'none') ?? 'all',
+    printWidth: prettierOptions?.printWidth ?? 100,
+    parser: 'typescript',
+  });
 
   const webOutputDir = path.resolve(process.cwd(), 'packages/web/src/generated');
   const webOutputPath = path.resolve(webOutputDir, 'examples.ts');
