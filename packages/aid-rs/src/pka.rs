@@ -461,14 +461,16 @@ fn parse_v2_covered_item(raw: &str) -> Result<V2Covered, AidError> {
             return Err(AidError::new("ERR_SECURITY", "Unsupported Signature-Input covered item parameter"));
         }
     }
-    if !matches!(name.as_str(), "@method" | "@target-uri" | "@authority" | "@status") {
+    if !matches!(name.as_str(), "@method" | "@target-uri" | "@authority" | "@status" | "aid-domain") {
         return Err(AidError::new("ERR_SECURITY", format!("Unsupported covered field: {}", name)));
     }
     Ok(V2Covered { name, req })
 }
 
-fn validate_v2_covered(covered: &[V2Covered]) -> Result<(), AidError> {
-    if covered.len() != 4 {
+fn validate_v2_covered(covered: &[V2Covered], tag: &str) -> Result<(), AidError> {
+    let domain_bound = constant_time_eq(tag.as_bytes(), b"aid-pka-v2-db");
+    let expected_len = if domain_bound { 5 } else { 4 };
+    if covered.len() != expected_len {
         return Err(AidError::new("ERR_SECURITY", "Signature-Input must cover required fields"));
     }
     let mut seen = HashSet::new();
@@ -476,6 +478,12 @@ fn validate_v2_covered(covered: &[V2Covered]) -> Result<(), AidError> {
         let expected_req = match item.name.as_str() {
             "@method" | "@target-uri" | "@authority" => true,
             "@status" => false,
+            "aid-domain" => {
+                if !domain_bound {
+                    return Err(AidError::new("ERR_SECURITY", "Signature-Input must cover required fields"));
+                }
+                true
+            }
             _ => return Err(AidError::new("ERR_SECURITY", "Signature-Input must cover required fields")),
         };
         if item.req != expected_req || !seen.insert(item.name.as_str()) {
@@ -500,7 +508,6 @@ fn parse_v2_signature_headers(headers: &HeaderMap) -> Result<V2ParsedHeaders, Ai
         .split_whitespace()
         .map(parse_v2_covered_item)
         .collect::<Result<Vec<_>, _>>()?;
-    validate_v2_covered(&covered)?;
     let params = &signature_params_raw[close + 1..];
     validate_v2_signature_input_params(params)?;
     let created_raw = param_value_raw(params, "created")?.ok_or_else(|| AidError::new("ERR_SECURITY", "Invalid Signature-Input"))?;
@@ -509,6 +516,7 @@ fn parse_v2_signature_headers(headers: &HeaderMap) -> Result<V2ParsedHeaders, Ai
     let alg = param_value(params, "alg")?.ok_or_else(|| AidError::new("ERR_SECURITY", "Invalid Signature-Input"))?;
     let nonce = param_value(params, "nonce")?.ok_or_else(|| AidError::new("ERR_SECURITY", "Invalid Signature-Input"))?;
     let tag = param_value(params, "tag")?.ok_or_else(|| AidError::new("ERR_SECURITY", "Invalid Signature-Input"))?;
+    validate_v2_covered(&covered, &tag)?;
     let created = parse_bare_i64_param(&created_raw)?;
     let expires = parse_bare_i64_param(&expires_raw)?;
     let sig_raw = extract_dict_member(&sig, "aid-pka")?;
@@ -812,6 +820,22 @@ mod tests {
             "aid-pka=({});created=1;expires=2;keyid=\"k\";alg=\"ed25519\";nonce=\"n\";tag=\"aid-pka-v2\"",
             covered
         )
+    }
+
+    #[test]
+    fn rejects_v2_db_missing_aid_domain_coverage() {
+        let vector = v2_vector("v2-db-missing-aid-domain-coverage");
+        let response = &vector["response"];
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "Signature-Input",
+            response["signature_input"].as_str().expect("signature input").parse().unwrap(),
+        );
+        headers.insert("Signature", response["signature"].as_str().expect("signature").parse().unwrap());
+        headers.insert("Cache-Control", response["cache_control"].as_str().expect("cache control").parse().unwrap());
+        let err = parse_v2_signature_headers(&headers).expect_err("db tag without aid-domain coverage must fail");
+        assert_eq!(err.error_code, "ERR_SECURITY");
+        assert!(err.message.contains("required fields"), "unexpected message: {}", err.message);
     }
 
     #[test]
