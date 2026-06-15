@@ -27,6 +27,24 @@ function base64ToUint8(b64: string): Uint8Array {
   return bytes;
 }
 
+/**
+ * Decode the base64 bytes carried inside a (V1 or V2) Signature header.
+ *
+ * `atob` throws a raw DOMException on non-base64 input. Left unguarded, that
+ * escapes the PKA handshake as a non-AidError, gets mapped to
+ * ERR_DNS_LOOKUP_FAILED in client.ts, and silently triggers the .well-known
+ * fallback — i.e. a failed endpoint proof fails open onto a different trust
+ * path. Wrapping it here turns a malformed signature into a hard ERR_SECURITY
+ * failure so discovery fails closed.
+ */
+function decodeSignatureBytes(b64: string): Uint8Array {
+  try {
+    return base64ToUint8(b64);
+  } catch {
+    throw new AidError('ERR_SECURITY', 'Invalid PKA signature encoding');
+  }
+}
+
 function base64UrlToUint8(value: string): Uint8Array {
   if (!/^[A-Za-z0-9_-]+$/.test(value) || value.includes('=')) {
     throw new AidError('ERR_SECURITY', 'Invalid aid2 PKA encoding');
@@ -242,7 +260,7 @@ function parseV1SignatureHeaders(headers: HeaderLike): {
   // Extract signature value from Signature header
   const sigMatch = /sig\s*=\s*:\s*([^:]+)\s*:/i.exec(sig);
   if (!sigMatch) throw new AidError('ERR_SECURITY', 'Invalid Signature header');
-  const signature = base64ToUint8(sigMatch[1]);
+  const signature = decodeSignatureBytes(sigMatch[1]);
   const responseDate = (headers.get('Date') || headers.get('date') || null) as string | null;
   return { covered, created, keyid, keyidRaw, alg, signature, responseDate };
 }
@@ -576,7 +594,7 @@ function parseV2SignatureHeaders(headers: HeaderLike): V2SignatureHeaders {
     nonce,
     tag,
     domainBound,
-    signature: base64ToUint8(sigMatch[1]),
+    signature: decodeSignatureBytes(sigMatch[1]),
   };
 }
 

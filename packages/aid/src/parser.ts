@@ -275,13 +275,16 @@ export function validateRecord(rawRecord: RawAidRecord): AidRecord {
     throw new AidError('ERR_INVALID_TXT', 'Missing protocol value');
   }
 
-  // Validate protocol token
-  if (!(protoValue in PROTOCOL_TOKENS)) {
+  // Validate protocol token.
+  // Use own-property membership rather than the `in` operator so inherited
+  // Object.prototype keys (constructor, toString, __proto__, valueOf, …) are
+  // not accepted as tokens (prototype-chain validation bypass).
+  if (!Object.prototype.hasOwnProperty.call(PROTOCOL_TOKENS, protoValue)) {
     throw new AidError('ERR_UNSUPPORTED_PROTO', `Unsupported protocol: ${protoValue}`);
   }
 
-  // Validate auth token if present
-  if (rawRecord.auth && !(rawRecord.auth in AUTH_TOKENS)) {
+  // Validate auth token if present (own-property membership, see note above)
+  if (rawRecord.auth && !Object.prototype.hasOwnProperty.call(AUTH_TOKENS, rawRecord.auth)) {
     throw new AidError('ERR_INVALID_TXT', `Invalid auth token: ${rawRecord.auth}`);
   }
 
@@ -411,7 +414,9 @@ export function parse(txtRecord: string): AidRecord {
  * @returns True if the token is valid
  */
 export function isValidProto(token: string): boolean {
-  return token in PROTOCOL_TOKENS;
+  // Own-property membership only: the `in` operator would accept inherited
+  // Object.prototype keys (constructor, toString, __proto__, …) as tokens.
+  return Object.prototype.hasOwnProperty.call(PROTOCOL_TOKENS, token);
 }
 
 /**
