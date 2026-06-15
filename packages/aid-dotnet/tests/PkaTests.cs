@@ -168,9 +168,12 @@ public class PkaTests
     // ---- Task N1 / N2 new tests ----
 
     [Fact]
-    public async Task V2DbMissingAidDomainCoverageIsRejected()
+    public async Task V2DbDomainMismatchIsRejected()
     {
-        var vector = V2Vector("v2-db-missing-aid-domain-coverage");
+        // Cross-domain forgery: response covers aid-domain (single tag aid-pka-v2) and the client
+        // sent AID-Domain example.com, but the signature was computed over evil.example. The
+        // verifier rebuilds the base with the committed domain, so Ed25519 verification fails.
+        var vector = V2Vector("v2-db-domain-mismatch");
         var nonce = Base64UrlDecode(vector.GetProperty("nonce").GetString()!);
         var oldFill = Pka.FillRandomBytesForTesting;
         var oldNow = Pka.NowUnixForTesting;
@@ -193,6 +196,7 @@ public class PkaTests
                 Pka.PerformHandshakeAsync(record.GetProperty("u").GetString()!, record.GetProperty("k").GetString()!, string.Empty, TimeSpan.FromSeconds(1), domain: vector.GetProperty("domain").GetString())
             );
             Assert.Equal(nameof(Constants.ERR_SECURITY), ex.ErrorCode);
+            Assert.Contains("PKA signature verification failed", ex.Message);
         }
         finally
         {
@@ -233,7 +237,7 @@ public class PkaTests
         {
             var record = vector.GetProperty("record");
             var domainBound = await Pka.PerformHandshakeAsync(record.GetProperty("u").GetString()!, record.GetProperty("k").GetString()!, string.Empty, TimeSpan.FromSeconds(1), domain: vector.GetProperty("domain").GetString());
-            Assert.True(domainBound, "Expected DomainBound=true for aid-pka-v2-db response");
+            Assert.True(domainBound, "Expected DomainBound=true for domain-bound (aid-domain covered) response");
         }
         finally
         {
@@ -282,7 +286,7 @@ public class PkaTests
             // domain (host for the well-known GET) is the loopback server; queriedDomain is the canonical domain.
             var (rec, domainBound) = await WellKnown.FetchAsync($"127.0.0.1:{server.Port}", TimeSpan.FromSeconds(3), allowInsecure: true, queriedDomain: queriedDomain);
             Assert.Equal(recordUri, rec.Uri);
-            Assert.True(domainBound, "Expected DomainBound=true from well-known fallback for aid-pka-v2-db response");
+            Assert.True(domainBound, "Expected DomainBound=true from well-known fallback for domain-bound (aid-domain covered) response");
         }
         finally
         {

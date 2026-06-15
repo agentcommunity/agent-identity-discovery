@@ -10,7 +10,6 @@ use httpdate::parse_http_date;
 use reqwest::header::HeaderMap;
 use reqwest::Client;
 use sha2::{Digest, Sha256};
-use std::collections::HashSet;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 #[derive(Default)]
@@ -446,6 +445,8 @@ struct V2ParsedHeaders {
     alg: String,
     nonce: String,
     tag: String,
+    /// True when the signed covered set includes `"aid-domain";req`.
+    domain_bound: bool,
     signature: Vec<u8>,
 }
 
@@ -485,30 +486,38 @@ fn parse_v2_covered_item(raw: &str) -> Result<V2Covered, AidError> {
     Ok(V2Covered { name, req })
 }
 
-fn validate_v2_covered(covered: &[V2Covered], tag: &str) -> Result<(), AidError> {
-    let domain_bound = constant_time_eq(tag.as_bytes(), b"aid-pka-v2-db");
-    let expected_len = if domain_bound { 5 } else { 4 };
-    if covered.len() != expected_len {
+/// Validates the covered set against the two permitted shapes and returns whether the
+/// proof is domain-bound (i.e. the signed covered set includes `"aid-domain";req`).
+///   Shape A (unbound): @method;req @target-uri;req @authority;req @status
+///   Shape B (bound):   @method;req @target-uri;req @authority;req aid-domain;req @status
+/// The covered set lives in the signed `@signature-params`, so this distinction is authenticated.
+fn validate_v2_covered(covered: &[V2Covered]) -> Result<bool, AidError> {
+    const BASE: [(&str, bool); 4] = [
+        ("@method", true),
+        ("@target-uri", true),
+        ("@authority", true),
+        ("@status", false),
+    ];
+
+    // Domain-bound iff there is exactly one extra item and aid-domain sits strictly between
+    // @authority (index 2) and @status (now index 4), i.e. at slot index 3.
+    let domain_bound = covered.len() == BASE.len() + 1 && covered.get(3).map(|c| c.name.as_str()) == Some("aid-domain");
+
+    let expected: Vec<(&str, bool)> = if domain_bound {
+        vec![BASE[0], BASE[1], BASE[2], ("aid-domain", true), BASE[3]]
+    } else {
+        BASE.to_vec()
+    };
+
+    if covered.len() != expected.len() {
         return Err(AidError::new("ERR_SECURITY", "Signature-Input must cover required fields"));
     }
-    let mut seen = HashSet::new();
-    for item in covered {
-        let expected_req = match item.name.as_str() {
-            "@method" | "@target-uri" | "@authority" => true,
-            "@status" => false,
-            "aid-domain" => {
-                if !domain_bound {
-                    return Err(AidError::new("ERR_SECURITY", "Signature-Input must cover required fields"));
-                }
-                true
-            }
-            _ => return Err(AidError::new("ERR_SECURITY", "Signature-Input must cover required fields")),
-        };
-        if item.req != expected_req || !seen.insert(item.name.as_str()) {
+    for (item, (name, req)) in covered.iter().zip(expected.iter()) {
+        if item.name.as_str() != *name || item.req != *req {
             return Err(AidError::new("ERR_SECURITY", "Signature-Input must cover required fields"));
         }
     }
-    Ok(())
+    Ok(domain_bound)
 }
 
 fn parse_v2_signature_headers(headers: &HeaderMap) -> Result<V2ParsedHeaders, AidError> {
@@ -534,7 +543,7 @@ fn parse_v2_signature_headers(headers: &HeaderMap) -> Result<V2ParsedHeaders, Ai
     let alg = param_value(params, "alg")?.ok_or_else(|| AidError::new("ERR_SECURITY", "Invalid Signature-Input"))?;
     let nonce = param_value(params, "nonce")?.ok_or_else(|| AidError::new("ERR_SECURITY", "Invalid Signature-Input"))?;
     let tag = param_value(params, "tag")?.ok_or_else(|| AidError::new("ERR_SECURITY", "Invalid Signature-Input"))?;
-    validate_v2_covered(&covered, &tag)?;
+    let domain_bound = validate_v2_covered(&covered)?;
     let created = parse_bare_i64_param(&created_raw)?;
     let expires = parse_bare_i64_param(&expires_raw)?;
     let sig_raw = extract_dict_member(&sig, "aid-pka")?;
@@ -546,7 +555,7 @@ fn parse_v2_signature_headers(headers: &HeaderMap) -> Result<V2ParsedHeaders, Ai
     let signature = B64
         .decode(sig_b64)
         .map_err(|_| AidError::new("ERR_SECURITY", "Invalid Signature header"))?;
-    Ok(V2ParsedHeaders { covered, signature_params_raw, created, expires, keyid, alg, nonce, tag, signature })
+    Ok(V2ParsedHeaders { covered, signature_params_raw, created, expires, keyid, alg, nonce, tag, domain_bound, signature })
 }
 
 fn has_no_store(headers: &HeaderMap) -> bool {
@@ -563,17 +572,18 @@ fn has_no_store(headers: &HeaderMap) -> bool {
 }
 
 fn build_accept_signature_v2(keyid: &str, nonce: &str, domain_bound: bool) -> String {
-    if domain_bound {
-        format!(
-            "aid-pka=(\"@method\";req \"@target-uri\";req \"@authority\";req \"aid-domain\";req \"@status\");created;expires;keyid=\"{}\";alg=\"ed25519\";nonce=\"{}\";tag=\"aid-pka-v2-db\"",
-            keyid, nonce
-        )
+    // Always emit a single `aid-pka-v2` tag. Domain binding is requested by including
+    // `"aid-domain";req` in the covered set (strictly between @authority and @status),
+    // not by a distinct tag.
+    let covered = if domain_bound {
+        "(\"@method\";req \"@target-uri\";req \"@authority\";req \"aid-domain\";req \"@status\")"
     } else {
-        format!(
-            "aid-pka=(\"@method\";req \"@target-uri\";req \"@authority\";req \"@status\");created;expires;keyid=\"{}\";alg=\"ed25519\";nonce=\"{}\";tag=\"aid-pka-v2\"",
-            keyid, nonce
-        )
-    }
+        "(\"@method\";req \"@target-uri\";req \"@authority\";req \"@status\")"
+    };
+    format!(
+        "aid-pka={};created;expires;keyid=\"{}\";alg=\"ed25519\";nonce=\"{}\";tag=\"aid-pka-v2\"",
+        covered, keyid, nonce
+    )
 }
 
 fn build_v2_signature_base(parsed: &V2ParsedHeaders, target_uri: &str, authority: &str, status: u16, domain: Option<&str>) -> Vec<u8> {
@@ -680,12 +690,15 @@ async fn perform_v2_pka_handshake_with_controls(
     if !constant_time_eq(parsed.nonce.as_bytes(), nonce.as_bytes()) {
         return Err(AidError::new("ERR_SECURITY", "Signature nonce mismatch"));
     }
-    let is_domain_bound = constant_time_eq(parsed.tag.as_bytes(), b"aid-pka-v2-db");
-    if !is_domain_bound && !constant_time_eq(parsed.tag.as_bytes(), b"aid-pka-v2") {
+    if !constant_time_eq(parsed.tag.as_bytes(), b"aid-pka-v2") {
         return Err(AidError::new("ERR_SECURITY", "Invalid signature tag"));
     }
+    // Domain binding is derived from the signed covered set (aid-domain coverage), not the tag.
+    let is_domain_bound = parsed.domain_bound;
+    // Fail closed: a response that covers aid-domain is only meaningful when the client
+    // committed to a domain via the AID-Domain header. Reject otherwise.
     if is_domain_bound && canonical_domain.is_none() {
-        return Err(AidError::new("ERR_SECURITY", "Unrequested domain-bound signature tag"));
+        return Err(AidError::new("ERR_SECURITY", "Response covers aid-domain but no AID-Domain was sent"));
     }
     let base = build_v2_signature_base(&parsed, &target_uri, &authority, status, canonical_domain.as_deref());
     let vk = VerifyingKey::from_bytes(pubkey.as_slice().try_into().unwrap())
@@ -871,22 +884,6 @@ mod tests {
     }
 
     #[test]
-    fn rejects_v2_db_missing_aid_domain_coverage() {
-        let vector = v2_vector("v2-db-missing-aid-domain-coverage");
-        let response = &vector["response"];
-        let mut headers = HeaderMap::new();
-        headers.insert(
-            "Signature-Input",
-            response["signature_input"].as_str().expect("signature input").parse().unwrap(),
-        );
-        headers.insert("Signature", response["signature"].as_str().expect("signature").parse().unwrap());
-        headers.insert("Cache-Control", response["cache_control"].as_str().expect("cache control").parse().unwrap());
-        let err = parse_v2_signature_headers(&headers).expect_err("db tag without aid-domain coverage must fail");
-        assert_eq!(err.error_code, "ERR_SECURITY");
-        assert!(err.message.contains("required fields"), "unexpected message: {}", err.message);
-    }
-
-    #[test]
     fn verifies_v2_db_domain_bound_vector() {
         let vector = v2_vector("v2-db-rfc9421-domain-bound");
         let record = &vector["record"];
@@ -909,7 +906,9 @@ mod tests {
         assert!(has_no_store(&headers));
 
         let parsed = parse_v2_signature_headers(&headers).expect("parse v2 db signature headers");
-        assert_eq!(parsed.tag, "aid-pka-v2-db");
+        // Single tag now: domain-binding is signaled by aid-domain coverage, not a -db tag.
+        assert_eq!(parsed.tag, "aid-pka-v2");
+        assert!(parsed.domain_bound, "covered set includes aid-domain -> domain_bound");
 
         let base = build_v2_signature_base(
             &parsed,
@@ -927,6 +926,45 @@ mod tests {
         let vk = VerifyingKey::from_bytes(public_key.as_slice().try_into().unwrap()).expect("valid public key");
         let sig = Signature::from_slice(&parsed.signature).expect("valid signature bytes");
         vk.verify(&base, &sig).expect("domain-bound v2 signature verifies");
+    }
+
+    #[test]
+    fn v2_db_domain_mismatch_vector_fails_at_ed25519_verification() {
+        // Same covered shape / tag as the bound vector, but the signature was produced over a
+        // different domain, so it must fail at Ed25519 verification (not earlier).
+        let vector = v2_vector("v2-db-domain-mismatch");
+        assert_eq!(vector["expect"].as_str().expect("expect"), "fail");
+        let record = &vector["record"];
+        let response = &vector["response"];
+        let request = &vector["request"];
+        let domain = vector["domain"].as_str().expect("domain");
+
+        let k = record["k"].as_str().expect("record k");
+        let (public_key, _keyid) = derive_v2_key_material(k).expect("derive v2 key material");
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "Signature-Input",
+            response["signature_input"].as_str().expect("signature input").parse().unwrap(),
+        );
+        headers.insert("Signature", response["signature"].as_str().expect("signature").parse().unwrap());
+        headers.insert("Cache-Control", response["cache_control"].as_str().expect("cache control").parse().unwrap());
+
+        // Parses cleanly and is recognized as domain-bound via coverage.
+        let parsed = parse_v2_signature_headers(&headers).expect("parse v2 db mismatch headers");
+        assert_eq!(parsed.tag, "aid-pka-v2");
+        assert!(parsed.domain_bound);
+
+        let base = build_v2_signature_base(
+            &parsed,
+            request["target_uri"].as_str().expect("target uri"),
+            request["authority"].as_str().expect("authority"),
+            response["status"].as_u64().expect("status") as u16,
+            Some(domain),
+        );
+        let vk = VerifyingKey::from_bytes(public_key.as_slice().try_into().unwrap()).expect("valid public key");
+        let sig = Signature::from_slice(&parsed.signature).expect("valid signature bytes");
+        assert!(vk.verify(&base, &sig).is_err(), "domain-mismatch signature must fail Ed25519 verification");
     }
 
     #[test]

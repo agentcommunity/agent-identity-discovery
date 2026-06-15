@@ -243,12 +243,15 @@ func performV2PKAHandshake(uri, pka, domain string, timeout time.Duration) (PKAH
 	if !timingSafeEqualString(parsed.nonce, nonce) {
 		return PKAHandshakeResult{}, newAidError("ERR_SECURITY", "Signature nonce mismatch")
 	}
-	isDomainBound := timingSafeEqualString(parsed.tag, "aid-pka-v2-db")
-	if !isDomainBound && !timingSafeEqualString(parsed.tag, "aid-pka-v2") {
+	if !timingSafeEqualString(parsed.tag, "aid-pka-v2") {
 		return PKAHandshakeResult{}, newAidError("ERR_SECURITY", "Invalid signature tag")
 	}
+	// Domain binding is derived from the signed covered set (aid-domain coverage), not the tag.
+	isDomainBound := parsed.domainBound
+	// Primary protection: a response that covers aid-domain is only meaningful when the client
+	// committed to a domain via the AID-Domain header. Reject otherwise (fail closed).
 	if isDomainBound && canonicalDomain == "" {
-		return PKAHandshakeResult{}, newAidError("ERR_SECURITY", "Unrequested domain-bound signature tag")
+		return PKAHandshakeResult{}, newAidError("ERR_SECURITY", "Response covers aid-domain but no AID-Domain was sent")
 	}
 
 	base, err := buildV2SignatureBase(parsed.covered, parsed.signatureParamsRaw, v2SignatureContext{
@@ -327,13 +330,13 @@ func requestAuthority(raw string) (string, error) {
 }
 
 func buildAcceptSignatureV2(keyID, nonce, domain string) string {
+	// Single tag aid-pka-v2 for both modes; domain binding is signalled by
+	// including "aid-domain";req in the covered set, not by a distinct tag.
 	covered := `("@method";req "@target-uri";req "@authority";req "@status")`
-	tag := "aid-pka-v2"
 	if domain != "" {
 		covered = `("@method";req "@target-uri";req "@authority";req "aid-domain";req "@status")`
-		tag = "aid-pka-v2-db"
 	}
-	return fmt.Sprintf(`aid-pka=%s;created;expires;keyid="%s";alg="ed25519";nonce="%s";tag="%s"`, covered, keyID, nonce, tag)
+	return fmt.Sprintf(`aid-pka=%s;created;expires;keyid="%s";alg="ed25519";nonce="%s";tag="aid-pka-v2"`, covered, keyID, nonce)
 }
 
 func hasNoStoreDirective(cacheControl string) bool {
@@ -371,7 +374,9 @@ type v2SignatureHeaders struct {
 	alg                string
 	nonce              string
 	tag                string
-	signature          []byte
+	// domainBound is true when the signed covered set includes "aid-domain";req.
+	domainBound bool
+	signature   []byte
 }
 
 type v2SignatureContext struct {
@@ -431,7 +436,8 @@ func parseV2SignatureHeaders(headers http.Header) (v2SignatureHeaders, error) {
 	if !hasCreated || !hasExpires || !hasKeyID || !hasAlg || !hasNonce || !hasTag {
 		return v2SignatureHeaders{}, newAidError("ERR_SECURITY", "Invalid Signature-Input")
 	}
-	if err := validateV2CoveredSet(covered, timingSafeEqualString(tag, "aid-pka-v2-db")); err != nil {
+	domainBound, err := validateV2CoveredSet(covered)
+	if err != nil {
 		return v2SignatureHeaders{}, err
 	}
 	created, err := strconv.ParseInt(createdRaw, 10, 64)
@@ -465,6 +471,7 @@ func parseV2SignatureHeaders(headers http.Header) (v2SignatureHeaders, error) {
 		alg:                alg,
 		nonce:              nonce,
 		tag:                tag,
+		domainBound:        domainBound,
 		signature:          signature,
 	}, nil
 }
@@ -626,31 +633,47 @@ func parseV2CoveredItem(raw string) (v2CoveredItem, error) {
 	return v2CoveredItem{raw: raw, name: name, req: req}, nil
 }
 
-func validateV2CoveredSet(covered []v2CoveredItem, isDomainBound bool) error {
-	expected := map[string]bool{
-		"@method":     true,
-		"@target-uri": true,
-		"@authority":  true,
-		"@status":     false,
+type v2CoveredExpectation struct {
+	name string
+	req  bool
+}
+
+// validateV2CoveredSet validates the covered set against the two permitted shapes
+// and returns whether the proof is domain-bound (i.e. the signed covered set includes
+// "aid-domain";req in slot index 3, strictly between @authority and @status).
+//
+//	Shape A (unbound): @method;req @target-uri;req @authority;req @status
+//	Shape B (bound):   @method;req @target-uri;req @authority;req aid-domain;req @status
+//
+// The covered set lives in the signed @signature-params, so this distinction is authenticated.
+func validateV2CoveredSet(covered []v2CoveredItem) (bool, error) {
+	base := []v2CoveredExpectation{
+		{name: "@method", req: true},
+		{name: "@target-uri", req: true},
+		{name: "@authority", req: true},
+		{name: "@status", req: false},
 	}
-	if isDomainBound {
-		expected["aid-domain"] = true
-	}
-	if len(covered) != len(expected) {
-		return newAidError("ERR_SECURITY", "Signature-Input must cover required fields")
-	}
-	seen := map[string]bool{}
-	for _, item := range covered {
-		req, ok := expected[item.name]
-		if !ok || seen[item.name] || req != item.req {
-			return newAidError("ERR_SECURITY", "Signature-Input must cover required fields")
+
+	domainBound := len(covered) == len(base)+1 && covered[3].name == "aid-domain"
+
+	expected := base
+	if domainBound {
+		expected = []v2CoveredExpectation{
+			base[0], base[1], base[2],
+			{name: "aid-domain", req: true},
+			base[3],
 		}
-		seen[item.name] = true
 	}
-	if len(seen) != len(expected) {
-		return newAidError("ERR_SECURITY", "Signature-Input must cover required fields")
+
+	if len(covered) != len(expected) {
+		return false, newAidError("ERR_SECURITY", "Signature-Input must cover required fields")
 	}
-	return nil
+	for i, want := range expected {
+		if covered[i].name != want.name || covered[i].req != want.req {
+			return false, newAidError("ERR_SECURITY", "Signature-Input must cover required fields")
+		}
+	}
+	return domainBound, nil
 }
 
 func unquoteSfString(value string) string {

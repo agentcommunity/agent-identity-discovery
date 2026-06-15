@@ -885,8 +885,11 @@ public class AidV2Test {
   }
 
   @Test
-  void rejectsAid2DbTagWithoutAidDomainCoverage() throws Exception {
-    JsonNode vector = loadPkaVector("v2-db-missing-aid-domain-coverage");
+  void rejectsAid2DbWhenSignedDomainDiffersFromSentDomain() throws Exception {
+    // The mismatch vector covers aid-domain (single tag aid-pka-v2) but was signed over a base
+    // whose aid-domain line is evil.example. The verifier rebuilds with the sent domain
+    // (example.com), so Ed25519 verification fails.
+    JsonNode vector = loadPkaVector("v2-db-domain-mismatch");
 
     AidError err =
         assertThrows(
@@ -902,7 +905,9 @@ public class AidV2Test {
                     vector.get("domain").asText()));
 
     assertEquals("ERR_SECURITY", err.errorCode);
-    assertTrue(err.getMessage().contains("required fields"), "message was: " + err.getMessage());
+    assertTrue(
+        err.getMessage().contains("PKA signature verification failed"),
+        "message was: " + err.getMessage());
   }
 
   private static JsonNode loadPkaVector(String id) throws Exception {

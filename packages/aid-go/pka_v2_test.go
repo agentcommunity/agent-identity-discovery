@@ -510,8 +510,15 @@ func TestPKAV2DomainBoundPassVector(t *testing.T) {
 	}
 }
 
-func TestPKAV2DomainBoundMissingCoverageRejected(t *testing.T) {
-	vector := loadPKAV2Vector(t, "v2-db-missing-aid-domain-coverage")
+func TestPKAV2DomainMismatchRejected(t *testing.T) {
+	// Cross-domain forgery: the response covers aid-domain and the client sent
+	// AID-Domain=example.com, but the signature was computed over a base whose
+	// aid-domain line is evil.example. The verifier rebuilds the base with
+	// example.com, so Ed25519 verification fails and the response is rejected.
+	vector := loadPKAV2Vector(t, "v2-db-domain-mismatch")
+	if vector.Expect != "fail" {
+		t.Fatalf("expected vector expect=fail, got %q", vector.Expect)
+	}
 	withPKAV2VectorClockAndNonce(t, vector)
 
 	oldClient := httpClient
@@ -526,7 +533,7 @@ func TestPKAV2DomainBoundMissingCoverageRejected(t *testing.T) {
 
 	_, err := performPKAHandshake(vector.Record.U, vector.Record.K, "", vector.Domain, time.Second)
 	if err == nil {
-		t.Fatalf("expected db tag without aid-domain coverage to be rejected")
+		t.Fatalf("expected cross-domain forgery to be rejected at Ed25519 verification")
 	}
 	aidErr, ok := err.(*AidError)
 	if !ok {
@@ -537,14 +544,16 @@ func TestPKAV2DomainBoundMissingCoverageRejected(t *testing.T) {
 	}
 }
 
-func TestPKAV2RejectsDbTagWithoutAidDomainCoverage(t *testing.T) {
+func TestPKAV2RejectsInvalidCoveredSet(t *testing.T) {
+	// aid-domain covered, but with an extra disallowed component (host) — validateV2CoveredSet
+	// accepts only the base-4 or base-4 + aid-domain shapes and rejects anything else.
 	headers := http.Header{}
-	headers.Set("Signature-Input", `aid-pka=("@method";req "@target-uri";req "@authority";req "@status");created=1;expires=2;keyid="key";alg="ed25519";nonce="nonce";tag="aid-pka-v2-db"`)
+	headers.Set("Signature-Input", `aid-pka=("@method";req "@target-uri";req "@authority";req "aid-domain";req "host";req "@status");created=1;expires=2;keyid="key";alg="ed25519";nonce="nonce";tag="aid-pka-v2"`)
 	headers.Set("Signature", `aid-pka=:`+base64.StdEncoding.EncodeToString(make([]byte, ed25519.SignatureSize))+`:`)
 
 	_, err := parseV2SignatureHeaders(headers)
 	if err == nil {
-		t.Fatalf("expected db tag without aid-domain coverage to be rejected")
+		t.Fatalf("expected invalid covered set to be rejected")
 	}
 	aidErr, ok := err.(*AidError)
 	if !ok {
@@ -552,6 +561,40 @@ func TestPKAV2RejectsDbTagWithoutAidDomainCoverage(t *testing.T) {
 	}
 	if aidErr.Symbol != "ERR_SECURITY" {
 		t.Fatalf("expected ERR_SECURITY, got %s", aidErr.Symbol)
+	}
+}
+
+func TestPKAV2RejectsAidDomainCoverageWhenNoDomainSent(t *testing.T) {
+	// Under the single-tag model, domain binding is signalled purely by aid-domain coverage.
+	// A response that covers aid-domain is only meaningful when the client committed to a
+	// domain via the AID-Domain header, so it must be rejected when no domain was sent.
+	vector := loadPKAV2Vector(t, "v2-db-rfc9421-domain-bound")
+	withPKAV2VectorClockAndNonce(t, vector)
+
+	oldClient := httpClient
+	httpClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		h := http.Header{}
+		h.Set("Cache-Control", vector.Response.CacheControl)
+		h.Set("Signature-Input", vector.Response.SignatureInput)
+		h.Set("Signature", vector.Response.Signature)
+		return &http.Response{StatusCode: vector.Response.Status, Header: h, Body: io.NopCloser(strings.NewReader(""))}, nil
+	})}
+	t.Cleanup(func() { httpClient = oldClient })
+
+	// No domain passed to the handshake -> fail closed.
+	_, err := performPKAHandshake(vector.Record.U, vector.Record.K, "", "", time.Second)
+	if err == nil {
+		t.Fatalf("expected aid-domain coverage without a sent domain to be rejected")
+	}
+	aidErr, ok := err.(*AidError)
+	if !ok {
+		t.Fatalf("expected AidError, got %T", err)
+	}
+	if aidErr.Symbol != "ERR_SECURITY" {
+		t.Fatalf("expected ERR_SECURITY, got %s", aidErr.Symbol)
+	}
+	if aidErr.Msg != "Response covers aid-domain but no AID-Domain was sent" {
+		t.Fatalf("unexpected message: %s", aidErr.Msg)
 	}
 }
 

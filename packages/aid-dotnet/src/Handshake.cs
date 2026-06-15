@@ -232,10 +232,10 @@ public static class Pka
 
         // Canonicalize domain ONCE; thread the SAME value to header + sig base
         string? canonicalDomain = domain is not null ? CanonicalizeAidDomain(domain) : null;
-        var isDomainBound = canonicalDomain is not null;
+        var requestDomainBound = canonicalDomain is not null;
 
         using var req = new HttpRequestMessage(HttpMethod.Get, requestUri);
-        req.Headers.TryAddWithoutValidation("Accept-Signature", BuildAcceptSignatureV2(expectedKeyid, nonce, isDomainBound));
+        req.Headers.TryAddWithoutValidation("Accept-Signature", BuildAcceptSignatureV2(expectedKeyid, nonce, requestDomainBound));
         req.Headers.CacheControl = new CacheControlHeaderValue { NoStore = true };
         if (canonicalDomain is not null)
         {
@@ -277,21 +277,22 @@ public static class Pka
             throw new AidError(nameof(Constants.ERR_SECURITY), "Signature nonce mismatch");
         }
 
-        // Accept both aid-pka-v2 and aid-pka-v2-db tags; reject mismatched db response when no domain sent
-        var responseIsDomainBound = TimingSafeEqualString(parsed.Tag, "aid-pka-v2-db");
-        var responseIsPlain = TimingSafeEqualString(parsed.Tag, "aid-pka-v2");
-        if (!responseIsDomainBound && !responseIsPlain)
+        if (!TimingSafeEqualString(parsed.Tag, "aid-pka-v2"))
         {
             throw new AidError(nameof(Constants.ERR_SECURITY), "Invalid signature tag");
         }
-        if (responseIsDomainBound && canonicalDomain is null)
+        // Domain binding is derived from the signed covered set (aid-domain coverage), not the tag.
+        var isDomainBound = parsed.DomainBound;
+        // Primary protection: a response that covers aid-domain is only meaningful when the client
+        // committed to a domain via the AID-Domain header. Reject otherwise (fail closed).
+        if (isDomainBound && canonicalDomain is null)
         {
-            throw new AidError(nameof(Constants.ERR_SECURITY), "Unrequested domain-bound signature tag");
+            throw new AidError(nameof(Constants.ERR_SECURITY), "Response covers aid-domain but no AID-Domain was sent");
         }
 
         var baseBytes = BuildV2SignatureBase(parsed.Covered, parsed.SignatureParamsRaw, "GET", requestUri, authority, status, canonicalDomain);
         VerifyEd25519(pub, baseBytes, parsed.Signature);
-        return responseIsDomainBound;
+        return isDomainBound;
     }
 
     private static (byte[] PublicKey, string Keyid) DeriveAid2KeyMaterial(string pka)
@@ -338,11 +339,12 @@ public static class Pka
 
     private static string BuildAcceptSignatureV2(string keyid, string nonce, bool domainBound = false)
     {
-        if (domainBound)
-        {
-            return $"aid-pka=(\"@method\";req \"@target-uri\";req \"@authority\";req \"aid-domain\";req \"@status\");created;expires;keyid=\"{keyid}\";alg=\"ed25519\";nonce=\"{nonce}\";tag=\"aid-pka-v2-db\"";
-        }
-        return $"aid-pka=(\"@method\";req \"@target-uri\";req \"@authority\";req \"@status\");created;expires;keyid=\"{keyid}\";alg=\"ed25519\";nonce=\"{nonce}\";tag=\"aid-pka-v2\"";
+        // The tag is a fixed profile identifier (RFC 9421 section 2.3); domain binding is signalled
+        // by including "aid-domain";req in the covered set, not by a distinct tag.
+        var covered = domainBound
+            ? "(\"@method\";req \"@target-uri\";req \"@authority\";req \"aid-domain\";req \"@status\")"
+            : "(\"@method\";req \"@target-uri\";req \"@authority\";req \"@status\")";
+        return $"aid-pka={covered};created;expires;keyid=\"{keyid}\";alg=\"ed25519\";nonce=\"{nonce}\";tag=\"aid-pka-v2\"";
     }
 
     private static bool HasNoStoreDirective(string cacheControl)
@@ -368,6 +370,7 @@ public static class Pka
         string Alg,
         string Nonce,
         string Tag,
+        bool DomainBound,
         byte[] Signature
     );
 
@@ -408,9 +411,8 @@ public static class Pka
             throw new AidError(nameof(Constants.ERR_SECURITY), "Invalid Signature-Input timestamp");
         }
 
-        // Tag must be parsed BEFORE validating covered-set so we know if it's domain-bound
-        var tag = parameters["tag"];
-        ValidateV2CoveredSet(covered, TimingSafeEqualString(tag, "aid-pka-v2-db"));
+        // Domain binding is derived from the signed covered set (aid-domain coverage), not the tag.
+        var domainBound = ValidateV2CoveredSet(covered);
 
         var signatureRaw = ExtractDictionaryMember(sig, "aid-pka");
         if (!signatureRaw.StartsWith(":", StringComparison.Ordinal) || !signatureRaw.EndsWith(":", StringComparison.Ordinal) || signatureRaw.Length < 3)
@@ -436,6 +438,7 @@ public static class Pka
             parameters["alg"],
             parameters["nonce"],
             parameters["tag"],
+            domainBound,
             signature
         );
     }
@@ -596,31 +599,43 @@ public static class Pka
         return new V2CoveredItem(raw, name, req);
     }
 
-    private static void ValidateV2CoveredSet(List<V2CoveredItem> covered, bool domainBound = false)
+    // Validates the covered set against the two permitted shapes and returns whether the
+    // proof is domain-bound (i.e. the signed covered set includes "aid-domain";req).
+    // Shape A (unbound): @method;req @target-uri;req @authority;req @status
+    // Shape B (bound):   @method;req @target-uri;req @authority;req aid-domain;req @status
+    // The covered set lives in the signed @signature-params, so this distinction is authenticated.
+    private static bool ValidateV2CoveredSet(List<V2CoveredItem> covered)
     {
-        var expected = new Dictionary<string, bool>(StringComparer.Ordinal)
+        var baseSet = new (string Name, bool Req)[]
         {
-            ["@method"] = true,
-            ["@target-uri"] = true,
-            ["@authority"] = true,
-            ["@status"] = false,
+            ("@method", true),
+            ("@target-uri", true),
+            ("@authority", true),
+            ("@status", false),
         };
-        if (domainBound)
-        {
-            expected["aid-domain"] = true;
-        }
-        if (covered.Count != expected.Count)
+
+        var domainBound = covered.Count == baseSet.Length + 1
+            && covered.Count > 3
+            && covered[3].Name == "aid-domain";
+
+        var expected = domainBound
+            ? new (string Name, bool Req)[] { baseSet[0], baseSet[1], baseSet[2], ("aid-domain", true), baseSet[3] }
+            : baseSet;
+
+        if (covered.Count != expected.Length)
         {
             throw new AidError(nameof(Constants.ERR_SECURITY), "Signature-Input must cover required fields");
         }
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var item in covered)
+
+        for (int i = 0; i < expected.Length; i++)
         {
-            if (!expected.TryGetValue(item.Name, out var req) || req != item.Req || !seen.Add(item.Name))
+            if (covered[i].Name != expected[i].Name || covered[i].Req != expected[i].Req)
             {
                 throw new AidError(nameof(Constants.ERR_SECURITY), "Signature-Input must cover required fields");
             }
         }
+
+        return domainBound;
     }
 
     private static string UnquoteSfString(string value)
