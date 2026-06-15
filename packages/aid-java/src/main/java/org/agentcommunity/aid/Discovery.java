@@ -28,8 +28,12 @@ public final class Discovery {
     public final AidRecord record;
     public final int ttl;
     public final String queryName;
+    public final boolean domainBound;
     public DiscoveryResult(AidRecord record, int ttl, String queryName) {
-      this.record = record; this.ttl = ttl; this.queryName = queryName;
+      this(record, ttl, queryName, false);
+    }
+    public DiscoveryResult(AidRecord record, int ttl, String queryName, boolean domainBound) {
+      this.record = record; this.ttl = ttl; this.queryName = queryName; this.domainBound = domainBound;
     }
   }
 
@@ -68,7 +72,11 @@ public final class Discovery {
   static final class ParsedRecordWithTtl {
     final AidRecord record;
     final int ttl;
-    ParsedRecordWithTtl(AidRecord record, int ttl) { this.record = record; this.ttl = ttl; }
+    final boolean domainBound;
+    ParsedRecordWithTtl(AidRecord record, int ttl) { this(record, ttl, false); }
+    ParsedRecordWithTtl(AidRecord record, int ttl, boolean domainBound) {
+      this.record = record; this.ttl = ttl; this.domainBound = domainBound;
+    }
   }
 
   @FunctionalInterface
@@ -114,6 +122,10 @@ public final class Discovery {
   }
 
   static ParsedRecordWithTtl selectValidRecord(List<RawTxtAnswer> answers, Duration timeout, String queryName, boolean performHandshake) {
+    return selectValidRecord(answers, timeout, queryName, performHandshake, null);
+  }
+
+  static ParsedRecordWithTtl selectValidRecord(List<RawTxtAnswer> answers, Duration timeout, String queryName, boolean performHandshake, String domain) {
     AidError last = null;
     List<ParsedRecordWithTtl> validRecords = new ArrayList<>();
     for (RawTxtAnswer answer : answers) {
@@ -144,10 +156,11 @@ public final class Discovery {
             "Multiple valid " + selectedVersion + " AID records found for " + queryName + "; publish exactly one valid record per queried DNS name");
       }
       ParsedRecordWithTtl selected = selectedRecords.get(0);
+      boolean domainBound = false;
       if (performHandshake && selected.record.pka != null) {
-        Handshake.performHandshake(selected.record.uri, selected.record.pka, selected.record.kid == null ? "" : selected.record.kid, timeout);
+        domainBound = Handshake.performHandshake(selected.record.uri, selected.record.pka, selected.record.kid == null ? "" : selected.record.kid, timeout, domain);
       }
-      return selected;
+      return new ParsedRecordWithTtl(selected.record, selected.ttl, domainBound);
     }
 
     throw last != null ? last : new AidError("ERR_NO_RECORD", "No valid AID record in TXT answers");
@@ -168,12 +181,12 @@ public final class Discovery {
     return false;
   }
 
-  private static ParsedRecordWithTtl parseSingleValid(List<DoHAnswer> answers, Duration timeout, String queryName) {
+  private static ParsedRecordWithTtl parseSingleValid(List<DoHAnswer> answers, Duration timeout, String queryName, String domain) {
     List<RawTxtAnswer> rawAnswers = new ArrayList<>();
     for (DoHAnswer answer : answers) {
       rawAnswers.add(new RawTxtAnswer(answer.data, answer.ttl));
     }
-    return selectValidRecord(rawAnswers, timeout, queryName, true);
+    return selectValidRecord(rawAnswers, timeout, queryName, true, domain);
   }
 
   public static DiscoveryResult discover(String domain, DiscoveryOptions options) {
@@ -188,8 +201,8 @@ public final class Discovery {
         if (options.requireDnssec && !res.ad) {
           throw new AidError("ERR_SECURITY", "DNSSEC validation failed or was not available for " + name);
         }
-        ParsedRecordWithTtl p = parseSingleValid(res.answer, options.timeout, name);
-        return new DiscoveryResult(p.record, p.ttl, name);
+        ParsedRecordWithTtl p = parseSingleValid(res.answer, options.timeout, name, alabel);
+        return new DiscoveryResult(p.record, p.ttl, name, p.domainBound);
       } catch (AidError e) {
         last = e;
         if (!"ERR_NO_RECORD".equals(e.errorCode)) break;
