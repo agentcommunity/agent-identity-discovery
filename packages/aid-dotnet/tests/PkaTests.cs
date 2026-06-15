@@ -165,6 +165,86 @@ public class PkaTests
         }
     }
 
+    // ---- Task N1 / N2 new tests ----
+
+    [Fact]
+    public async Task V2DbMissingAidDomainCoverageIsRejected()
+    {
+        var vector = V2Vector("v2-db-missing-aid-domain-coverage");
+        var nonce = Base64UrlDecode(vector.GetProperty("nonce").GetString()!);
+        var oldFill = Pka.FillRandomBytesForTesting;
+        var oldNow = Pka.NowUnixForTesting;
+        var oldSend = Pka.SendAsyncForTesting;
+        Pka.FillRandomBytesForTesting = bytes => Array.Copy(nonce, bytes, bytes.Length);
+        Pka.NowUnixForTesting = () => vector.GetProperty("created").GetInt64();
+        Pka.SendAsyncForTesting = (_, _) =>
+        {
+            var responseVector = vector.GetProperty("response");
+            var response = new HttpResponseMessage((System.Net.HttpStatusCode)responseVector.GetProperty("status").GetInt32());
+            response.Headers.TryAddWithoutValidation("Cache-Control", responseVector.GetProperty("cache_control").GetString());
+            response.Headers.TryAddWithoutValidation("Signature-Input", responseVector.GetProperty("signature_input").GetString());
+            response.Headers.TryAddWithoutValidation("Signature", responseVector.GetProperty("signature").GetString());
+            return Task.FromResult(response);
+        };
+        try
+        {
+            var record = vector.GetProperty("record");
+            var ex = await Assert.ThrowsAsync<AidError>(() =>
+                Pka.PerformHandshakeAsync(record.GetProperty("u").GetString()!, record.GetProperty("k").GetString()!, string.Empty, TimeSpan.FromSeconds(1), domain: vector.GetProperty("domain").GetString())
+            );
+            Assert.Equal(nameof(Constants.ERR_SECURITY), ex.ErrorCode);
+        }
+        finally
+        {
+            Pka.FillRandomBytesForTesting = oldFill;
+            Pka.NowUnixForTesting = oldNow;
+            Pka.SendAsyncForTesting = oldSend;
+        }
+    }
+
+    [Fact]
+    public async Task V2DbDomainBoundVectorRunsAgainstHandshake()
+    {
+        var vector = V2Vector("v2-db-rfc9421-domain-bound");
+        var nonce = Base64UrlDecode(vector.GetProperty("nonce").GetString()!);
+        var oldFill = Pka.FillRandomBytesForTesting;
+        var oldNow = Pka.NowUnixForTesting;
+        var oldSend = Pka.SendAsyncForTesting;
+        Pka.FillRandomBytesForTesting = bytes => Array.Copy(nonce, bytes, bytes.Length);
+        Pka.NowUnixForTesting = () => vector.GetProperty("created").GetInt64();
+        var expectedAidDomain = vector.GetProperty("request").GetProperty("aid_domain").GetString()!;
+        Pka.SendAsyncForTesting = (request, _) =>
+        {
+            // Assert the AID-Domain header is sent and equals the canonical domain
+            Assert.True(request.Headers.Contains("AID-Domain"), "Expected AID-Domain header to be set");
+            Assert.Equal(expectedAidDomain, request.Headers.GetValues("AID-Domain").Single());
+
+            var expectedRequest = vector.GetProperty("request");
+            Assert.Equal(expectedRequest.GetProperty("accept_signature").GetString(), request.Headers.GetValues("Accept-Signature").Single());
+
+            var responseVector = vector.GetProperty("response");
+            var response = new HttpResponseMessage((System.Net.HttpStatusCode)responseVector.GetProperty("status").GetInt32());
+            response.Headers.TryAddWithoutValidation("Cache-Control", responseVector.GetProperty("cache_control").GetString());
+            response.Headers.TryAddWithoutValidation("Signature-Input", responseVector.GetProperty("signature_input").GetString());
+            response.Headers.TryAddWithoutValidation("Signature", responseVector.GetProperty("signature").GetString());
+            return Task.FromResult(response);
+        };
+        try
+        {
+            var record = vector.GetProperty("record");
+            var domainBound = await Pka.PerformHandshakeAsync(record.GetProperty("u").GetString()!, record.GetProperty("k").GetString()!, string.Empty, TimeSpan.FromSeconds(1), domain: vector.GetProperty("domain").GetString());
+            Assert.True(domainBound, "Expected DomainBound=true for aid-pka-v2-db response");
+        }
+        finally
+        {
+            Pka.FillRandomBytesForTesting = oldFill;
+            Pka.NowUnixForTesting = oldNow;
+            Pka.SendAsyncForTesting = oldSend;
+        }
+    }
+
+    // ---- end new tests ----
+
     [Fact]
     public async Task Vectors_RunAgainstHandshake()
     {
@@ -766,6 +846,9 @@ public class PkaTests
                     break;
                 case "date":
                     lines.Add($"{item}: Tue, 30 Dec 2025 00:00:00 GMT");
+                    break;
+                case "aid-domain":
+                    lines.Add($"{item}: {vector.GetProperty("domain").GetString()}");
                     break;
                 default:
                     throw new InvalidOperationException($"Unsupported covered item in test helper: {item}");
