@@ -479,6 +479,24 @@ func TestPKAV2RejectsRepeatedPhysicalSignatureHeaders(t *testing.T) {
 	}
 }
 
+func TestPKAV2RejectsDbTagWithoutAidDomainCoverage(t *testing.T) {
+	headers := http.Header{}
+	headers.Set("Signature-Input", `aid-pka=("@method";req "@target-uri";req "@authority";req "@status");created=1;expires=2;keyid="key";alg="ed25519";nonce="nonce";tag="aid-pka-v2-db"`)
+	headers.Set("Signature", `aid-pka=:`+base64.StdEncoding.EncodeToString(make([]byte, ed25519.SignatureSize))+`:`)
+
+	_, err := parseV2SignatureHeaders(headers)
+	if err == nil {
+		t.Fatalf("expected db tag without aid-domain coverage to be rejected")
+	}
+	aidErr, ok := err.(*AidError)
+	if !ok {
+		t.Fatalf("expected AidError, got %T", err)
+	}
+	if aidErr.Symbol != "ERR_SECURITY" {
+		t.Fatalf("expected ERR_SECURITY, got %s", aidErr.Symbol)
+	}
+}
+
 func validPKAV2SignatureHeaders() http.Header {
 	headers := http.Header{}
 	headers.Set("Signature-Input", `aid-pka=("@method";req "@target-uri";req "@authority";req "@status");created=1;expires=2;keyid="key";alg="ed25519";nonce="nonce";tag="aid-pka-v2"`)

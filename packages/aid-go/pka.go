@@ -368,9 +368,6 @@ func parseV2SignatureHeaders(headers http.Header) (v2SignatureHeaders, error) {
 		}
 		covered = append(covered, item)
 	}
-	if err := validateV2CoveredSet(covered); err != nil {
-		return v2SignatureHeaders{}, err
-	}
 
 	params, err := parseSignatureParams(paramsRaw)
 	if err != nil {
@@ -384,6 +381,9 @@ func parseV2SignatureHeaders(headers http.Header) (v2SignatureHeaders, error) {
 	tag, hasTag := params["tag"]
 	if !hasCreated || !hasExpires || !hasKeyID || !hasAlg || !hasNonce || !hasTag {
 		return v2SignatureHeaders{}, newAidError("ERR_SECURITY", "Invalid Signature-Input")
+	}
+	if err := validateV2CoveredSet(covered, timingSafeEqualString(tag, "aid-pka-v2-db")); err != nil {
+		return v2SignatureHeaders{}, err
 	}
 	created, err := strconv.ParseInt(createdRaw, 10, 64)
 	if err != nil {
@@ -570,22 +570,25 @@ func parseV2CoveredItem(raw string) (v2CoveredItem, error) {
 		}
 	}
 	switch name {
-	case "@method", "@target-uri", "@authority", "@status":
+	case "@method", "@target-uri", "@authority", "@status", "aid-domain":
 	default:
 		return v2CoveredItem{}, newAidError("ERR_SECURITY", "Unsupported covered field: "+name)
 	}
 	return v2CoveredItem{raw: raw, name: name, req: req}, nil
 }
 
-func validateV2CoveredSet(covered []v2CoveredItem) error {
-	if len(covered) != 4 {
-		return newAidError("ERR_SECURITY", "Signature-Input must cover required fields")
-	}
+func validateV2CoveredSet(covered []v2CoveredItem, isDomainBound bool) error {
 	expected := map[string]bool{
 		"@method":     true,
 		"@target-uri": true,
 		"@authority":  true,
 		"@status":     false,
+	}
+	if isDomainBound {
+		expected["aid-domain"] = true
+	}
+	if len(covered) != len(expected) {
+		return newAidError("ERR_SECURITY", "Signature-Input must cover required fields")
 	}
 	seen := map[string]bool{}
 	for _, item := range covered {
