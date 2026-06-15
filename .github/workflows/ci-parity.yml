@@ -2,9 +2,9 @@ name: CI • Parity
 on:
   workflow_dispatch:
   push:
-    branches: [main, feat/aid1.1-spec, feat/next16-react19-modernization]
+    branches: [main]
   pull_request:
-    branches: [main, feat/aid1.1-spec, feat/next16-react19-modernization]
+    branches: [main]
 
 permissions:
   contents: read
@@ -32,7 +32,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.23'
 
       - name: Install deps
         run: pnpm install --frozen-lockfile

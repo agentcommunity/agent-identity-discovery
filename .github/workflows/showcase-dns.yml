@@ -2,10 +2,10 @@ name: Showcase DNS
 
 on:
   pull_request:
-    branches: [main, feat/aid1.1-spec, feat/next16-react19-modernization, cloudflare-migration]
+    branches: [main]
     paths: ['showcase/terraform/**']
   push:
-    branches: [main, feat/aid1.1-spec, feat/next16-react19-modernization, cloudflare-migration]
+    branches: [main]
     paths: ['showcase/terraform/**']
   workflow_dispatch: {}
 
@@ -24,7 +24,7 @@ jobs:
         working-directory: showcase/terraform
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v4
@@ -32,7 +32,7 @@ jobs:
           terraform_version: 1.6.6
 
       - name: Cache Terraform dir
-        uses: actions/cache@v5
+        uses: actions/cache@v4
         with:
           path: showcase/terraform/.terraform
           key: terraform-${{ hashFiles('showcase/terraform/**/*.tf') }}

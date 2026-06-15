@@ -4,9 +4,9 @@ on:
   schedule:
     - cron: '0 2 * * *'
   push:
-    branches: [main, feat/aid1.1-spec, feat/next16-react19-modernization]
+    branches: [main]
   pull_request:
-    branches: [main, feat/aid1.1-spec, feat/next16-react19-modernization]
+    branches: [main]
 
 permissions:
   contents: read
@@ -125,13 +125,21 @@ jobs:
           category: '/language:${{ matrix.language }}'
           upload: true
 
-      - name: Generate SBOM (CycloneDX)
+      # SBOM: generate the npm dependency tree only for the JS/TS leg.
+      # The gh-node-module-generatebom tool is Node-specific; running it in the
+      # Go/Python/Rust/.NET/Java legs would produce identical npm SBOMs mislabeled
+      # with an ecosystem name they do not represent. Ecosystem-appropriate SBOM
+      # tools (cyclonedx-gomod, cargo-cyclonedx, cyclonedx-py, etc.) can be added
+      # per-language when required.
+      - name: Generate SBOM (CycloneDX, npm)
+        if: matrix.language == 'javascript-typescript'
         uses: CycloneDX/gh-node-module-generatebom@v1
         with:
-          output: ./sbom-${{ matrix.language }}.xml
+          output: ./sbom-npm.xml
 
       - name: Upload SBOM
+        if: matrix.language == 'javascript-typescript'
         uses: actions/upload-artifact@v4
         with:
-          name: sbom-${{ matrix.language }}
-          path: ./sbom-${{ matrix.language }}.xml
+          name: sbom-npm
+          path: ./sbom-npm.xml
