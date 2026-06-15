@@ -191,6 +191,11 @@ def test_v2_pka_accepts_canonical_rfc9421_signed_401(monkeypatch):
 
     vector = _vector_by_id("v2-rfc9421-response-signature")
 
+    # Derive keyid from the vector's response signature_input rather than hardcoding.
+    keyid_match = re.search(r'keyid="([^"]+)"', vector["response"]["signature_input"])
+    assert keyid_match is not None, "keyid not found in vector response signature_input"
+    keyid = keyid_match.group(1)
+
     def _no_record(name, rdtype, lifetime=5.0):
         raise dns.resolver.NXDOMAIN()
 
@@ -203,9 +208,12 @@ def test_v2_pka_accepts_canonical_rfc9421_signed_401(monkeypatch):
         if url.endswith("/.well-known/agent"):
             return _Resp(200, {"Content-Type": "application/json"}, json.dumps(vector["record"]))
         assert url == vector["request"]["target_uri"]
-        # Discovery now sends domain_alabel, so Accept-Signature uses aid-pka-v2-db form.
-        # We verify Cache-Control is still sent correctly; signature correctness is tested by verify.
         assert _header(req, "Cache-Control") == vector["request"]["cache_control"]
+        # discover() always sends domain_alabel, so the client uses the db form.
+        expected_accept_sig = pka_module._build_accept_signature_v2(keyid, vector["nonce"], domain_bound=True)
+        assert _header(req, "Accept-Signature") == expected_accept_sig
+        # AID-Domain must be the canonicalized queried host.
+        assert _header(req, "AID-Domain") == "example.com"
         return _Resp(
             401,
             {
@@ -225,6 +233,8 @@ def test_v2_pka_accepts_canonical_rfc9421_signed_401(monkeypatch):
     rec, _ = discover("example.com", well_known_fallback=True)
     assert rec["v"] == "aid2"
     assert rec["pka"] == vector["record"]["k"]
+    # The server replied with aid-pka-v2 (unbound); dual-tag acceptance → domain_bound False.
+    assert rec.get("domain_bound") is False
 
 
 def test_v2_pka_canonicalizes_uppercase_host_default_port_and_fragment(monkeypatch):
@@ -234,6 +244,11 @@ def test_v2_pka_canonicalizes_uppercase_host_default_port_and_fragment(monkeypat
 
     vector = _vector_by_id("v2-uppercase-host-default-port-canonical-target")
 
+    # Derive keyid from the vector's response signature_input rather than hardcoding.
+    keyid_match = re.search(r'keyid="([^"]+)"', vector["response"]["signature_input"])
+    assert keyid_match is not None, "keyid not found in vector response signature_input"
+    keyid = keyid_match.group(1)
+
     def _no_record(name, rdtype, lifetime=5.0):
         raise dns.resolver.NXDOMAIN()
 
@@ -246,8 +261,11 @@ def test_v2_pka_canonicalizes_uppercase_host_default_port_and_fragment(monkeypat
         if url.endswith("/.well-known/agent"):
             return _Resp(200, {"Content-Type": "application/json"}, json.dumps(vector["record"]))
         assert url == vector["request"]["target_uri"]
-        # Discovery now sends domain_alabel, so Accept-Signature uses aid-pka-v2-db form.
-        # Signature correctness is verified by Ed25519 on the response.
+        # discover() always sends domain_alabel, so the client uses the db form.
+        expected_accept_sig = pka_module._build_accept_signature_v2(keyid, vector["nonce"], domain_bound=True)
+        assert _header(req, "Accept-Signature") == expected_accept_sig
+        # AID-Domain must be the canonicalized queried host.
+        assert _header(req, "AID-Domain") == "example.com"
         return _Resp(
             401,
             {
@@ -267,6 +285,8 @@ def test_v2_pka_canonicalizes_uppercase_host_default_port_and_fragment(monkeypat
     rec, _ = discover("example.com", well_known_fallback=True)
     assert rec["v"] == "aid2"
     assert rec["pka"] == vector["record"]["k"]
+    # The server replied with aid-pka-v2 (unbound); dual-tag acceptance → domain_bound False.
+    assert rec.get("domain_bound") is False
 
 
 def test_v2_pka_rejects_modified_response_signature(monkeypatch):
@@ -622,6 +642,54 @@ def test_v2_pka_accepts_domain_bound_signature(monkeypatch):
     assert rec["v"] == "aid2"
     assert rec.get("domain_bound") is True
     assert captured_aid_domain and captured_aid_domain[0] == vector["request"]["aid_domain"]
+
+
+def test_v2_pka_no_domain_handshake_sends_legacy_accept_signature(monkeypatch):
+    """Calling the v2 handshake directly with domain=None sends the legacy 4-component
+    aid-pka-v2 Accept-Signature (no AID-Domain header). This path is no longer exercised
+    by discover() — which always passes domain_alabel — so it is tested here directly."""
+    import urllib.request
+    import aid_py.pka as pka_module
+
+    vector = _vector_by_id("v2-rfc9421-response-signature")
+
+    # Derive keyid from the vector's response signature_input.
+    keyid_match = re.search(r'keyid="([^"]+)"', vector["response"]["signature_input"])
+    assert keyid_match is not None, "keyid not found in vector response signature_input"
+    keyid = keyid_match.group(1)
+
+    monkeypatch.setattr(pka_module.os, "urandom", lambda n: _b64url_decode(vector["nonce"]))
+    monkeypatch.setattr(pka_module.time, "time", lambda: vector["created"] + 30)
+
+    def _fake_open(req, timeout=2.0):
+        # Assert: no AID-Domain header is sent when domain=None.
+        assert _header(req, "AID-Domain") is None
+        # Assert: the legacy 4-component (non-db) Accept-Signature is used.
+        expected_accept_sig = pka_module._build_accept_signature_v2(keyid, vector["nonce"], domain_bound=False)
+        assert _header(req, "Accept-Signature") == expected_accept_sig
+        return _Resp(
+            401,
+            {
+                "Cache-Control": vector["response"]["cache_control"],
+                "Signature-Input": vector["response"]["signature_input"],
+                "Signature": vector["response"]["signature"],
+            },
+            "",
+        )
+
+    class _FakeOpener:
+        def open(self, req, timeout=2.0):
+            return _fake_open(req, timeout)
+
+    monkeypatch.setattr(urllib.request, "build_opener", lambda *args, **kwargs: _FakeOpener())
+
+    is_db = pka_module._perform_v2_pka_handshake(
+        vector["request"]["target_uri"],
+        vector["record"]["k"],
+        domain=None,
+    )
+    # Unbound response → not domain-bound.
+    assert is_db is False
 
 
 def test_debug_write_does_not_create_package_debug_dir_by_default(tmp_path, monkeypatch):
