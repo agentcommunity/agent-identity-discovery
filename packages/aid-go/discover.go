@@ -85,7 +85,7 @@ func DiscoverWithOptions(domain string, timeout time.Duration, opts DiscoveryOpt
 			}
 			valid := selected[0]
 			if valid.Pka != "" {
-				if err := performPKAHandshake(valid.URI, valid.Pka, valid.Kid, timeout); err != nil {
+				if _, err := performPKAHandshake(valid.URI, valid.Pka, valid.Kid, alabel, timeout); err != nil {
 					return AidRecord{}, 0, err
 				}
 			}
@@ -130,7 +130,7 @@ func DiscoverWithOptions(domain string, timeout time.Duration, opts DiscoveryOpt
 			return AidRecord{}, 0, werr
 		}
 		if rec.Pka != "" {
-			if err := performPKAHandshake(rec.URI, rec.Pka, rec.Kid, timeout); err != nil {
+			if _, err := performPKAHandshake(rec.URI, rec.Pka, rec.Kid, alabel, timeout); err != nil {
 				return AidRecord{}, 0, err
 			}
 		}

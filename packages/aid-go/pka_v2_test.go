@@ -21,10 +21,12 @@ type pkaV2Vector struct {
 		P string `json:"p"`
 		K string `json:"k"`
 	} `json:"record"`
+	Domain  string `json:"domain"`
 	Request struct {
 		Method          string `json:"method"`
 		TargetURI       string `json:"target_uri"`
 		Authority       string `json:"authority"`
+		AidDomain       string `json:"aid_domain"`
 		AcceptSignature string `json:"accept_signature"`
 		CacheControl    string `json:"cache_control"`
 	} `json:"request"`
@@ -140,7 +142,7 @@ func TestPKAV2CanonicalRFC9421ResponseSignature(t *testing.T) {
 	})}
 	t.Cleanup(func() { httpClient = oldClient })
 
-	if err := performPKAHandshake(vector.Record.U, vector.Record.K, "", time.Second); err != nil {
+	if _, err := performPKAHandshake(vector.Record.U, vector.Record.K, "", "", time.Second); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -172,7 +174,7 @@ func TestPKAV2CanonicalizesUppercaseHostDefaultPortAndFragment(t *testing.T) {
 	})}
 	t.Cleanup(func() { httpClient = oldClient })
 
-	if err := performPKAHandshake(vector.Record.U, vector.Record.K, "", time.Second); err != nil {
+	if _, err := performPKAHandshake(vector.Record.U, vector.Record.K, "", "", time.Second); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -221,7 +223,7 @@ func TestPKAV2RejectsRedirectResponse(t *testing.T) {
 	})}
 	t.Cleanup(func() { httpClient = oldClient })
 
-	err := performPKAHandshake(vector.Record.U, vector.Record.K, "", time.Second)
+	_, err := performPKAHandshake(vector.Record.U, vector.Record.K, "", "", time.Second)
 	if err == nil {
 		t.Fatalf("expected redirect error")
 	}
@@ -476,6 +478,35 @@ func TestPKAV2RejectsRepeatedPhysicalSignatureHeaders(t *testing.T) {
 				t.Fatalf("expected repeated physical %s header values to be rejected", headerName)
 			}
 		})
+	}
+}
+
+func TestPKAV2DomainBoundPassVector(t *testing.T) {
+	vector := loadPKAV2Vector(t, "v2-db-rfc9421-domain-bound")
+	withPKAV2VectorClockAndNonce(t, vector)
+
+	oldClient := httpClient
+	httpClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		if req.Header.Get("AID-Domain") != vector.Request.AidDomain {
+			t.Fatalf("expected AID-Domain %q got %q", vector.Request.AidDomain, req.Header.Get("AID-Domain"))
+		}
+		if req.Header.Get("Accept-Signature") != vector.Request.AcceptSignature {
+			t.Fatalf("unexpected Accept-Signature: %s", req.Header.Get("Accept-Signature"))
+		}
+		h := http.Header{}
+		h.Set("Cache-Control", vector.Response.CacheControl)
+		h.Set("Signature-Input", vector.Response.SignatureInput)
+		h.Set("Signature", vector.Response.Signature)
+		return &http.Response{StatusCode: vector.Response.Status, Header: h, Body: io.NopCloser(strings.NewReader(""))}, nil
+	})}
+	t.Cleanup(func() { httpClient = oldClient })
+
+	result, err := performPKAHandshake(vector.Record.U, vector.Record.K, "", vector.Domain, time.Second)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.DomainBound {
+		t.Fatalf("expected DomainBound=true")
 	}
 }
 
