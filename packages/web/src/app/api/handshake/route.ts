@@ -7,6 +7,7 @@ import {
   type AuthCredentials,
 } from '@/lib/api/handshake-validation';
 import { getSecurityInfo } from '@/lib/api/handshake-security';
+import { isPrivateHost } from '@/lib/api/ssrf';
 
 export const runtime = 'nodejs';
 
@@ -91,7 +92,11 @@ export async function POST(request: Request) {
     try {
       const url = new URL(uri);
       if (url.protocol.startsWith('http')) {
-        const probe = await fetch(url.toString(), { method: 'HEAD', redirect: 'manual' });
+        const probe = await fetch(url.toString(), {
+          method: 'HEAD',
+          redirect: 'manual',
+          signal: AbortSignal.timeout(3000),
+        });
         if (probe.status === 401) {
           const headerValue = probe.headers.get('www-authenticate') ?? undefined;
           const metadataMatch = headerValue?.match(/as_uri="([^"]+)"/i);
@@ -181,13 +186,6 @@ export async function POST(request: Request) {
 
 const isSupportedScheme = (protocol: SupportedScheme): boolean =>
   ['http:', 'https:', 'ws:', 'wss:'].includes(protocol);
-
-const isPrivateHost = (host: string): boolean =>
-  host === 'localhost' ||
-  host === '127.0.0.1' ||
-  /^10\./.test(host) ||
-  /^192\.168\./.test(host) ||
-  /^172\.(1[6-9]|2\d|3[0-1])\./.test(host);
 
 const safeParseBody = async (
   request: Request,

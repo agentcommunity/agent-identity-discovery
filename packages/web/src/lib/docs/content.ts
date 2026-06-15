@@ -12,12 +12,10 @@
  */
 
 import { preprocessMarkdown } from './markdown';
+import { extractHeadings } from './headings';
+import type { Heading } from './headings';
 
-export interface Heading {
-  depth: number; // 2–6
-  text: string;
-  id: string;
-}
+export type { Heading } from './headings';
 
 export interface DocPage {
   slug: string; // "index" for root; e.g. "quickstart/quickstart_ts" otherwise
@@ -65,32 +63,6 @@ function toRouteSlug(slug: string): string {
   if (slug === 'index') return 'index';
   if (slug.endsWith('/index')) return slug.slice(0, -'/index'.length);
   return slug;
-}
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replaceAll(/[^\w\s-]/g, '')
-    .replaceAll(/\s+/g, '-')
-    .replaceAll(/-+/g, '-')
-    .trim();
-}
-
-function extractHeadings(content: string): Heading[] {
-  const headings: Heading[] = [];
-  for (const line of content.split('\n')) {
-    const match = line.match(/^(#{2,6})\s+(.+)/);
-    if (match) {
-      const depth = match[1].length;
-      const text = match[2]
-        .replaceAll(/`([^`]*)`/g, '$1')
-        .replaceAll(/\*\*([^*]*)\*\*/g, '$1')
-        .replaceAll(/\*([^*]*)\*/g, '$1')
-        .trim();
-      headings.push({ depth, text, id: slugify(text) });
-    }
-  }
-  return headings;
 }
 
 function getDocFromFs(slug: string): DocPage | null {

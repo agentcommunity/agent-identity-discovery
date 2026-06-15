@@ -72,12 +72,11 @@ function isHandshakeLike(x: unknown): x is HandshakeSuccessData | HandshakeV1 {
 type Cap = { id: string; type: 'tool' | 'resource'; name?: string; description?: string };
 function isCap(x: unknown): x is Cap {
   return (
-    (typeof x === 'object' &&
-      x !== null &&
-      'id' in x &&
-      'type' in x &&
-      (x as { type: unknown }).type === 'tool') ||
-    (x as { type: unknown }).type === 'resource'
+    typeof x === 'object' &&
+    x !== null &&
+    'id' in x &&
+    'type' in x &&
+    ((x as { type: unknown }).type === 'tool' || (x as { type: unknown }).type === 'resource')
   );
 }
 

@@ -11,11 +11,13 @@ import { NextResponse } from 'next/server';
 export function GET() {
   return NextResponse.json(
     {
-      v: 'aid1',
+      v: 'aid2',
       p: 'mcp',
       u: 'https://aid.agentcommunity.org/api/pka-demo',
       s: 'AID Workbench — Agent Identity Discovery',
       d: 'https://aid.agentcommunity.org/docs',
+      // pka-basic showcase key (matches /api/pka-demo, which signs tag="aid-pka-v2").
+      k: 'Eesj9h7MD0cRERrc_ICXu5Lb1WkokpkbWAkRcDsxUvA',
     },
     {
       headers: {

@@ -74,11 +74,12 @@ export function validate(data: AidGeneratorFormData): ValidationResult {
     errors.push({ code: 'ERR_DOCS_HTTPS', message: 'Docs must use https://' });
   }
 
-  // dep ISO 8601 Z check (basic)
-  if (data.dep) {
-    const iso = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
-    if (!iso.test(data.dep))
-      errors.push({ code: 'ERR_DEP_ISO', message: 'Dep must be ISO 8601 UTC Z' });
+  // dep ISO 8601 UTC check — mirror the SDK parser semantics (parser.ts:308-316)
+  // so the Generator UI and the canonical parser never disagree: must end with
+  // Z and be a real, parseable instant (this accepts fractional seconds and
+  // rejects impossible dates like month 13).
+  if (data.dep && (!data.dep.endsWith('Z') || Number.isNaN(Date.parse(data.dep)))) {
+    errors.push({ code: 'ERR_DEP_ISO', message: 'Dep must be ISO 8601 UTC Z' });
   }
 
   if (data.pka && !isValidBase64UrlEd25519(data.pka)) {
