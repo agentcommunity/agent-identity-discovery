@@ -81,7 +81,7 @@ public final class Discovery {
 
   @FunctionalInterface
   interface WellKnownFetcher {
-    AidRecord fetch(String domain, Duration timeout);
+    WellKnown.Result fetch(String domain, Duration timeout);
   }
 
   static List<String> queryNames(String alabel, String protocol) {
@@ -209,7 +209,9 @@ public final class Discovery {
       }
     }
 
-    return resolveWellKnownFallback(alabel, options, last, (fallbackDomain, timeout) -> WellKnown.fetch(fallbackDomain, timeout, false));
+    final String queriedDomain = alabel;
+    return resolveWellKnownFallback(
+        alabel, options, last, (fallbackDomain, timeout) -> WellKnown.fetchBound(fallbackDomain, timeout, false, queriedDomain));
   }
 
   static DiscoveryResult resolveWellKnownFallback(
@@ -221,8 +223,8 @@ public final class Discovery {
             "DNSSEC is required; .well-known fallback cannot satisfy dnssec=require for " + alabel);
       }
       if (options.wellKnownFallback) {
-        AidRecord rec = fetcher.fetch(alabel, options.wellKnownTimeout);
-        return new DiscoveryResult(rec, Constants.DNS_TTL_MIN, Constants.DNS_SUBDOMAIN+"."+alabel);
+        WellKnown.Result result = fetcher.fetch(alabel, options.wellKnownTimeout);
+        return new DiscoveryResult(result.record, Constants.DNS_TTL_MIN, Constants.DNS_SUBDOMAIN+"."+alabel, result.domainBound);
       }
     }
     throw last != null ? last : new AidError("ERR_DNS_LOOKUP_FAILED", "DNS query failed");

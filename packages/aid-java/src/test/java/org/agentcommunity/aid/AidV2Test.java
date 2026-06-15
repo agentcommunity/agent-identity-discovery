@@ -804,7 +804,8 @@ public class AidV2Test {
                     new AidError("ERR_NO_RECORD", "missing"),
                     (domain, timeout) -> {
                       called[0] = true;
-                      return Parser.parse("v=aid2;u=https://fallback.example.com/mcp;p=mcp");
+                      return new WellKnown.Result(
+                          Parser.parse("v=aid2;u=https://fallback.example.com/mcp;p=mcp"), false);
                     }));
 
     assertEquals("ERR_SECURITY", err.errorCode);
@@ -827,7 +828,8 @@ public class AidV2Test {
                     new AidError("ERR_DNS_LOOKUP_FAILED", "network"),
                     (domain, timeout) -> {
                       called[0] = true;
-                      return Parser.parse("v=aid2;u=https://fallback.example.com/mcp;p=mcp");
+                      return new WellKnown.Result(
+                          Parser.parse("v=aid2;u=https://fallback.example.com/mcp;p=mcp"), false);
                     }));
 
     assertEquals("ERR_SECURITY", err.errorCode);
@@ -848,13 +850,38 @@ public class AidV2Test {
               called[0] = true;
               assertEquals("example.com", domain);
               assertEquals(options.wellKnownTimeout, timeout);
-              return Parser.parse("v=aid2;u=https://fallback.example.com/mcp;p=mcp");
+              return new WellKnown.Result(
+                  Parser.parse("v=aid2;u=https://fallback.example.com/mcp;p=mcp"), false);
             });
 
     assertTrue(called[0]);
     assertEquals("https://fallback.example.com/mcp", result.record.uri);
     assertEquals(Constants.DNS_TTL_MIN, result.ttl);
     assertEquals(Constants.DNS_SUBDOMAIN + ".example.com", result.queryName);
+    assertFalse(result.domainBound);
+  }
+
+  @Test
+  void wellKnownFallbackSurfacesDomainBoundFromFetcher() {
+    Discovery.DiscoveryOptions options = new Discovery.DiscoveryOptions();
+    String[] seenDomain = {null};
+
+    Discovery.DiscoveryResult result =
+        Discovery.resolveWellKnownFallback(
+            "example.com",
+            options,
+            new AidError("ERR_NO_RECORD", "missing"),
+            (domain, timeout) -> {
+              seenDomain[0] = domain;
+              // Simulate a fetcher that obtained a domain-bound PKA proof on the well-known path.
+              return new WellKnown.Result(
+                  Parser.parse("v=aid2;u=https://fallback.example.com/mcp;p=mcp"), true);
+            });
+
+    // The queried domain is threaded into the fetcher (which forwards it as AID-Domain),
+    // and the domain-bound flag is surfaced on the DiscoveryResult instead of being hardcoded false.
+    assertEquals("example.com", seenDomain[0]);
+    assertTrue(result.domainBound);
   }
 
   @Test
