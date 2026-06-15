@@ -20,6 +20,12 @@ function validAid2PkaVector(): PkaVector {
   return vector;
 }
 
+function pkaVectorById(id: string): PkaVector {
+  const vector = pkaVectors.vectors.find((candidate) => candidate.id === id);
+  if (!vector) throw new Error(`missing PKA fixture: ${id}`);
+  return vector;
+}
+
 describe('aid-conformance runner', () => {
   it('reports v2 record sets, PKA vectors, and enterprise policy vectors', async () => {
     const result = await runFixture(fixtures, { pkaVectors, enterpriseFixtures });
@@ -29,6 +35,17 @@ describe('aid-conformance runner', () => {
     expect(result.categories.recordSets.total).toBeGreaterThan(0);
     expect(result.categories.pkaVectors.total).toBeGreaterThan(0);
     expect(result.categories.enterprisePolicies.total).toBeGreaterThan(0);
+
+    // The real fixtures must all PASS, not merely be present. A regressed vector
+    // (e.g. a pass vector whose Ed25519 signature stops verifying, or a fail
+    // vector that loses its structural failure evidence) increments `failed`,
+    // and asserting only `total > 0` would let it slip through this CI gate.
+    expect(result.categories.records.failed).toBe(0);
+    expect(result.categories.invalid.failed).toBe(0);
+    expect(result.categories.recordSets.failed).toBe(0);
+    expect(result.categories.pkaVectors.failed).toBe(0);
+    expect(result.categories.enterprisePolicies.failed).toBe(0);
+    expect(result.failed).toBe(0);
   });
 
   it('fails PKA pass vectors that lack required v2 proof material', async () => {
@@ -101,6 +118,42 @@ describe('aid-conformance runner', () => {
     const result = await runFixture(emptyFixture, { pkaVectors: invalidPkaVectors });
 
     expect(result.categories.pkaVectors).toEqual({ total: 1, passed: 0, failed: 1 });
+  });
+
+  it('classifies the domain-bound v2 vector as pass (aid-domain covered, real Ed25519 signature verifies)', async () => {
+    const vector = pkaVectorById('v2-db-rfc9421-domain-bound');
+    expect(vector.expect).toBe('pass');
+
+    const result = await runFixture(emptyFixture, {
+      pkaVectors: { version: 1, vectors: [vector] },
+    });
+
+    expect(result.categories.pkaVectors).toEqual({ total: 1, passed: 1, failed: 0 });
+  });
+
+  it('classifies the cross-domain forgery v2 vector as fail (aid-domain line forged, signature does not verify)', async () => {
+    const vector = pkaVectorById('v2-db-domain-mismatch');
+    expect(vector.expect).toBe('fail');
+
+    // As a well-formed fail vector it must carry structural failure evidence, so
+    // the runner accepts it (passed: 1).
+    const asFail = await runFixture(emptyFixture, {
+      pkaVectors: { version: 1, vectors: [vector] },
+    });
+    expect(asFail.categories.pkaVectors).toEqual({ total: 1, passed: 1, failed: 0 });
+
+    // And it genuinely classifies as a forgery: relabelled as a pass vector it
+    // must be rejected, because its forged aid-domain line makes the Ed25519
+    // signature fail to verify against the rebuilt base. This is the core
+    // cross-domain-forgery rejection property of the one-tag domain-binding
+    // contract.
+    const asPass = await runFixture(emptyFixture, {
+      pkaVectors: {
+        version: 1,
+        vectors: [{ ...vector, id: 'v2-db-domain-mismatch-as-pass', expect: 'pass' }],
+      },
+    });
+    expect(asPass.categories.pkaVectors).toEqual({ total: 1, passed: 0, failed: 1 });
   });
 
   it('fails record sets when the only preferred-version selection differs from expectedSelected', async () => {

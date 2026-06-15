@@ -1,21 +1,19 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { createHash } from 'node:crypto';
 import type { DoctorReport } from '@agentcommunity/aid-engine';
+import {
+  classifySecurityChange as engineClassifySecurityChange,
+  derivePkaKeyid as engineDerivePkaKeyid,
+} from '@agentcommunity/aid-engine';
 
 export const CACHE_SCHEMA_VERSION = 3;
 
 export type CacheTrustSource = 'dns' | 'well-known-tls';
-export type SecurityChangeStatus =
-  | 'first_seen'
-  | 'no_change'
-  | 'pka_added'
-  | 'pka_removed'
-  | 'key_replaced'
-  | 'version_downgrade'
-  | 'binding_loss'
-  | 'fallback_well_known_tls';
+
+// Re-exported from aid-engine so the doctor cache and the engine checker share a
+// single source of truth for security-change classification (no divergent copy).
+export type { SecurityChangeStatus } from '@agentcommunity/aid-engine';
 
 export interface CacheEntry {
   lastSeen: string;
@@ -38,68 +36,9 @@ function cachePath(): string {
   return path.join(os.homedir(), '.aid', 'cache.json');
 }
 
-const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-
-function decodeBase58(value: string): Uint8Array | null {
-  let leadingZeros = 0;
-  for (const char of value) {
-    if (char !== '1') break;
-    leadingZeros += 1;
-  }
-  if (leadingZeros === value.length) {
-    return new Uint8Array(leadingZeros);
-  }
-
-  const bytes = [0];
-  for (const char of value.slice(leadingZeros)) {
-    const valueIndex = BASE58_ALPHABET.indexOf(char);
-    if (valueIndex === -1) return null;
-    let carry = valueIndex;
-    for (let index = 0; index < bytes.length; index += 1) {
-      carry += bytes[index] * 58;
-      bytes[index] = carry & 0xff;
-      carry >>= 8;
-    }
-    while (carry > 0) {
-      bytes.push(carry & 0xff);
-      carry >>= 8;
-    }
-  }
-
-  const decoded = bytes.reverse();
-  return new Uint8Array([...new Array<number>(leadingZeros).fill(0), ...decoded]);
-}
-
-function decodeBase64Url(value: string): Uint8Array | null {
-  if (!/^[A-Za-z0-9_-]+$/.test(value) || value.includes('=') || value.length % 4 === 1) {
-    return null;
-  }
-  try {
-    return new Uint8Array(Buffer.from(value, 'base64url'));
-  } catch {
-    return null;
-  }
-}
-
-function toBase64Url(bytes: Uint8Array): string {
-  return Buffer.from(bytes).toString('base64url');
-}
-
-export function derivePkaKeyid(pka: string | null | undefined): {
-  keyid: string;
-  jwkX: string;
-} | null {
-  if (!pka) return null;
-  const publicKey = pka.startsWith('z') ? decodeBase58(pka.slice(1)) : decodeBase64Url(pka);
-  if (!publicKey || publicKey.length !== 32) return null;
-
-  const jwkX = toBase64Url(publicKey);
-  const thumbprintInput = `{"crv":"Ed25519","kty":"OKP","x":"${jwkX}"}`;
-  return {
-    jwkX,
-    keyid: createHash('sha256').update(thumbprintInput).digest('base64url'),
-  };
-}
+// Re-exported from aid-engine: the engine owns the single PKA key-identity
+// derivation, so the doctor cache and the engine checker can never diverge.
+export const derivePkaKeyid = engineDerivePkaKeyid;
 
 function isCacheEntry(value: unknown): value is CacheEntry {
   if (!value || typeof value !== 'object') return false;
@@ -174,40 +113,11 @@ export function buildCacheEntryFromReport(report: DoctorReport, now = new Date()
   };
 }
 
-export function classifySecurityChange(
-  previous: CacheEntry | null | undefined,
-  current: CacheEntry,
-): SecurityChangeStatus {
-  if (current.trustSource === 'well-known-tls') {
-    return 'fallback_well_known_tls';
-  }
-
-  if (!previous) return 'first_seen';
-
-  if (previous.version === 'aid2' && current.version === 'aid1') {
-    return 'version_downgrade';
-  }
-
-  const previousHasPka = Boolean(previous.pka || previous.keyid);
-  const currentHasPka = Boolean(current.pka || current.keyid);
-  if (!previousHasPka && currentHasPka) return 'pka_added';
-  if (previousHasPka && !currentHasPka) return 'pka_removed';
-
-  const previousKey = previous.keyid ?? previous.pka;
-  const currentKey = current.keyid ?? current.pka;
-  if (previousKey && currentKey && previousKey !== currentKey) {
-    return 'key_replaced';
-  }
-
-  // Binding loss is warning-only. Keep it AFTER the fail-eligible branches above so
-  // it can never mask a higher-severity downgrade (key replacement, version drop,
-  // pka removal) — otherwise it would open a downgrade-evasion path.
-  if (previous.domainBound === true && current.domainBound === false) {
-    return 'binding_loss';
-  }
-
-  return 'no_change';
-}
+// Re-exported from aid-engine so the runtime CLI path and the engine checker use
+// the identical classification logic (including the derivePkaKeyid fallback for
+// pka-set/keyid-null entries). Eliminates the previous divergent copy that
+// false-positived key_replaced for such entries.
+export const classifySecurityChange = engineClassifySecurityChange;
 
 export async function loadCache(): Promise<CacheShape> {
   try {

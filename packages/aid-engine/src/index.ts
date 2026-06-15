@@ -10,6 +10,7 @@
 
 export * from './types';
 export * from './checker';
+export * from './security-change';
 export * from './error_messages';
 export * from './generator';
 export * from './keys';
