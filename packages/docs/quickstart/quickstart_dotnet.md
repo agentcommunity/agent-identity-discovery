@@ -48,6 +48,7 @@ Console.WriteLine($"proto={rec.Proto}, uri={rec.Uri}");
 Notes
 
 - PKA handshake runs automatically when v2 `pka`/`k` is present. Legacy `aid1` records still use `pka`/`kid`.
+- For `aid2` PKA, the SDK sends the queried host in the `AID-Domain` header by default and surfaces `DiscoveryResult.DomainBound` (`true` only for a verified `aid-pka-v2-db` proof). Requesting binding is not itself a mitigation — only `domain-binding=require` enforces it. See [Specification Appendix B.7](../specification.md#b7-domain-binding).
 - Errors: `AidError : Exception` exposes `.ErrorCode` (symbol) and `.Code` (number).
 
 ---

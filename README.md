@@ -42,6 +42,7 @@ AID v2 is the current normative protocol surface in `packages/docs/specification
 - **Key identity:** HTTP Message Signature `keyid` is the RFC 7638 JWK thumbprint derived from `k`; v2 records do not publish DNS `kid`/`i`.
 - **PKA challenge:** clients request an RFC 9421 response signature with `Accept-Signature` and a nonce.
 - **Freshness:** v2 PKA requires `created`, `expires`, exact nonce echo, and response `Cache-Control: no-store`.
+- **Domain binding:** for `aid2` PKA, clients send the queried host in the `AID-Domain` header by default and report a `domainBound` indicator (`true` only for a verified `aid-pka-v2-db` proof). Requesting binding does not by itself mitigate unauthorized association — only `domain-binding=require` enforces it. See specification Appendix B.7.
 - **No v1 defaults in v2:** no signed HTTP `Date`, no `AID-Challenge`, no base58 `z...` key, and no DNS `kid`/`i`.
 
 ### v2.0 Highlights
@@ -78,7 +79,7 @@ graph TD
 >
 > - Canonical location is `_agent.<domain>`. Clients query the base record first. Protocol-specific `_agent._<proto>.<domain>` probing is legacy, diagnostic, or base-failure-only behavior where explicitly supported and configured.
 > - `.well-known` JSON fallback is allowed only on DNS failure (HTTPS-only, JSON content-type, ≤64KB, ~2s timeout, no redirects). On success, TTL=300.
-> - For `aid2`, if `pka`/`k` is present, clients perform nonce-bound RFC 9421 endpoint proof using the derived JWK thumbprint keyid and response `Cache-Control: no-store`.
+> - For `aid2`, if `pka`/`k` is present, clients perform nonce-bound RFC 9421 endpoint proof using the derived JWK thumbprint keyid and response `Cache-Control: no-store`. Clients send the queried host in `AID-Domain` by default and report `domainBound` (Appendix B.7); only `domain-binding=require` enforces binding.
 > - For legacy `aid1`, `pka`/`kid` still use the v1 compatibility handshake with `AID-Challenge`, signed `Date`, and `keyid` matching DNS `kid`.
 
 ## Guiding Principles

@@ -65,6 +65,7 @@ Notes
 
 - Use `proto` (preferred) or shorthand `p`. Do not set both.
 - Remote protocols must use `https://`. Local uses allowed custom schemes.
+- When `pka`/`k` is present in an `aid2` record, the PKA handshake runs automatically. The SDK sends the queried host in the `AID-Domain` header by default and reports a `domainBound` indicator in PKA state (`true` only for a verified `aid-pka-v2-db` proof). Requesting binding is not itself a mitigation — only `domain-binding=require` enforces it. See [Specification Appendix B.7](../specification.md#b7-domain-binding).
 - Errors are standardized (`1000..1005`).
 
 > **Advanced Usage**: For building custom tools, use `@agentcommunity/aid-engine` - a pure, stateless library containing all AID business logic without CLI dependencies.

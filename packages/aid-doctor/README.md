@@ -99,6 +99,7 @@ AID_ALLOW_INSECURE_WELL_KNOWN=1 aid-doctor check localhost:19081 --show-details 
 - v2 reports derive the HTTP Message Signature `keyid` as the RFC 7638 JWK SHA-256 thumbprint
 - `alg` must be `ed25519`
 - v2 PKA uses a nonce-bound HTTP Message Signature response and requires `Cache-Control: no-store`
+- v2 PKA sends the queried host in the `AID-Domain` header by default and reports a `domainBound` indicator (`true` only for a verified `aid-pka-v2-db` proof). Requesting binding does not by itself mitigate unauthorized association — only `domain-binding=require` enforces it. See specification Appendix B.7.
 - Legacy `aid1` records can still be checked during the compatibility window, including their legacy `kid`
 
 ### Loopback HTTP (dev‑only)

@@ -9,8 +9,8 @@
     },
     {
       "path": "quickstart/index.md",
-      "bytes": 3418,
-      "sha256": "da0c08fec694d58073a0a38e2adf96233d805a984e27c44beb923cae0d56219c"
+      "bytes": 3769,
+      "sha256": "1b2add79efada43ae95a5975de3cc76a62a234e57bba9570cc6f45c8fbe46ca2"
     },
     {
       "path": "quickstart/quickstart_a2a.md",
@@ -24,18 +24,18 @@
     },
     {
       "path": "quickstart/quickstart_dotnet.md",
-      "bytes": 1541,
-      "sha256": "cc35c7332f949739db21b3fb60f60afa11c111d980917f1852a0e5234b775931"
+      "bytes": 1889,
+      "sha256": "fb49778f249171d88cb219fa834cf0bbd21d0f8d462267051c3c61cd5b92e10b"
     },
     {
       "path": "quickstart/quickstart_go.md",
-      "bytes": 1535,
-      "sha256": "8c3df5c37ee26794d0c0c6d516cf46826ccc363103fac56fe745ebec8fe4642d"
+      "bytes": 2135,
+      "sha256": "78fc96cfb2c2dac8a9edccbc1e2babe50f4903d82943d3f98ce02394f163ef24"
     },
     {
       "path": "quickstart/quickstart_java.md",
-      "bytes": 1640,
-      "sha256": "b282555df571ef1a312c12f072269d659a82d4ee04fdc3115aa3a86f068674b4"
+      "bytes": 1988,
+      "sha256": "7c532ae9744e63ecf7f3804d805c71fecbd3bd06edb345d62a4baed2b4bf5656"
     },
     {
       "path": "quickstart/quickstart_mcp.md",
@@ -49,18 +49,18 @@
     },
     {
       "path": "quickstart/quickstart_python.md",
-      "bytes": 1372,
-      "sha256": "16fbc7ab62aabda4de290fd143ad417145edd34b0d7f17aa3ef16da34df56a13"
+      "bytes": 1729,
+      "sha256": "60359c7f571d56bd02d6e818148ef979650471f4d281df932b167cb09c1e41fd"
     },
     {
       "path": "quickstart/quickstart_rust.md",
-      "bytes": 1952,
-      "sha256": "422cf42092956a65515adb66615a94e4d3ea11bc3cd4a25fe3a9015d93c7522b"
+      "bytes": 2444,
+      "sha256": "e6d98535a7961fa74f199df59926fcfe284b46d9485c903285d3be46ef58113d"
     },
     {
       "path": "quickstart/quickstart_ts.md",
-      "bytes": 2039,
-      "sha256": "64ab0d006ad27ce610cbae41bf43cd315e656b4482030d265684177e9a07d9cd"
+      "bytes": 2464,
+      "sha256": "4d03afc86f78982377811afaf9de07bc7fc9f44ae95c98f1f5e591fa3582820e"
     },
     {
       "path": "Reference/discovery_api.md",
@@ -158,5 +158,5 @@
       "sha256": "599a515ee2f1c179d3538459626595141a6d18c97dbbe81f6aac836e3f540814"
     }
   ],
-  "aggregateSha256": "191f6b0ace36bfe7d14480dd09abc47a86c8fb54705404b0c687aca57209840e"
+  "aggregateSha256": "fae223e249f8849a02b06dc704eac4b7787dd79165b74b8a819e8e63e56b6ae9"
 }

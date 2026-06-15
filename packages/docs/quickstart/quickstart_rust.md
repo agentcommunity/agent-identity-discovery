@@ -74,6 +74,7 @@ Notes
 
 - TTL from DNS is respected; successful `.well-known` fallback uses TTL=300.
 - PKA handshake (when v2 `pka`/`k` is present) requires enabling the `handshake` feature. Legacy `aid1` records still use `pka`/`kid`.
+- For `aid2` PKA, the SDK sends the queried host in the `AID-Domain` header by default and verifies a domain-bound (`aid-pka-v2-db`) proof, rejecting an `aid-pka-v2-db` response that omits `"aid-domain";req` coverage. Surfacing the `domainBound` outcome through discovery is a fast-follow (verification-only in this release). Requesting binding is not itself a mitigation — only `domain-binding=require` enforces it. See [Specification Appendix B.7](../specification.md#b7-domain-binding).
 
 ---
 
