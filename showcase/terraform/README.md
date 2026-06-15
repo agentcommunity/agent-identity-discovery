@@ -59,7 +59,7 @@ Defined in `main.tf`:
 | --------------------------- | ------ | ------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `cloudflare_zone_id`        | string | —       | yes      | Cloudflare zone ID for `agentcommunity.org`. In CI this comes from the `CLOUDFLARE_ZONE_ID` GitHub secret.                                                                                                       |
 | `record_ttl`                | number | `360`   | no       | TTL in seconds for the published TXT records. Spec §4 recommends 300–900.                                                                                                                                        |
-| `include_protocol_specific` | bool   | `false` | no       | If true, additionally creates the optional `_agent._mcp.simple` and `_agent._a2a.gateway` underscore-form examples described in spec §2.4. Off by default — the canonical `_agent.<sub>` records remain primary. |
+| `include_protocol_specific` | bool   | `false` | no       | If true, additionally creates the optional `_agent._mcp.simple` and `_agent._a2a.gateway` underscore-form examples described in spec §2.5. Off by default — the canonical `_agent.<sub>` records remain primary. |
 
 The Cloudflare provider authenticates via the `CLOUDFLARE_API_TOKEN` environment variable.
 
@@ -109,9 +109,9 @@ The records published here demonstrate the AID v2 surface area. Relevant specifi
 
 - **§2 — TXT Record Specification**: format, required keys, key aliases, multi-string handling.
 - **§2.4 — Exact-host semantics and explicit delegation**: canonical base-name behavior.
-- **§2.5 — Multiple Protocols And Protocol-Specific Compatibility Names**: covered by the optional `include_protocol_specific` records.
+- **§2.5 — Protocol-Specific Names**: covered by the optional `include_protocol_specific` records.
 - **§4 — DNS and Caching**: TTL recommendation enforced via `record_ttl`.
-- **§7.2 — Protocol Tokens**: every protocol token has a representative showcase record (`mcp`, `a2a`, `openapi`, `grpc`, `graphql`, `local`, `ucp`).
+- **§7.2 — Protocol Tokens**: the network-facing protocol tokens each have a representative showcase record (`mcp`, `a2a`, `openapi`, `grpc`, `graphql`, `local`, `ucp`); `websocket` and `zeroconf` are not currently showcased.
 - **Appendix B — PKA Handshake**: `_agent.pka-basic` exercises the live PKA endpoint.
 
 The full spec lives at [`packages/docs/specification.md`](../../packages/docs/specification.md).

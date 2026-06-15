@@ -151,7 +151,7 @@ Merely sending `AID-Domain` does not prevent an attacker-controlled endpoint fro
 
 ## PKA Key Management
 
-Public Key Attestation adds cryptographic endpoint proof. Proper key management is essential.
+Public Key for Agent (PKA) adds cryptographic endpoint proof. Proper key management is essential.
 
 ### Best Practices
 

@@ -9,15 +9,16 @@ tags:
   - v2
   - design-notes
   - '2026-05-23'
+  - superseded
 ---
 
 # Agent Identity & Discovery (AID) v2 - Design Notes
 
 _Historical notes from the v2 specification work_
 
-**Date:** 23 May 2026
+**Date:** 23 May 2026 (frozen; superseded by specification.md as of 2026-06-14, which added the domain-binding profile)
 **Editor:** Agent Community
-**Status:** Non-normative design notes
+**Status:** Historical design notes — superseded
 
 > **This page is a historical draft and has been superseded.**
 > The authoritative, normative protocol is the **[AID v2 Specification](specification.md)**. Read that document for all implementation decisions, wire-format rules, security requirements, and domain-binding (Appendix B.7) details. This page is retained only as design history and review context for the legacy `aid1` to v2 transition. Where this page conflicts with `specification.md`, the specification takes precedence.
@@ -184,8 +185,8 @@ When given a domain, an AID client performs these steps:
 5. Select the highest supported valid version allowed by local policy, normally `aid2` before `aid1`.
 6. Within the selected version, if exactly one valid record exists, use it. If more than one valid record exists, fail with ambiguity.
 7. Process optional metadata: display `docs`, warn or fail on `dep` according to policy.
-8. If `k` is present, perform PKA endpoint proof using Appendix B.
-9. Return the discovered endpoint, protocol, metadata, PKA state, and trust source.
+8. If `k` is present, perform PKA endpoint proof using Appendix B. Clients SHOULD send the `AID-Domain` request header by default (unless `domain-binding=off`), requesting the domain-bound proof shape described in Appendix B.7.
+9. Return the discovered endpoint, protocol, metadata, PKA state (including the boolean `domainBound` indicator), and trust source.
 
 Malformed answers do not matter when there is exactly one valid record in the selected version. Clients MUST NOT choose among multiple valid same-version records by DNS answer order.
 
@@ -255,6 +256,7 @@ Mitigations provided by AID v2:
 - **Version downgrade:** Returning clients can detect `aid2` to `aid1` downgrade when they retain previous version state.
 - **Command injection in local agents:** Local execution safeguards.
 - **Cross-origin redirects:** PKA redirects are rejected.
+- **Unauthorized association:** The domain-binding profile (Appendix B.7) — where the endpoint proves it consents to serve the queried domain by signing the `AID-Domain` request header. v2 clients SHOULD request this by default; `domain-binding=require` enforces it. See also Section 3.1.
 
 Explicitly out of scope:
 
@@ -482,14 +484,15 @@ Signers MUST emit `alg="ed25519"` lowercase. Verifiers MUST compare the semantic
 
 ### B.4 Covered Components
 
-The v2 PKA response signature covers:
+The v2 PKA response signature covers exactly:
 
 - `"@method";req`
 - `"@target-uri";req`
 - `"@authority";req`
+- _(optional)_ `"aid-domain";req` — present only in domain-bound proofs (see Appendix B.7); positioned between `"@authority";req` and `"@status"`
 - `"@status"`
 
-`@method`, `@target-uri`, and `@authority` are request-derived components and therefore use `;req`. `@status` is response-derived and does not use `;req`.
+`@method`, `@target-uri`, and `@authority` are request-derived components and therefore use `;req`. `@status` is response-derived and does not use `;req`. The covered set is either those four base components, or those four plus the optional `"aid-domain";req` for domain-bound proofs. No other components are permitted.
 
 `@status` signs the status actually returned. PKA does not require status `200`. A signed `401` can still prove endpoint authenticity before the OAuth/auth.md handoff continues.
 
@@ -518,6 +521,13 @@ A verifier accepts a v2 PKA response only when:
 7. `created` and `expires` pass freshness checks;
 8. the response includes `Cache-Control: no-store`;
 9. Ed25519 verification succeeds over the reconstructed RFC 9421 signature base.
+
+For domain binding (when `AID-Domain` was sent):
+
+10. A response is domain-bound if and only if its covered set includes `"aid-domain";req` matching the exact `AID-Domain` value the client sent.
+11. A client that did NOT send `AID-Domain` MUST reject a response whose covered set includes `aid-domain` (fail-closed).
+12. If `domain-binding=require` is active and the verified proof is unbound (covered set omits `aid-domain`), fail with `ERR_SECURITY`.
+13. Clients MUST expose a boolean `domainBound` indicator: `true` when `"aid-domain";req` was covered and verified for the queried domain, `false` otherwise.
 
 > **Explainer:** This is a v2 wire-format break from the current SDK PKA handshake. That is intentional. The v1 text left too much RFC 9421 behavior implicit for independent implementations.
 

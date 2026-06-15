@@ -127,7 +127,7 @@ Reject the PKA response when any of these are true:
 - `k` is missing, padded, not base64url, or not 32 decoded bytes;
 - the response follows a redirect;
 - `Signature-Input` or `Signature` is missing or malformed;
-- covered components differ from the AID profile;
+- covered components differ from the AID profile (either the four base components, or those four plus the optional `"aid-domain";req` — see Domain Binding Profile below);
 - `tag` is not `aid-pka-v2`;
 - `keyid` differs from the RFC 7638 thumbprint derived from DNS `k`;
 - `alg` is not semantically `ed25519`;

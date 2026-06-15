@@ -347,7 +347,7 @@ Thanks to our production-grade setup:
 
 - For questions, ideas, and support, join our **[GitHub Discussions](https://github.com/orgs/agentcommunity/discussions)**.
 - Chat with us on **[Discord](https://discord.gg/S5XqVHrj)**.
-- To contribute, please see our **[Contributing Guide](./CONTRIBUTING.md)** and **[Code of Conduct](./CODE_OF_CONDUCT.md)**.
+- To contribute, please see our **[Contributing Guide](./CONTRIBUTING.md)** and **[Code of Conduct](https://github.com/agentcommunity/.github/blob/main/CONTRIBUTING.md)**.
 
 ## License
 

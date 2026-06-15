@@ -6,6 +6,8 @@ icon: material/language-java
 
 # Java
 
+> **Not yet published to Maven Central.** Consume the SDK from source (see `packages/aid-java/`) until a Maven coordinate is available. Maven/Gradle coordinates will be added here once the package is published.
+
 ## Discover by Domain
 
 ```java

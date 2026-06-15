@@ -51,7 +51,7 @@ The AID specification and its surrounding tooling (libraries, validators) are ve
 
 ### v1.1.0 — August 2025
 
-- **Public Key Attestation (PKA):** Optional Ed25519 endpoint proof via HTTP Message Signatures (RFC 9421)
+- **Public Key for Agent (PKA):** Optional Ed25519 endpoint proof via HTTP Message Signatures (RFC 9421)
 - **Key aliases:** Single-letter aliases for all TXT record keys (`v`, `p`, `u`, `s`, `a`, `d`, `e`, `k`, `i`) for byte efficiency
 - **Metadata keys:** `docs`/`d` for documentation URL, `dep`/`e` for deprecation timestamp
 - **Protocol extensions:** Added `grpc`, `graphql`, `websocket`, `zeroconf`, and `ucp` protocol tokens

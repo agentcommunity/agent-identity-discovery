@@ -82,7 +82,7 @@ Providers **SHOULD** emit the short-key form for compact DNS deployment.
 | `uri`     | `u`   | **Required** | Absolute `https://` URL for a remote agent, `wss://` for WebSocket, or a local locator.  | `u=https://api.example.com/mcp`                 |
 | `proto`   | `p`   | **Required** | Protocol token from the protocol registry.                                               | `p=mcp`                                         |
 | `auth`    | `a`   | Recommended  | Authentication hint token from the auth registry.                                        | `a=oauth2_code`                                 |
-| `desc`    | `s`   | Optional     | Short human-readable display text.                                                       | `s=Primary AI Gateway`                          |
+| `desc`    | `s`   | Optional     | Short human-readable display text. MUST be ≤ 60 UTF-8 bytes.                             | `s=Primary AI Gateway`                          |
 | `docs`    | `d`   | Optional     | Absolute `https://` URL to human-readable documentation.                                 | `d=https://docs.example.com/agent`              |
 | `dep`     | `e`   | Optional     | ISO 8601 UTC deprecation timestamp.                                                      | `e=2027-01-01T00:00:00Z`                        |
 | `pka`     | `k`   | Optional     | Unpadded base64url Ed25519 public key. The value is exactly the RFC 8037 JWK `x` member. | `k=JrQLj5P_89iXES9-vFgrIy29clF9CC_oPPsw3c5D0bs` |

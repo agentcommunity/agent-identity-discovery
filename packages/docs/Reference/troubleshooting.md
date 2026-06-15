@@ -28,7 +28,7 @@ icon: material/tools
   - Use `proto` (preferred) or `p` (shorthand), not both.
   - Remote URIs must be `https://` and parseable.
 - 1002 ERR_UNSUPPORTED_PROTO: unsupported `proto`
-  - Use one of: `mcp`, `openapi`, `a2a`, `local`.
+  - Use a registered protocol token (see [Protocols & Auth](protocols.md)): `mcp`, `a2a`, `openapi`, `grpc`, `graphql`, `websocket`, `local`, `zeroconf`, `ucp`.
 - 1003 ERR_SECURITY: security policy violation
   - DNSSEC failures, invalid local execution, disallowed scheme, failed PKA proof, or domain-binding policy rejection (see Domain-binding failures below).
 - 1004 ERR_DNS_LOOKUP_FAILED: DNS/network timeout/failure

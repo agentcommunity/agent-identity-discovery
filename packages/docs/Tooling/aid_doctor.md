@@ -114,7 +114,7 @@ aid-doctor pka generate [--label <name>] [--out <dir>] [--print-private]
 aid-doctor pka verify --key <base64url-jwk-x>
 ```
 
-- Generate Ed25519 keys. For v2, this prints the unpadded base64url JWK `x` public key and its derived RFC 7638 JWK thumbprint `keyid`.
+- Generate Ed25519 keys. For v2, this prints the unpadded base64url JWK `x` public key to stdout and saves the private key to disk (path printed to stderr).
 - Verify the format of a v2 PKA public key. Legacy v1 records use `z...` base58btc plus `kid`.
 
 ---
