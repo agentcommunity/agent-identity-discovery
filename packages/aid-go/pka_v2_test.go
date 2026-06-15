@@ -510,6 +510,33 @@ func TestPKAV2DomainBoundPassVector(t *testing.T) {
 	}
 }
 
+func TestPKAV2DomainBoundMissingCoverageRejected(t *testing.T) {
+	vector := loadPKAV2Vector(t, "v2-db-missing-aid-domain-coverage")
+	withPKAV2VectorClockAndNonce(t, vector)
+
+	oldClient := httpClient
+	httpClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		h := http.Header{}
+		h.Set("Cache-Control", vector.Response.CacheControl)
+		h.Set("Signature-Input", vector.Response.SignatureInput)
+		h.Set("Signature", vector.Response.Signature)
+		return &http.Response{StatusCode: vector.Response.Status, Header: h, Body: io.NopCloser(strings.NewReader(""))}, nil
+	})}
+	t.Cleanup(func() { httpClient = oldClient })
+
+	_, err := performPKAHandshake(vector.Record.U, vector.Record.K, "", vector.Domain, time.Second)
+	if err == nil {
+		t.Fatalf("expected db tag without aid-domain coverage to be rejected")
+	}
+	aidErr, ok := err.(*AidError)
+	if !ok {
+		t.Fatalf("expected AidError, got %T", err)
+	}
+	if aidErr.Symbol != "ERR_SECURITY" {
+		t.Fatalf("expected ERR_SECURITY, got %s", aidErr.Symbol)
+	}
+}
+
 func TestPKAV2RejectsDbTagWithoutAidDomainCoverage(t *testing.T) {
 	headers := http.Header{}
 	headers.Set("Signature-Input", `aid-pka=("@method";req "@target-uri";req "@authority";req "@status");created=1;expires=2;keyid="key";alg="ed25519";nonce="nonce";tag="aid-pka-v2-db"`)
