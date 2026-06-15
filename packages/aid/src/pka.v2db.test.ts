@@ -109,49 +109,48 @@ describe('AID v2 PKA domain binding', () => {
     ).resolves.toEqual({ domainBound: false });
   });
 
-  it('rejects a db-tagged response that does not cover aid-domain', async () => {
-    const vector = loadVector('v2-db-missing-aid-domain-coverage');
-    mockVectorResponse(vector);
-
-    await expect(
-      performPKAHandshake(vector.record.u, vector.record.k, undefined, vector.domain),
-    ).rejects.toThrow('Signature-Input must cover required fields');
-  });
-
-  it('rejects a plain aid-pka-v2 response that covers aid-domain', async () => {
-    const vector = loadVector('v2-rfc9421-response-signature');
+  it('rejects a response with an invalid covered set', async () => {
+    // aid-domain covered, but with an extra disallowed component (host) — validateV2CoveredSet
+    // accepts only the base-4 or base-4 + aid-domain shapes and rejects anything else.
+    const vector = loadVector('v2-db-rfc9421-domain-bound');
     const tampered: typeof vector = {
       ...vector,
       response: {
         ...vector.response,
         signature_input: vector.response.signature_input.replace(
-          '"@authority";req ',
-          '"@authority";req "aid-domain";req ',
+          '"@status")',
+          '"host";req "@status")',
         ),
       },
     };
     mockVectorResponse(tampered);
 
     await expect(
-      performPKAHandshake(tampered.record.u, tampered.record.k, undefined, 'example.com'),
-    ).rejects.toThrow('Signature-Input must cover required fields');
+      performPKAHandshake(tampered.record.u, tampered.record.k, undefined, tampered.domain),
+    ).rejects.toThrow(/Signature-Input must cover required fields|Unsupported covered field/);
   });
 
-  it('rejects an unrequested domain-bound response', async () => {
+  it('rejects a response that covers aid-domain when no AID-Domain was sent', async () => {
+    // Under the single-tag model, domain binding is signalled purely by aid-domain coverage.
+    // A response that covers aid-domain is only meaningful when the client committed to a
+    // domain via the AID-Domain header, so it must be rejected when no domain was sent.
     const vector = loadVector('v2-db-rfc9421-domain-bound');
     mockVectorResponse(vector);
 
     await expect(performPKAHandshake(vector.record.u, vector.record.k)).rejects.toThrow(
-      'Unrequested domain-bound signature tag',
+      'Response covers aid-domain but no AID-Domain was sent',
     );
   });
 
   it('rejects when the signed domain differs from the sent domain', async () => {
-    const vector = loadVector('v2-db-rfc9421-domain-bound');
+    // The mismatch vector covers aid-domain (tag aid-pka-v2) but was signed over a base whose
+    // aid-domain line is evil.example. The verifier rebuilds with the sent domain (example.com),
+    // so Ed25519 verification fails.
+    const vector = loadVector('v2-db-domain-mismatch');
     mockVectorResponse(vector);
 
     await expect(
-      performPKAHandshake(vector.record.u, vector.record.k, undefined, 'evil.example'),
+      performPKAHandshake(vector.record.u, vector.record.k, undefined, vector.domain),
     ).rejects.toThrow('PKA signature verification failed');
   });
 

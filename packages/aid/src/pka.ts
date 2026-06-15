@@ -93,7 +93,6 @@ export interface PKAHandshakeResult {
 
 export const AID_DOMAIN_HEADER = 'AID-Domain';
 const AID_PKA_TAG_V2 = 'aid-pka-v2';
-const AID_PKA_TAG_V2_DB = 'aid-pka-v2-db';
 
 export function canonicalizeAidDomain(domain: string): string {
   let value = asciiLowerCase(domain.trim());
@@ -470,6 +469,8 @@ interface V2SignatureHeaders {
   alg: string;
   nonce: string;
   tag: string;
+  /** True when the signed covered set includes "aid-domain";req. */
+  domainBound: boolean;
   signature: Uint8Array;
 }
 
@@ -490,30 +491,37 @@ function parseV2CoveredItem(raw: string): V2CoveredItem {
   return { raw, name, req: reqCount === 1 };
 }
 
-function validateV2CoveredSet(covered: V2CoveredItem[], domainBound: boolean): void {
-  const expected = new Map<V2CoveredItem['name'], boolean>([
+// Validates the covered set against the two permitted shapes and returns whether the
+// proof is domain-bound (i.e. the signed covered set includes "aid-domain";req).
+// Shape A (unbound): @method;req @target-uri;req @authority;req @status
+// Shape B (bound):   @method;req @target-uri;req @authority;req aid-domain;req @status
+// The covered set lives in the signed @signature-params, so this distinction is authenticated.
+function validateV2CoveredSet(covered: V2CoveredItem[]): boolean {
+  const base: ReadonlyArray<[V2CoveredItem['name'], boolean]> = [
     ['@method', true],
     ['@target-uri', true],
     ['@authority', true],
     ['@status', false],
-  ]);
-  if (domainBound) expected.set('aid-domain', true);
+  ];
 
-  if (covered.length !== expected.size) {
+  const domainBound = covered.length === base.length + 1 && covered[3]?.name === 'aid-domain';
+
+  const expected: ReadonlyArray<[V2CoveredItem['name'], boolean]> = domainBound
+    ? [base[0], base[1], base[2], ['aid-domain', true], base[3]]
+    : base;
+
+  if (covered.length !== expected.length) {
     throw new AidError('ERR_SECURITY', 'Signature-Input must cover required fields');
   }
 
-  const seen = new Set<string>();
-  for (const item of covered) {
-    if (seen.has(item.name) || expected.get(item.name) !== item.req) {
+  for (let i = 0; i < expected.length; i++) {
+    const [name, req] = expected[i];
+    if (covered[i].name !== name || covered[i].req !== req) {
       throw new AidError('ERR_SECURITY', 'Signature-Input must cover required fields');
     }
-    seen.add(item.name);
   }
 
-  if (seen.size !== expected.size) {
-    throw new AidError('ERR_SECURITY', 'Signature-Input must cover required fields');
-  }
+  return domainBound;
 }
 
 function parseV2SignatureHeaders(headers: HeaderLike): V2SignatureHeaders {
@@ -552,7 +560,7 @@ function parseV2SignatureHeaders(headers: HeaderLike): V2SignatureHeaders {
     throw new AidError('ERR_SECURITY', 'Invalid Signature-Input timestamp');
   }
 
-  validateV2CoveredSet(covered, tag === AID_PKA_TAG_V2_DB);
+  const domainBound = validateV2CoveredSet(covered);
 
   const signatureRaw = extractDictionaryMember(sig, 'aid-pka');
   const sigMatch = /^:\s*([^:]+?)\s*:$/.exec(signatureRaw);
@@ -567,6 +575,7 @@ function parseV2SignatureHeaders(headers: HeaderLike): V2SignatureHeaders {
     alg,
     nonce,
     tag,
+    domainBound,
     signature: base64ToUint8(sigMatch[1]),
   };
 }
@@ -605,8 +614,8 @@ function buildV2SignatureBase(
     if (item.name === '@target-uri') lines.push(`"@target-uri";req: ${ctx.targetUri}`);
     if (item.name === '@authority') lines.push(`"@authority";req: ${ctx.authority}`);
     if (item.name === 'aid-domain') {
-      // Fail-closed invariant: unreachable in normal flow (the tag/coverage gates in
-      // performV2PKAHandshake reject a covered aid-domain without a sent domain), kept as defense-in-depth.
+      // Fail-closed invariant: unreachable in normal flow (performV2PKAHandshake rejects a
+      // covered aid-domain without a sent domain before reaching here), kept as defense-in-depth.
       if (ctx.aidDomain === undefined) {
         throw new AidError(
           'ERR_SECURITY',
@@ -636,11 +645,12 @@ async function deriveAid2KeyMaterial(
 }
 
 function buildAcceptSignatureV2(keyid: string, nonce: string, domainBound: boolean): string {
+  // The tag is a fixed profile identifier (RFC 9421 §2.3); domain binding is signalled by
+  // including "aid-domain";req in the covered set, not by a distinct tag.
   const covered = domainBound
     ? '("@method";req "@target-uri";req "@authority";req "aid-domain";req "@status")'
     : '("@method";req "@target-uri";req "@authority";req "@status")';
-  const tag = domainBound ? AID_PKA_TAG_V2_DB : AID_PKA_TAG_V2;
-  return `aid-pka=${covered};created;expires;keyid="${keyid}";alg="ed25519";nonce="${nonce}";tag="${tag}"`;
+  return `aid-pka=${covered};created;expires;keyid="${keyid}";alg="ed25519";nonce="${nonce}";tag="${AID_PKA_TAG_V2}"`;
 }
 
 async function performV1PKAHandshake(uri: string, pka: string, kid: string): Promise<void> {
@@ -763,12 +773,15 @@ async function performV2PKAHandshake(
   if (!timingSafeEqual(parsed.nonce, nonce)) {
     throw new AidError('ERR_SECURITY', 'Signature nonce mismatch');
   }
-  const isDomainBound = timingSafeEqual(parsed.tag, AID_PKA_TAG_V2_DB);
-  if (!isDomainBound && !timingSafeEqual(parsed.tag, AID_PKA_TAG_V2)) {
+  if (!timingSafeEqual(parsed.tag, AID_PKA_TAG_V2)) {
     throw new AidError('ERR_SECURITY', 'Invalid signature tag');
   }
+  // Domain binding is derived from the signed covered set (aid-domain coverage), not the tag.
+  const isDomainBound = parsed.domainBound;
+  // Primary protection: a response that covers aid-domain is only meaningful when the client
+  // committed to a domain via the AID-Domain header. Reject otherwise (fail closed).
   if (isDomainBound && canonicalDomain === undefined) {
-    throw new AidError('ERR_SECURITY', 'Unrequested domain-bound signature tag');
+    throw new AidError('ERR_SECURITY', 'Response covers aid-domain but no AID-Domain was sent');
   }
 
   const base = buildV2SignatureBase(parsed.covered, parsed.signatureParamsRaw, {

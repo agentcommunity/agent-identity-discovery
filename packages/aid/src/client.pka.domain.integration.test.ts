@@ -57,7 +57,7 @@ describe('PKA domain binding integration', () => {
       const nonce = /nonce="([^"]+)"/.exec(accept)?.[1] ?? '';
       const created = Math.floor(Date.now() / 1000);
       const expires = created + 60;
-      const params = `("@method";req "@target-uri";req "@authority";req "aid-domain";req "@status");created=${created};expires=${expires};keyid="${keyid}";alg="ed25519";nonce="${nonce}";tag="aid-pka-v2-db"`;
+      const params = `("@method";req "@target-uri";req "@authority";req "aid-domain";req "@status");created=${created};expires=${expires};keyid="${keyid}";alg="ed25519";nonce="${nonce}";tag="aid-pka-v2"`;
       const base = [
         `"@method";req: GET`,
         `"@target-uri";req: https://api.example.com/mcp`,
