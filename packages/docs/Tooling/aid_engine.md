@@ -161,7 +161,11 @@ The CLI wrapper `aid-doctor` handles:
 import { AidError } from '@agentcommunity/aid';
 
 try {
-  const result = await runCheck('example.com');
+  const result = await runCheck('example.com', {
+    timeoutMs: 5000,
+    allowFallback: true,
+    wellKnownTimeoutMs: 2000,
+  });
 } catch (error) {
   if (error instanceof AidError) {
     console.log('AID Error:', error.code, error.errorCode);

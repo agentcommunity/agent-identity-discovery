@@ -19,6 +19,9 @@ _Historical notes from the v2 specification work_
 **Editor:** Agent Community
 **Status:** Non-normative design notes
 
+> **This page is a historical draft and has been superseded.**
+> The authoritative, normative protocol is the **[AID v2 Specification](specification.md)**. Read that document for all implementation decisions, wire-format rules, security requirements, and domain-binding (Appendix B.7) details. This page is retained only as design history and review context for the legacy `aid1` to v2 transition. Where this page conflicts with `specification.md`, the specification takes precedence.
+
 > The current normative protocol is the [AID v2 specification](specification.md). This page is retained as design history and review context for the legacy `aid1` to v2 transition.
 
 ## Background Reading
@@ -235,7 +238,10 @@ PKA does not prove:
 - that an OAuth token is valid;
 - that a SPIFFE SVID belongs to a trust domain;
 - that an internal policy engine approved a request;
-- that a key change is cryptographically continuous with a previous key.
+- that a key change is cryptographically continuous with a previous key;
+- that the endpoint consents to serve as the agent for the queried domain.
+
+Because the response signature binds only the endpoint's own request context, any domain can publish a record containing another operator's endpoint URI and public key, and the endpoint proof still verifies. This _unauthorized association_ does not let the publishing domain impersonate the endpoint, but it falsely implies a relationship between the domain and the endpoint. Clients that need the endpoint's consent to the association use the domain-binding profile in Appendix B.7; v2 clients **SHOULD** request this by default.
 
 > **Explainer:** This narrow trust claim is the core of v2. AID can help other systems decide where to begin trust establishment, but AID is not the whole trust establishment system.
 
@@ -265,6 +271,7 @@ Clients that expose enterprise controls SHOULD provide simple policy knobs:
 - **DNSSEC policy:** `off | prefer | require`
 - **Well-known policy:** `auto | disable`
 - **Downgrade policy:** `off | warn | fail`
+- **Domain-binding policy:** `off | prefer | require`
 
 Policy semantics:
 
@@ -272,6 +279,9 @@ Policy semantics:
 - `dnssec=require`: discovery fails when DNSSEC validation is unavailable or unsuccessful for the selected DNS answer.
 - `well-known=disable`: clients do not use `/.well-known/agent`.
 - `downgrade=warn|fail`: applies to PKA removal, key replacement, and `aid2` to `aid1` downgrade when previous state exists.
+- `domain-binding=off`: the client does not send `AID-Domain` on PKA requests.
+- `domain-binding=prefer` (default): the client sends `AID-Domain`. A domain-bound proof (one whose covered set includes `"aid-domain";req`) is recorded as such; an unbound proof is still accepted. `prefer` records the outcome but does not enforce it.
+- `domain-binding=require`: discovery fails unless the endpoint proof is domain-bound (its covered set includes `"aid-domain";req`). This is the only mode that mitigates unauthorized association (Section 3.1, Appendix B.7); merely sending `AID-Domain` does not. Has no effect when no `k` is present.
 
 If discovery succeeds only through `.well-known`, the result cannot satisfy `dnssec=require`.
 
@@ -501,7 +511,7 @@ A verifier accepts a v2 PKA response only when:
 
 1. the selected AID record contains valid v2 `k`;
 2. the response contains a valid `Signature-Input` and `Signature`;
-3. the covered components and `tag="aid-pka-v2"` match this profile;
+3. the tag is `tag="aid-pka-v2"` and the covered components are exactly the four base components above, or those four plus the optional `"aid-domain";req` component (between `"@authority";req` and `"@status"`) per the domain-binding profile in Appendix B.7;
 4. `keyid` equals the RFC 7638 thumbprint derived from DNS `k`;
 5. `alg` has semantic value `ed25519`;
 6. `nonce` exactly equals the verifier-generated challenge;
@@ -510,6 +520,27 @@ A verifier accepts a v2 PKA response only when:
 9. Ed25519 verification succeeds over the reconstructed RFC 9421 signature base.
 
 > **Explainer:** This is a v2 wire-format break from the current SDK PKA handshake. That is intentional. The v1 text left too much RFC 9421 behavior implicit for independent implementations.
+
+### B.7 Domain Binding
+
+This profile lets an endpoint prove that it consents to serve as the agent for the queried domain, addressing the unauthorized-association gap described in Section 3.1. When `k` is present in an `aid2` record, clients SHOULD request domain binding by default. The domain-binding indicator in the discovery result is the expected outcome for well-configured v2 deployments; clients that need hard enforcement use `domain-binding=require` (Section 3.3).
+
+There is a single RFC 9421 tag for all v2 PKA proofs: `aid-pka-v2`. A proof is domain-bound if and only if its signed covered set includes the `"aid-domain";req` component, positioned strictly between `"@authority";req` and `"@status"`.
+
+A client requesting domain binding sends the queried domain in the `AID-Domain` request header and requests an extended response signature:
+
+```http
+AID-Domain: example.com
+Accept-Signature: aid-pka=("@method";req "@target-uri";req "@authority";req "aid-domain";req "@status");created;expires;keyid="<jwk-thumbprint>";alg="ed25519";nonce="<client-challenge>";tag="aid-pka-v2"
+```
+
+The `AID-Domain` value is the exact host the client queried, normalized to its A-label form, lowercased, and without a trailing dot or port.
+
+A server that supports this profile and serves the named domain responds with the Appendix B.3 shape but with `"aid-domain";req` added after `"@authority";req` in the covered set. A server that does not serve the named domain **MUST NOT** produce a signature covering that `AID-Domain` value; it SHOULD respond with status `403` and no `Signature-Input` header — which constitutes a failed endpoint proof, so discovery fails for that domain (the intended outcome). A server that does not support this profile ignores the header and responds with the base Appendix B.3 shape (an unbound proof), which remains a valid endpoint proof without domain binding.
+
+A client that did not send `AID-Domain` **MUST** reject a response whose covered set includes `aid-domain` (fail-closed). Clients expose a boolean `domainBound` indicator set `true` only when `aid-domain` was covered and the proof verified for the queried domain. Requesting binding does not by itself mitigate unauthorized association — only `domain-binding=require` does (Section 3.3).
+
+> **Explainer:** The tag (`aid-pka-v2`) does not change between bound and unbound proofs. The covered set distinguishes them. Because `@signature-params` is itself signed, the presence or absence of `aid-domain` in the covered set is authenticated and cannot be altered without invalidating the signature.
 
 ---
 

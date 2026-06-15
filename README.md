@@ -3,8 +3,8 @@
 <div align="center">
   <p><strong>The 0-th hop for agent discovery.</strong></p>
   <p>
-    <a href="https://github.com/agentcommunity/agent-identity-discovery/actions/workflows/ci.yml">
-      <img src="https://github.com/agentcommunity/agent-identity-discovery/actions/workflows/ci.yml/badge.svg" alt="Build Status" />
+    <a href="https://github.com/agentcommunity/agent-identity-discovery/actions/workflows/ci-parity.yml">
+      <img src="https://github.com/agentcommunity/agent-identity-discovery/actions/workflows/ci-parity.yml/badge.svg" alt="Build Status" />
     </a>
     <a href="https://aid.agentcommunity.org/workbench">
       <img src="https://img.shields.io/badge/Demo-Try%20AID%20Workbench-brightgreen?style=flat&logo=rocket" alt="Demo AID Workbench" />

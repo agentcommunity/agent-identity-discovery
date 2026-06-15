@@ -20,16 +20,15 @@ Install the CLI:
 npm install -g @agentcommunity/aid-doctor
 ```
 
-Generate a record:
+Generate a record interactively:
 
 ```bash
-aid-doctor generate \
-  --uri https://api.example.com/mcp \
-  --proto mcp \
-  --desc "Example AI Tools"
+aid-doctor generate
+# Optional: save the output to a file for later deployment
+aid-doctor generate --save-draft /path/to/my-record.txt
 ```
 
-The output is a TXT value like this:
+The wizard prompts for `uri`, `proto`, optional `auth`, `desc`, and other fields, then prints the canonical TXT value and copies it to your clipboard:
 
 ```text
 v=aid2;u=https://api.example.com/mcp;p=mcp;s=Example AI Tools

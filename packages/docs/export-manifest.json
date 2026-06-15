@@ -3,66 +3,6 @@
   "source": "packages/docs",
   "files": [
     {
-      "path": "index.md",
-      "bytes": 4785,
-      "sha256": "ea00f6d37757fde5b3b50d4c875ce0fc1d48f395d035ba4540168c4e4def73fa"
-    },
-    {
-      "path": "quickstart/index.md",
-      "bytes": 3833,
-      "sha256": "face7e1beb992e255ec12f3e77928cc3528a0720790b2860f1b1b783869472f1"
-    },
-    {
-      "path": "quickstart/quickstart_a2a.md",
-      "bytes": 3749,
-      "sha256": "1c7994d2aeba4302b41906c485f69ab6b9ce3a4ad166f9fb89c8d4eb47aba64c"
-    },
-    {
-      "path": "quickstart/quickstart_browser.md",
-      "bytes": 1200,
-      "sha256": "a7336b3e8f152f366d12fab5cdcd3f2538f25e05e3c86a593de894b8624b13ba"
-    },
-    {
-      "path": "quickstart/quickstart_dotnet.md",
-      "bytes": 1953,
-      "sha256": "35a27e2f9f359ba0e0d3dc096f3dd40ec950eed3c452c8803fc65dc215d958cb"
-    },
-    {
-      "path": "quickstart/quickstart_go.md",
-      "bytes": 2199,
-      "sha256": "620db9c4c0e3df76ba0416770331c2a683c9f8b217e4f1610215be3b6f276541"
-    },
-    {
-      "path": "quickstart/quickstart_java.md",
-      "bytes": 2052,
-      "sha256": "e2d20e1ecf0416eb06ce58c60d98e281c6607235994fb871e6c3baf95f0df422"
-    },
-    {
-      "path": "quickstart/quickstart_mcp.md",
-      "bytes": 3596,
-      "sha256": "a8982068a6c809c36e43c8cf1ffde3b084ab786a7b693899a66a0b31af56a46e"
-    },
-    {
-      "path": "quickstart/quickstart_openapi.md",
-      "bytes": 4049,
-      "sha256": "b73c3f3a1085a8a98bcb01e8f8948ff8779b87b0d95158caf517adeabd4a453b"
-    },
-    {
-      "path": "quickstart/quickstart_python.md",
-      "bytes": 1793,
-      "sha256": "a4a2c37f025027321b0b498dc935f909344c5e380f064fb1074f0c670bddead2"
-    },
-    {
-      "path": "quickstart/quickstart_rust.md",
-      "bytes": 2509,
-      "sha256": "21aea481a1b12376646b4d27a98fd55725da5c4295cdfcc29bcf36b5bd02ce21"
-    },
-    {
-      "path": "quickstart/quickstart_ts.md",
-      "bytes": 2528,
-      "sha256": "b17b52931d86a46ed96b081d91a0324c416e3937f01e513418dd32d81fd57bc3"
-    },
-    {
       "path": "Reference/discovery_api.md",
       "bytes": 5707,
       "sha256": "cdea1c610a191fee6c4e13608c716c7275cd877a7f2b579ac4b75c990ee76d4c"
@@ -113,24 +53,14 @@
       "sha256": "a52e875b8b96c29d4e4034e9e80c2430f7c5e8662a5a3e23a99fd056d6dd9fbe"
     },
     {
-      "path": "specification_v2_explained.md",
-      "bytes": 33560,
-      "sha256": "e1020844ec1872d2e50660ceded5d4c4c73978716c2dfc655d33d63a4d81ee8e"
-    },
-    {
-      "path": "specification.md",
-      "bytes": 36205,
-      "sha256": "572175829238aa533d300e12e1a8c574783cc2ed94860e6834eaf39c2b7d211b"
-    },
-    {
       "path": "Tooling/aid_doctor.md",
       "bytes": 8431,
       "sha256": "8ef9fb6b0eba3e786a6959847c25e851b95809867d6d12943f76b3bcc02b03ac"
     },
     {
       "path": "Tooling/aid_engine.md",
-      "bytes": 5812,
-      "sha256": "fd19c98a0c558ccebf0ba6eafc73bae98dba2e687b22d494792881458ab7edb2"
+      "bytes": 5880,
+      "sha256": "7e3985478adc1f3bb193a57d497e2feb7cd985a2d83aaa947d05254de4ddb31a"
     },
     {
       "path": "Tooling/conformance.md",
@@ -156,7 +86,77 @@
       "path": "Understand/rationale.md",
       "bytes": 14814,
       "sha256": "599a515ee2f1c179d3538459626595141a6d18c97dbbe81f6aac836e3f540814"
+    },
+    {
+      "path": "index.md",
+      "bytes": 4785,
+      "sha256": "ea00f6d37757fde5b3b50d4c875ce0fc1d48f395d035ba4540168c4e4def73fa"
+    },
+    {
+      "path": "quickstart/index.md",
+      "bytes": 3992,
+      "sha256": "4caa5e41ea2778f8413b233bb8b3f505bfc998f9f3e988de2614d1565fb2ea1e"
+    },
+    {
+      "path": "quickstart/quickstart_a2a.md",
+      "bytes": 3749,
+      "sha256": "1c7994d2aeba4302b41906c485f69ab6b9ce3a4ad166f9fb89c8d4eb47aba64c"
+    },
+    {
+      "path": "quickstart/quickstart_browser.md",
+      "bytes": 1200,
+      "sha256": "a7336b3e8f152f366d12fab5cdcd3f2538f25e05e3c86a593de894b8624b13ba"
+    },
+    {
+      "path": "quickstart/quickstart_dotnet.md",
+      "bytes": 1953,
+      "sha256": "35a27e2f9f359ba0e0d3dc096f3dd40ec950eed3c452c8803fc65dc215d958cb"
+    },
+    {
+      "path": "quickstart/quickstart_go.md",
+      "bytes": 2149,
+      "sha256": "0a3745c789d8b295d53efa4483e8f2ae018563ebfaec75d06c7f1db7f324f13d"
+    },
+    {
+      "path": "quickstart/quickstart_java.md",
+      "bytes": 2052,
+      "sha256": "e2d20e1ecf0416eb06ce58c60d98e281c6607235994fb871e6c3baf95f0df422"
+    },
+    {
+      "path": "quickstart/quickstart_mcp.md",
+      "bytes": 3596,
+      "sha256": "a8982068a6c809c36e43c8cf1ffde3b084ab786a7b693899a66a0b31af56a46e"
+    },
+    {
+      "path": "quickstart/quickstart_openapi.md",
+      "bytes": 4049,
+      "sha256": "b73c3f3a1085a8a98bcb01e8f8948ff8779b87b0d95158caf517adeabd4a453b"
+    },
+    {
+      "path": "quickstart/quickstart_python.md",
+      "bytes": 1776,
+      "sha256": "40e5780de4bf398d894ff5e311da6b668b49d1483721d4bb27358b6466e39b12"
+    },
+    {
+      "path": "quickstart/quickstart_rust.md",
+      "bytes": 2509,
+      "sha256": "21aea481a1b12376646b4d27a98fd55725da5c4295cdfcc29bcf36b5bd02ce21"
+    },
+    {
+      "path": "quickstart/quickstart_ts.md",
+      "bytes": 2528,
+      "sha256": "b17b52931d86a46ed96b081d91a0324c416e3937f01e513418dd32d81fd57bc3"
+    },
+    {
+      "path": "specification.md",
+      "bytes": 36205,
+      "sha256": "572175829238aa533d300e12e1a8c574783cc2ed94860e6834eaf39c2b7d211b"
+    },
+    {
+      "path": "specification_v2_explained.md",
+      "bytes": 38121,
+      "sha256": "e770d42b579b335cdee31d82e572636ef659108bc2c2e620ade9e5a5732af75e"
     }
   ],
-  "aggregateSha256": "7eda59ed833989d299f38efdcd949f1a949333fa91bf6e035a0225004b6ddf08"
+  "aggregateSha256": "8096ed133e8a3ee817ef62da55fb9cd760cf33561fe3d2591d8d34e596ca897c"
 }
