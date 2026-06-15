@@ -17,6 +17,7 @@ public sealed class DiscoveryResult
     public required AidRecord Record { get; init; }
     public required int Ttl { get; init; }
     public required string QueryName { get; init; }
+    public bool DomainBound { get; init; }
 }
 
 public static class Discovery
@@ -74,7 +75,7 @@ public static class Discovery
         throw new AidError(nameof(Constants.ERR_NO_RECORD), $"No TXT answers for {fqdn}");
     }
 
-    private static AidRecord ParseSingleValid(IEnumerable<string> txts, TimeSpan timeout, string queryName)
+    private static (AidRecord, bool) ParseSingleValid(IEnumerable<string> txts, TimeSpan timeout, string queryName, string? queriedDomain = null)
     {
         AidError? last = null;
         var byVersion = new Dictionary<string, List<AidRecord>>(StringComparer.Ordinal)
@@ -109,11 +110,12 @@ public static class Discovery
                 );
             }
             var valid = records[0];
+            bool domainBound = false;
             if (!string.IsNullOrEmpty(valid.Pka))
             {
-                Pka.PerformHandshakeAsync(valid.Uri, valid.Pka!, valid.Kid ?? string.Empty, timeout).GetAwaiter().GetResult();
+                domainBound = Pka.PerformHandshakeAsync(valid.Uri, valid.Pka!, valid.Kid ?? string.Empty, timeout, domain: queriedDomain).GetAwaiter().GetResult();
             }
-            return valid;
+            return (valid, domainBound);
         }
         throw last ?? new AidError(nameof(Constants.ERR_NO_RECORD), "No valid AID record in TXT answers");
     }
@@ -131,8 +133,8 @@ public static class Discovery
             try
             {
                 var (txts, ttl) = await QueryTxtDoHAsync(name, options.Timeout).ConfigureAwait(false);
-                var rec = ParseSingleValid(txts, options.Timeout, name);
-                return new DiscoveryResult { Record = rec, Ttl = ttl, QueryName = name };
+                var (rec, domainBound) = ParseSingleValid(txts, options.Timeout, name, alabel);
+                return new DiscoveryResult { Record = rec, Ttl = ttl, QueryName = name, DomainBound = domainBound };
             }
             catch (AidError e)
             {
