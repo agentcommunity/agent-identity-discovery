@@ -105,7 +105,7 @@ describe('/api/pka-demo', () => {
       new Request(PKA_DEMO_URL, {
         headers: {
           'Accept-Signature':
-            'aid-pka=("@method";req "@target-uri";req "@authority";req "aid-domain";req "@status");created;expires;keyid="sYkYRKJfa8y8rCgWHb-qxqR4LY93c_hbbL10YbvT88o";alg="ed25519";nonce="test-nonce-123";tag="aid-pka-v2-db"',
+            'aid-pka=("@method";req "@target-uri";req "@authority";req "aid-domain";req "@status");created;expires;keyid="sYkYRKJfa8y8rCgWHb-qxqR4LY93c_hbbL10YbvT88o";alg="ed25519";nonce="test-nonce-123";tag="aid-pka-v2"',
           'AID-Domain': 'evil.example',
         },
       }),
@@ -125,7 +125,7 @@ describe('/api/pka-demo', () => {
       new Request(PKA_DEMO_URL, {
         headers: {
           'Accept-Signature':
-            'aid-pka=("@method";req "@target-uri";req "@authority";req "aid-domain";req "@status");created;expires;keyid="sYkYRKJfa8y8rCgWHb-qxqR4LY93c_hbbL10YbvT88o";alg="ed25519";nonce="test-nonce-123";tag="aid-pka-v2-db"',
+            'aid-pka=("@method";req "@target-uri";req "@authority";req "aid-domain";req "@status");created;expires;keyid="sYkYRKJfa8y8rCgWHb-qxqR4LY93c_hbbL10YbvT88o";alg="ed25519";nonce="test-nonce-123";tag="aid-pka-v2"',
           'AID-Domain': 'aid.agentcommunity.org',
         },
       }),
@@ -136,7 +136,7 @@ describe('/api/pka-demo', () => {
 
     const signatureInput = response.headers.get('Signature-Input');
     const signature = response.headers.get('Signature');
-    expect(signatureInput).toContain('tag="aid-pka-v2-db"');
+    expect(signatureInput).toContain('tag="aid-pka-v2"');
     expect(signatureInput).toContain('"aid-domain";req');
     if (!signatureInput || !signature) throw new Error('Missing signature headers');
 

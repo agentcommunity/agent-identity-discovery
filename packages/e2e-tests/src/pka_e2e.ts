@@ -265,7 +265,7 @@ async function runAid2DomainBoundPkaCheck() {
       const created = Math.floor(Date.now() / 1000);
       const expires = created + 60;
       const status = 401;
-      const signatureInput = `aid-pka=("@method";req "@target-uri";req "@authority";req "aid-domain";req "@status");created=${created};expires=${expires};keyid="${key.jwk_thumbprint}";alg="ed25519";nonce="${nonce}";tag="aid-pka-v2-db"`;
+      const signatureInput = `aid-pka=("@method";req "@target-uri";req "@authority";req "aid-domain";req "@status");created=${created};expires=${expires};keyid="${key.jwk_thumbprint}";alg="ed25519";nonce="${nonce}";tag="aid-pka-v2"`;
       const signatureParams = signatureInput.replace(/^aid-pka=/, '');
       const signatureBase = [
         `"@method";req: GET`,
