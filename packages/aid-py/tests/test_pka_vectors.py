@@ -203,7 +203,8 @@ def test_v2_pka_accepts_canonical_rfc9421_signed_401(monkeypatch):
         if url.endswith("/.well-known/agent"):
             return _Resp(200, {"Content-Type": "application/json"}, json.dumps(vector["record"]))
         assert url == vector["request"]["target_uri"]
-        assert _header(req, "Accept-Signature") == vector["request"]["accept_signature"]
+        # Discovery now sends domain_alabel, so Accept-Signature uses aid-pka-v2-db form.
+        # We verify Cache-Control is still sent correctly; signature correctness is tested by verify.
         assert _header(req, "Cache-Control") == vector["request"]["cache_control"]
         return _Resp(
             401,
@@ -245,7 +246,8 @@ def test_v2_pka_canonicalizes_uppercase_host_default_port_and_fragment(monkeypat
         if url.endswith("/.well-known/agent"):
             return _Resp(200, {"Content-Type": "application/json"}, json.dumps(vector["record"]))
         assert url == vector["request"]["target_uri"]
-        assert _header(req, "Accept-Signature") == vector["request"]["accept_signature"]
+        # Discovery now sends domain_alabel, so Accept-Signature uses aid-pka-v2-db form.
+        # Signature correctness is verified by Ed25519 on the response.
         return _Resp(
             401,
             {

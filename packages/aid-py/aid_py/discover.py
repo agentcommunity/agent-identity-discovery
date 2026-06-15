@@ -43,15 +43,16 @@ def _select_preferred_record(valid_records: list[dict], query_name: str) -> dict
     )
 
 
-def _perform_pka_for_record(record: dict, timeout: float) -> None:
+def _perform_pka_for_record(record: dict, timeout: float, *, queried_domain: str | None = None) -> bool:
+    """Perform the PKA handshake for a record (if PKA is present). Returns True if domain-bound."""
     if not record.get("pka"):
-        return
+        return False
     if perform_pka_handshake is None:
         raise AidError("ERR_SECURITY", "PKA handshake not supported in this environment")
     if record.get("v") == SPEC_VERSION_V1:
         perform_pka_handshake(record["uri"], record["pka"], record.get("kid") or "", timeout=timeout)
-        return
-    perform_pka_handshake(record["uri"], record["pka"], timeout=timeout)
+        return False
+    return perform_pka_handshake(record["uri"], record["pka"], domain=queried_domain, timeout=timeout)
 
 
 def _query_txt_record(fqdn: str, timeout: float) -> Tuple[list[str], int]:
@@ -148,7 +149,8 @@ def discover(
 
         if valid_records:
             record = _select_preferred_record(valid_records, query_name)
-            _perform_pka_for_record(record, timeout)
+            domain_bound = _perform_pka_for_record(record, timeout, queried_domain=domain_alabel)
+            record["domain_bound"] = domain_bound
             return record, ttl
 
         # If we got here, either no records or all invalid
@@ -242,6 +244,7 @@ def discover(
         doc = _fetch_well_known_json(domain_alabel, well_known_timeout)
         record = _canonicalize_well_known(doc)
         # Perform PKA handshake if present
-        _perform_pka_for_record(record, well_known_timeout)
+        domain_bound = _perform_pka_for_record(record, well_known_timeout, queried_domain=domain_alabel)
+        record["domain_bound"] = domain_bound
         return record, DNS_TTL_MIN
     raise last_error or AidError("ERR_NO_RECORD", f"No valid _agent TXT record found for {base_fqdn}")
