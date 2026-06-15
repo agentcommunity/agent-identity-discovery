@@ -173,7 +173,7 @@ All real-world examples include Public Key Authentication. New examples use the 
 - **Format**: unpadded base64url Ed25519 JWK `x` in `k`/`pka`
 - **Key ID**: derived RFC 7638 JWK thumbprint used as the HTTP signature `keyid`; no DNS `kid`/`i`
 - **Handshake**: RFC 9421 `Accept-Signature` nonce, mandatory `created` and `expires`, and response `Cache-Control: no-store`
-- **Domain binding**: for `aid2` PKA, clients send the queried host in the `AID-Domain` header by default and report a `domainBound` indicator (`true` only for a verified `aid-pka-v2-db` proof). Requesting binding does not by itself mitigate unauthorized association — only `domain-binding=require` enforces it. See specification Appendix B.7.
+- **Domain binding**: for `aid2` PKA, clients send the queried host in the `AID-Domain` header by default and report a `domainBound` indicator (`true` only for a verified domain-bound proof — one whose `aid-pka-v2` covered set includes `"aid-domain";req`). Requesting binding does not by itself mitigate unauthorized association — only `domain-binding=require` enforces it. See specification Appendix B.7.
 - **Purpose**: Endpoint proof via HTTP Message Signatures (RFC 9421)
 
 Example v2 PKA record:

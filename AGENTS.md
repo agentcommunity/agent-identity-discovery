@@ -109,7 +109,7 @@ RawAidRecord
 - Current keys: `docs` (`d`), `dep` (`e`), and `pka` (`k`). `kid` (`i`) is legacy `aid1` only.
 - Aliases: clients must accept single-letter keys for all fields.
 - PKA: if `pka`/`k` is present in an `aid2` record, clients must perform the v2 endpoint-proof handshake (RFC 9421 + Ed25519) and derive `keyid` from `k`.
-- Domain binding: for `aid2` PKA, clients send the queried host in the `AID-Domain` header by default and report a `domainBound` indicator (`true` only for a verified `aid-pka-v2-db` proof). Requesting binding does not by itself mitigate unauthorized association — only `domain-binding=require` enforces it. See specification Appendix B.7.
+- Domain binding: for `aid2` PKA, clients send the queried host in the `AID-Domain` header by default and report a `domainBound` indicator (`true` only for a verified domain-bound proof — one whose `aid-pka-v2` covered set includes `"aid-domain";req`). Requesting binding does not by itself mitigate unauthorized association — only `domain-binding=require` enforces it. See specification Appendix B.7.
 - Fallback: clients may query `/.well-known/agent` on DNS failure.
 
 ## Workbench and CLI

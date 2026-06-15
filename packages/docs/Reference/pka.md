@@ -152,43 +152,43 @@ The value is the queried domain from step 1 of the discovery algorithm: A-label 
 
 ### Extended request shape
 
-The client requests the domain-binding tag:
+The tag stays `aid-pka-v2`; the client requests domain binding by adding `"aid-domain";req` to the covered set:
 
 ```http
 AID-Domain: example.com
-Accept-Signature: aid-pka=("@method";req "@target-uri";req "@authority";req "aid-domain";req "@status");created;expires;keyid="<jwk-thumbprint>";alg="ed25519";nonce="<client-challenge>";tag="aid-pka-v2-db"
+Accept-Signature: aid-pka=("@method";req "@target-uri";req "@authority";req "aid-domain";req "@status");created;expires;keyid="<jwk-thumbprint>";alg="ed25519";nonce="<client-challenge>";tag="aid-pka-v2"
 Cache-Control: no-store
 ```
 
-The additional covered component is `"aid-domain";req` — the `aid-domain` request header, per RFC 9421 component identifier rules.
+The additional covered component is `"aid-domain";req` — the `aid-domain` request header, per RFC 9421 component identifier rules. Because the covered set lives in the signed `@signature-params`, coverage of `aid-domain` is authenticated; a single tag suffices for both unbound and domain-bound proofs.
 
 ### Server response shape
 
-A server that supports this profile and serves the named domain responds with the Appendix B.3 shape, except the covered components include `"aid-domain";req` and the tag is `aid-pka-v2-db`. A server that does not support domain binding ignores `AID-Domain` and responds with the base tag `aid-pka-v2`, which remains a valid unbound proof.
+A server that supports this profile and serves the named domain responds with the Appendix B.3 shape, except the covered set includes `"aid-domain";req`. A server that does not support domain binding ignores `AID-Domain` and responds with the base covered set (no `aid-domain`), which remains a valid unbound proof.
 
-A server that supports this profile but does not serve the named domain MUST NOT produce a `aid-pka-v2-db` signature for it. It SHOULD respond `403` with no `Signature-Input`. A `403` refusal is a failed endpoint proof, so discovery fails for that domain.
+A server that supports this profile but does not serve the named domain MUST NOT produce a signature covering that `AID-Domain` value. It SHOULD respond `403` with no `Signature-Input`. A `403` refusal is a failed endpoint proof, so discovery fails for that domain.
 
 ### Domain-binding verifier rules
 
 In addition to the Appendix B.6 checklist:
 
-1. A response with `tag="aid-pka-v2-db"` MUST cover `"aid-domain";req`, constructed from the exact `AID-Domain` value the client sent. A response with `tag="aid-pka-v2"` MUST NOT cover `aid-domain`.
-2. A client that did not send `AID-Domain` MUST reject a `tag="aid-pka-v2-db"` response.
+1. A response is domain-bound if and only if its covered set includes `"aid-domain";req`, constructed from the exact `AID-Domain` value the client sent. The covered set MUST be either the four base components or those four plus `"aid-domain";req` (between `"@authority";req` and `"@status"`) — nothing else.
+2. A client that did not send `AID-Domain` MUST reject a response whose covered set includes `aid-domain` (fail-closed).
 
 ### domainBound indicator
 
 Clients that request domain binding MUST expose a boolean `domainBound` field in PKA state:
 
-- `true` when a valid `tag="aid-pka-v2-db"` proof was verified for the queried domain.
-- `false` when the verified proof used `tag="aid-pka-v2"` (unbound).
+- `true` when a valid proof covering `"aid-domain";req` was verified for the queried domain.
+- `false` when the verified proof omits `aid-domain` (unbound).
 
 ### Rejection checklist additions
 
 Add these checks when `AID-Domain` was sent:
 
-- `tag` is `aid-pka-v2-db` but `"aid-domain";req` is not in the covered components — reject.
-- `tag` is `aid-pka-v2-db` but the client did not send `AID-Domain` — reject.
-- `domain-binding=require` is active and the verified tag is `aid-pka-v2` (unbound) — fail with `ERR_SECURITY`.
+- the covered set includes `aid-domain` but `"aid-domain";req` does not match the exact `AID-Domain` value the client sent — reject.
+- the covered set includes `aid-domain` but the client did not send `AID-Domain` — reject.
+- `domain-binding=require` is active and the verified proof is unbound (covered set omits `aid-domain`) — fail with `ERR_SECURITY`.
 
 See [Specification Appendix B.7](../specification.md#b7-domain-binding) for the normative text.
 

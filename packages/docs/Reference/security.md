@@ -137,7 +137,7 @@ PKA proves endpoint key possession. It does not by itself prove the endpoint con
 
 ### How it works
 
-v2 clients SHOULD send the `AID-Domain: <queried-domain>` header on every PKA request (default behavior). The endpoint includes `"aid-domain";req` in its response signature and uses tag `aid-pka-v2-db` to signal it consents to serve as the agent for that domain. The discovery result reports `domainBound: true` for a verified bound proof and `domainBound: false` for a verified unbound proof.
+v2 clients SHOULD send the `AID-Domain: <queried-domain>` header on every PKA request (default behavior). The endpoint includes `"aid-domain";req` in the covered set of its `aid-pka-v2` response signature to signal it consents to serve as the agent for that domain. The discovery result reports `domainBound: true` for a verified bound proof and `domainBound: false` for a verified unbound proof.
 
 ### The honesty caveat
 

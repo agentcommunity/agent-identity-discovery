@@ -42,7 +42,7 @@ AID v2 is the current normative protocol surface in `packages/docs/specification
 - **Key identity:** HTTP Message Signature `keyid` is the RFC 7638 JWK thumbprint derived from `k`; v2 records do not publish DNS `kid`/`i`.
 - **PKA challenge:** clients request an RFC 9421 response signature with `Accept-Signature` and a nonce.
 - **Freshness:** v2 PKA requires `created`, `expires`, exact nonce echo, and response `Cache-Control: no-store`.
-- **Domain binding:** for `aid2` PKA, clients send the queried host in the `AID-Domain` header by default and report a `domainBound` indicator (`true` only for a verified `aid-pka-v2-db` proof). Requesting binding does not by itself mitigate unauthorized association — only `domain-binding=require` enforces it. See specification Appendix B.7.
+- **Domain binding:** for `aid2` PKA, clients send the queried host in the `AID-Domain` header by default and report a `domainBound` indicator (`true` only for a verified domain-bound proof — one whose `aid-pka-v2` covered set includes `"aid-domain";req`). Requesting binding does not by itself mitigate unauthorized association — only `domain-binding=require` enforces it. See specification Appendix B.7.
 - **No v1 defaults in v2:** no signed HTTP `Date`, no `AID-Challenge`, no base58 `z...` key, and no DNS `kid`/`i`.
 
 ### v2.0 Highlights

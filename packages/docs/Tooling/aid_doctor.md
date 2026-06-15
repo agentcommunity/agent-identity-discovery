@@ -138,7 +138,7 @@ aid-doctor pka verify --key <base64url-jwk-x>
 - TLS: first-hop redirect policy enforced; cert issuer/SAN/dates/days remaining (warns if < 21 days).
 - PKA: Performs the v2 endpoint-proof handshake when `k` is present, using the derived RFC 7638 JWK thumbprint as `keyid`.
 - PKA compatibility: Performs the legacy v1.1 handshake when an `aid1` record includes `pka`/`kid`.
-- Domain binding: When `--domain-binding prefer` (default) or `--domain-binding require` is active, sends `AID-Domain: <domain>` on the PKA request. Human output labels the result `domain-bound` (tag `aid-pka-v2-db` verified) or `endpoint-proof only` (tag `aid-pka-v2`, unbound). JSON output includes `domainBound: true | false` in the `pka` object. A `BINDING_LOSS` warning is emitted when a domain previously returned a domain-bound proof (`domainBound: true`) but the current check returns an unbound one — indicating a server-side regression in binding support.
+- Domain binding: When `--domain-binding prefer` (default) or `--domain-binding require` is active, sends `AID-Domain: <domain>` on the PKA request. Human output labels the result `domain-bound` (the verified `aid-pka-v2` proof covers `"aid-domain";req`) or `endpoint-proof only` (the `aid-pka-v2` covered set omits `aid-domain`, unbound). JSON output includes `domainBound: true | false` in the `pka` object. A `BINDING_LOSS` warning is emitted when a domain previously returned a domain-bound proof (`domainBound: true`) but the current check returns an unbound one — indicating a server-side regression in binding support.
 - Downgrade: warns if a domain previously had PKA and now removed or changed it (`--check-downgrade` flag required).
 
 ---

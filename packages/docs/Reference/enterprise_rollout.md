@@ -183,7 +183,7 @@ Exit criteria:
 - DNSSEC validation works from real client networks
 - PKA rotation runbook has been exercised
 - teams agree on rollback ownership and escalation path
-- all PKA endpoints return `tag="aid-pka-v2-db"` (domain-bound) responses
+- all PKA endpoints return domain-bound responses (the `aid-pka-v2` covered set includes `"aid-domain";req`)
 
 ## Rollback Guidance
 
@@ -241,7 +241,7 @@ Treat rollback as part of the rollout plan.
 - [ ] endpoint deployed and TLS valid
 - [ ] PKA key pair generated and stored securely if used
 - [ ] DNSSEC plan confirmed
-- [ ] domain-binding policy agreed (`prefer` for balanced, `require` for strict); confirm endpoint returns `tag="aid-pka-v2-db"` before enabling `require`
+- [ ] domain-binding policy agreed (`prefer` for balanced, `require` for strict); confirm endpoint returns a domain-bound proof (covered set includes `"aid-domain";req`) before enabling `require`
 
 ### During rollout
 
