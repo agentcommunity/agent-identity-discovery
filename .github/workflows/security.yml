@@ -13,6 +13,12 @@ permissions:
   security-events: write
   actions: read
 
+# Cancel superseded runs on the same branch; do not cancel in-progress on main
+# (schedule runs on main should always complete).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   security:
     name: Security Scanning
@@ -21,7 +27,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: ['javascript-typescript', 'go', 'python', 'java', 'csharp', 'rust']
+        # 'rust' is NOT included here: CodeQL Rust support is in public preview
+        # and the query suites used in codeql-config.yml (security-and-quality,
+        # security-experimental) do not yet have GA coverage. Rust security is
+        # handled by cargo clippy + cargo test in ci-rust.yml instead.
+        language: ['javascript-typescript', 'go', 'python', 'java', 'csharp']
     steps:
       - uses: actions/checkout@v4
         with:
@@ -53,7 +63,10 @@ jobs:
 
       - name: Secret scanning (diff)
         if: github.event_name == 'pull_request' || github.event_name == 'push'
-        uses: trufflesecurity/trufflehog@main
+        # Pinned to a specific release tag — do NOT use @main (floating branch =
+        # supply-chain risk: any commit to trufflehog's main runs with read access
+        # to this repo's checkout). Update the pin periodically or via Dependabot.
+        uses: trufflesecurity/trufflehog@v3.90.0
         with:
           path: ./
           base: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
@@ -62,14 +75,25 @@ jobs:
 
       - name: Secret scanning (full)
         if: github.event_name != 'pull_request' && github.event_name != 'push'
-        uses: trufflesecurity/trufflehog@main
+        uses: trufflesecurity/trufflehog@v3.90.0
         with:
           path: ./
           extra_args: --debug --only-verified
 
       - name: License compliance check
         run: |
-          find packages -name "*.ts" -o -name "*.js" -o -name "*.rs" -o -name "*.go" -o -name "*.cs" -o -name "*.java" | head -10 | xargs -I {} sh -c 'head -5 "{}" | grep -q "MIT\|License\|Copyright" || echo "Missing license header: {}"'
+          violations=()
+          while IFS= read -r f; do
+            if ! head -5 "$f" | grep -qE "MIT|License|Copyright"; then
+              violations+=("$f")
+            fi
+          done < <(find packages \( -name "*.ts" -o -name "*.js" -o -name "*.rs" -o -name "*.go" -o -name "*.cs" -o -name "*.java" \))
+          if [ ${#violations[@]} -gt 0 ]; then
+            echo "Missing license header in ${#violations[@]} file(s):"
+            printf '  %s\n' "${violations[@]}"
+            exit 1
+          fi
+          echo "License headers OK"
 
       - name: Dependency vulnerability scan
         run: |
