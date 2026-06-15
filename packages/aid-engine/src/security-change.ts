@@ -121,3 +121,31 @@ export function classifySecurityChange(
 
   return 'no_change';
 }
+
+/**
+ * Security-state transitions that the `fail` downgrade policy must reject
+ * outright. Shared by the engine checker and the aid-doctor cache so both
+ * enforce identical fail-policy semantics.
+ */
+const FAIL_POLICY_STATUSES = new Set<SecurityChangeStatus>([
+  'pka_removed',
+  'key_replaced',
+  'version_downgrade',
+]);
+
+/**
+ * Decide whether a classified security change must be rejected under the `fail`
+ * downgrade policy. The `fallback_well_known_tls` transition only fails when the
+ * previously trusted source was DNS (a genuine trust downgrade); a first-seen or
+ * already-well-known entry is not a downgrade. This is the single source of truth
+ * shared by the engine checker and aid-doctor (which re-exports it).
+ */
+export function shouldRejectForFailPolicy(
+  status: SecurityChangeStatus,
+  previous: CacheEntry | null | undefined,
+): boolean {
+  if (FAIL_POLICY_STATUSES.has(status)) return true;
+  if (status !== 'fallback_well_known_tls') return false;
+
+  return Boolean(previous && (previous.trustSource ?? 'dns') === 'dns');
+}

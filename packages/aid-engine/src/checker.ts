@@ -6,7 +6,11 @@ import { probeDnssecRrsigTxt } from './dnssec';
 import { runProtocolProbe } from './protoProbe';
 import { ERROR_MESSAGES } from './error_messages';
 import { findLongKeyNames } from './generator';
-import { classifySecurityChange, derivePkaKeyid } from './security-change';
+import {
+  classifySecurityChange,
+  derivePkaKeyid,
+  shouldRejectForFailPolicy,
+} from './security-change';
 
 /**
  * Normalize a discovery domain to its bare host for the AID-Domain binding
@@ -60,8 +64,6 @@ function initReport(domain: string, protocol?: string): DoctorReport {
       kid: null,
       keyid: null,
       alg: null,
-      createdSkewSec: null,
-      covered: null,
     },
     downgrade: { checked: false, previous: null, status: null },
     exitCode: 1,
@@ -336,6 +338,16 @@ export async function runCheck(domain: string, opts: CheckOptions): Promise<Doct
           break;
         default:
           break;
+      }
+
+      // Enforce the fail policy with the same semantics as the doctor's
+      // applySecurityState: under 'fail', a rejectable downgrade sets the
+      // ERR_SECURITY exit code and refuses to persist the (now-untrusted)
+      // entry. Keep this in sync via the shared shouldRejectForFailPolicy.
+      if (opts.downgradePolicy === 'fail' && shouldRejectForFailPolicy(status, prev)) {
+        report.exitCode = 1003;
+        report.cacheEntry = null;
+        return report;
       }
 
       // Save current

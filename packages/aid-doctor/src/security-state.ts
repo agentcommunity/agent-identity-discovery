@@ -2,30 +2,15 @@ import type { DoctorReport } from '@agentcommunity/aid-engine';
 import {
   buildCacheEntryFromReport,
   classifySecurityChange,
+  shouldRejectForFailPolicy,
   type CacheEntry,
   type SecurityChangeStatus,
 } from './cache';
 
 type DowngradePolicy = 'off' | 'warn' | 'fail';
 
-const FAIL_POLICY_STATUSES = new Set<SecurityChangeStatus>([
-  'pka_removed',
-  'key_replaced',
-  'version_downgrade',
-]);
-
 interface ApplySecurityStateResult {
   shouldPersist: boolean;
-}
-
-function shouldRejectForFailPolicy(
-  status: SecurityChangeStatus,
-  previousCacheEntry: CacheEntry | undefined,
-): boolean {
-  if (FAIL_POLICY_STATUSES.has(status)) return true;
-  if (status !== 'fallback_well_known_tls') return false;
-
-  return Boolean(previousCacheEntry && (previousCacheEntry.trustSource ?? 'dns') === 'dns');
 }
 
 export function applySecurityState(

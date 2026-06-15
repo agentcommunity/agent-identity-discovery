@@ -87,8 +87,6 @@ export interface PkaBlock {
   kid: string | null;
   keyid: string | null;
   alg: string | null;
-  createdSkewSec: number | null;
-  covered: string[] | null;
 }
 
 export interface DowngradeBlock {

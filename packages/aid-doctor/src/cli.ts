@@ -187,8 +187,10 @@ export function createCliProgram(): Command {
           spinner.stop();
           console.log(formatCheckResult(report));
 
-          // Exit with report exit code
-          process.exit(report.exitCode);
+          // Honor --code: when set, emit the granular report exit code (e.g.
+          // 1001/1003); otherwise collapse any failure to a generic exit 1 so
+          // scripts that opt out of granular codes get a stable success/failure.
+          process.exit(options.code ? report.exitCode : report.exitCode === 0 ? 0 : 1);
         } catch (error) {
           spinner.stop();
           console.log(formatError(error, domain));
@@ -280,7 +282,9 @@ export function createCliProgram(): Command {
           }
 
           console.log(JSON.stringify(report, null, 2));
-          process.exit(report.exitCode);
+          // Honor --code on the report path too (mirrors the catch path below):
+          // granular code when --code is set, otherwise generic 0/1.
+          process.exit(options.code ? report.exitCode : report.exitCode === 0 ? 0 : 1);
         } catch (error) {
           // Output error result
           if (error instanceof AidError) {

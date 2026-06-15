@@ -58,8 +58,6 @@ const makeReport = (overrides: Partial<DoctorReport> = {}): DoctorReport => ({
     verified: true,
     kid: 'legacy-dns-kid-that-must-not-render',
     alg: 'ed25519',
-    createdSkewSec: 1,
-    covered: [],
   },
   downgrade: { checked: true, previous: null, status: 'first_seen' },
   exitCode: 0,
@@ -273,6 +271,57 @@ describe('AID Doctor CLI', () => {
       );
       expect(processExitSpy).toHaveBeenCalledWith(1003);
     });
+
+    it('collapses a report-level failure to exit 1 without --code (check command)', async () => {
+      const runCheck = vi.fn().mockResolvedValue(makeReport({ exitCode: 1001 }));
+      const { createCliProgram } = await importCliWithMocks(runCheck);
+      const program = createCliProgram();
+
+      await program.parseAsync(['check', 'bad.example'], { from: 'user' });
+
+      // Without --code the granular report code is NOT leaked; failures map to 1.
+      expect(processExitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it('emits the granular report exit code with --code (check command)', async () => {
+      const runCheck = vi.fn().mockResolvedValue(makeReport({ exitCode: 1001 }));
+      const { createCliProgram } = await importCliWithMocks(runCheck);
+      const program = createCliProgram();
+
+      await program.parseAsync(['check', 'bad.example', '--code'], { from: 'user' });
+
+      expect(processExitSpy).toHaveBeenCalledWith(1001);
+    });
+
+    it('still exits 0 on a successful report regardless of --code (check command)', async () => {
+      const runCheck = vi.fn().mockResolvedValue(makeReport({ exitCode: 0 }));
+      const { createCliProgram } = await importCliWithMocks(runCheck);
+      const program = createCliProgram();
+
+      await program.parseAsync(['check', 'ok.example'], { from: 'user' });
+
+      expect(processExitSpy).toHaveBeenCalledWith(0);
+    });
+
+    it('collapses a report-level failure to exit 1 without --code (json command)', async () => {
+      const runCheck = vi.fn().mockResolvedValue(makeReport({ exitCode: 1003 }));
+      const { createCliProgram } = await importCliWithMocks(runCheck);
+      const program = createCliProgram();
+
+      await program.parseAsync(['json', 'bad.example'], { from: 'user' });
+
+      expect(processExitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it('emits the granular report exit code with --code (json command)', async () => {
+      const runCheck = vi.fn().mockResolvedValue(makeReport({ exitCode: 1003 }));
+      const { createCliProgram } = await importCliWithMocks(runCheck);
+      const program = createCliProgram();
+
+      await program.parseAsync(['json', 'bad.example', '--code'], { from: 'user' });
+
+      expect(processExitSpy).toHaveBeenCalledWith(1003);
+    });
   });
 
   describe('Package integrity', () => {
@@ -406,8 +455,6 @@ describe('AID Doctor CLI', () => {
           verified: true,
           kid: 'g1',
           alg: 'ed25519',
-          createdSkewSec: 1,
-          covered: [],
         },
         downgrade: { checked: true, previous: null, status: 'first_seen' },
         exitCode: 0,
@@ -471,8 +518,6 @@ describe('AID Doctor CLI', () => {
           verified: true,
           kid: 'legacy-dns-kid-that-must-not-render',
           alg: 'ed25519',
-          createdSkewSec: 1,
-          covered: [],
         },
         downgrade: { checked: true, previous: null, status: 'first_seen' },
         exitCode: 0,
@@ -530,8 +575,6 @@ describe('AID Doctor CLI', () => {
           verified: null,
           kid: null,
           alg: null,
-          createdSkewSec: null,
-          covered: null,
         },
         downgrade: {
           checked: true,
@@ -545,6 +588,35 @@ describe('AID Doctor CLI', () => {
       const output = formatCheckResult(report);
       expect(output).toContain('TLS-hosted fallback metadata');
       expect(output).toContain('well-known-tls');
+    });
+
+    it('renders a binding_loss downgrade as a warning step, not a green "No change"', () => {
+      const report = makeReport({
+        record: {
+          ...makeReport().record,
+          warnings: [
+            {
+              code: 'BINDING_LOSS',
+              message:
+                'Domain-binding proof was present in the previous check but is now absent (endpoint-proof only).',
+            },
+          ],
+        },
+        downgrade: {
+          checked: true,
+          previous: { pka: 'same', kid: null },
+          status: 'binding_loss',
+        },
+      });
+
+      const output = formatCheckResult(report);
+      const stepLine = output.split('\n').find((line) => line.includes('[6/6]')) ?? '';
+      // The [6/6] step line must surface the binding loss as a warning and must
+      // NOT fall through to the green "No change" else-branch.
+      expect(stepLine).toContain('Domain-binding lost');
+      expect(stepLine).not.toContain('No change');
+      // The warning is still listed in the Summary.
+      expect(output).toContain('endpoint-proof only');
     });
 
     it('should generate actionable suggestions', () => {
@@ -591,8 +663,6 @@ describe('AID Doctor CLI', () => {
           verified: null,
           kid: null,
           alg: null,
-          createdSkewSec: null,
-          covered: null,
         },
         downgrade: { checked: false, previous: null, status: null },
         exitCode: 0,
@@ -698,8 +768,6 @@ describe('AID Doctor CLI', () => {
           verified: true,
           kid: 'g1',
           alg: 'ed25519',
-          createdSkewSec: 1,
-          covered: [],
         },
         downgrade: { checked: true, previous: null, status: 'first_seen' },
         exitCode: 0,

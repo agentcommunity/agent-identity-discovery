@@ -50,8 +50,6 @@ function reportFor(record: DoctorReport['record']['parsed'], usedWellKnown = fal
       verified: record?.pka ? true : null,
       kid: record?.v === 'aid1' ? (record.kid ?? null) : null,
       alg: record?.pka ? 'ed25519' : null,
-      createdSkewSec: null,
-      covered: null,
     },
     downgrade: { checked: false, previous: null, status: null },
     exitCode: record ? 0 : 1,

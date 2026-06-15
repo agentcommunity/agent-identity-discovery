@@ -145,6 +145,10 @@ export function formatCheckResult(report: DoctorReport): string {
       lines.push(`[6/6] Downgrade check ... ${icons.ok} PKA added`);
     } else if (status === 'version_downgrade') {
       lines.push(`[6/6] Downgrade check ... ${icons.warn} AID version downgrade aid2->aid1`);
+    } else if (status === 'binding_loss') {
+      lines.push(
+        `[6/6] Downgrade check ... ${icons.warn} Domain-binding lost (endpoint-proof only)`,
+      );
     } else if (status === 'fallback_well_known_tls') {
       lines.push(
         `[6/6] Downgrade check ... ${icons.warn} DNS failed; using TLS-hosted fallback metadata (trustSource=well-known-tls)`,

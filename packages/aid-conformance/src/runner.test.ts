@@ -156,6 +156,58 @@ describe('aid-conformance runner', () => {
     expect(asPass.categories.pkaVectors).toEqual({ total: 1, passed: 0, failed: 1 });
   });
 
+  it('fails a domain-bound pass vector whose aid-domain;req sits at the wrong covered index', async () => {
+    const vector = pkaVectorById('v2-db-rfc9421-domain-bound');
+    // Move aid-domain;req from the required index 3 to index 4. The Ed25519
+    // signature was computed over the correctly-ordered base, so a subset-only
+    // check would still pass it; the positional validator must reject it.
+    const misordered: PkaVector = {
+      ...vector,
+      id: 'v2-db-misordered-covered',
+      covered: ['@method;req', '@target-uri;req', '@authority;req', '@status', 'aid-domain;req'],
+    };
+
+    const result = await runFixture(emptyFixture, {
+      pkaVectors: { version: 1, vectors: [misordered] },
+    });
+
+    expect(result.categories.pkaVectors).toEqual({ total: 1, passed: 0, failed: 1 });
+  });
+
+  it('fails a domain-bound pass vector that declares a domain but drops aid-domain coverage', async () => {
+    const vector = pkaVectorById('v2-db-rfc9421-domain-bound');
+    // Keep the top-level domain but strip aid-domain;req from the covered set
+    // (base-4 only). A domain-bound vector that no longer covers aid-domain must
+    // be rejected so a regression dropping the binding cannot slip through.
+    const unboundCovered: PkaVector = {
+      ...vector,
+      id: 'v2-db-domain-without-coverage',
+      covered: ['@method;req', '@target-uri;req', '@authority;req', '@status'],
+    };
+
+    const result = await runFixture(emptyFixture, {
+      pkaVectors: { version: 1, vectors: [unboundCovered] },
+    });
+
+    expect(result.categories.pkaVectors).toEqual({ total: 1, passed: 0, failed: 1 });
+  });
+
+  it('fails a v2 pass vector that adds an extra component beyond the permitted covered set', async () => {
+    const vector = validAid2PkaVector();
+    // base-4 plus an unexpected trailing component is neither permitted shape.
+    const extraCovered: PkaVector = {
+      ...vector,
+      id: 'v2-extra-covered-component',
+      covered: ['@method;req', '@target-uri;req', '@authority;req', '@status', '@query;req'],
+    };
+
+    const result = await runFixture(emptyFixture, {
+      pkaVectors: { version: 1, vectors: [extraCovered] },
+    });
+
+    expect(result.categories.pkaVectors).toEqual({ total: 1, passed: 0, failed: 1 });
+  });
+
   it('fails record sets when the only preferred-version selection differs from expectedSelected', async () => {
     const fixture: GoldenFixture = {
       records: [],

@@ -5,6 +5,7 @@ import type { DoctorReport } from '@agentcommunity/aid-engine';
 import {
   classifySecurityChange as engineClassifySecurityChange,
   derivePkaKeyid as engineDerivePkaKeyid,
+  shouldRejectForFailPolicy as engineShouldRejectForFailPolicy,
 } from '@agentcommunity/aid-engine';
 
 export const CACHE_SCHEMA_VERSION = 3;
@@ -118,6 +119,10 @@ export function buildCacheEntryFromReport(report: DoctorReport, now = new Date()
 // pka-set/keyid-null entries). Eliminates the previous divergent copy that
 // false-positived key_replaced for such entries.
 export const classifySecurityChange = engineClassifySecurityChange;
+
+// Re-exported from aid-engine so the doctor's applySecurityState and the engine
+// checker's downgrade block apply identical fail-policy rejection semantics.
+export const shouldRejectForFailPolicy = engineShouldRejectForFailPolicy;
 
 export async function loadCache(): Promise<CacheShape> {
   try {

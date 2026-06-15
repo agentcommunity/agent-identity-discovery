@@ -105,6 +105,64 @@ function hasRequiredCoveredFields(covered: unknown, required: readonly string[])
   );
 }
 
+// The two permitted v2 covered-set shapes, mirroring the SDK's validateV2CoveredSet
+// (packages/aid/src/pka.ts). The covered set is signed inside @signature-params, so
+// the exact ordered sequence is authenticated and must match one of these exactly.
+const V2_COVERED_UNBOUND = ['@method;req', '@target-uri;req', '@authority;req', '@status'] as const;
+const V2_COVERED_DOMAIN_BOUND = [
+  '@method;req',
+  '@target-uri;req',
+  '@authority;req',
+  'aid-domain;req',
+  '@status',
+] as const;
+
+function sameStringSequence(covered: unknown, expected: readonly string[]): boolean {
+  return (
+    Array.isArray(covered) &&
+    covered.length === expected.length &&
+    expected.every((field, index) => covered[index] === field)
+  );
+}
+
+// Returns whether the covered set is the domain-bound shape (aid-domain;req at
+// index 3). Throws-equivalent: callers push an error when it is neither shape.
+function isDomainBoundCoveredSet(covered: unknown): boolean {
+  return sameStringSequence(covered, V2_COVERED_DOMAIN_BOUND);
+}
+
+// Enforces that the v2 covered set is EXACTLY one of the two permitted shapes
+// (base-4, or base-4 with aid-domain;req inserted at index 3) and nothing else,
+// and that the domain-bound shape is used iff the vector carries a top-level
+// domain. This mirrors the SDK's positional validateV2CoveredSet so the
+// conformance pack is no weaker than the verifier it certifies, and rejects
+// malformed binding vectors (e.g. aid-domain at the wrong index, extra/missing
+// components, or a domain-bearing vector that drops aid-domain coverage).
+function validateV2CoveredSetShape(vector: RuntimePkaVector): string[] {
+  const errors: string[] = [];
+  const covered = vector.covered;
+  const hasDomain = isNonEmptyString(vector.domain) || isNonEmptyString(vector.aid_domain);
+  const domainBound = isDomainBoundCoveredSet(covered);
+
+  if (!domainBound && !sameStringSequence(covered, V2_COVERED_UNBOUND)) {
+    errors.push(
+      'aid2 vector covered must be exactly the base-4 set, or base-4 with "aid-domain;req" at index 3',
+    );
+  }
+
+  // Domain-bound vectors carry a top-level domain; their covered set must include
+  // aid-domain;req at index 3 (and vice versa, an aid-domain-covered vector must
+  // declare the domain it binds), so coverage and the asserted binding agree.
+  if (hasDomain && !domainBound) {
+    errors.push('aid2 domain-bound vector must cover "aid-domain;req" at index 3');
+  }
+  if (domainBound && !hasDomain) {
+    errors.push('aid2 vector covers "aid-domain;req" but declares no domain to bind');
+  }
+
+  return errors;
+}
+
 function includesNoStore(value: unknown): boolean {
   return (
     isNonEmptyString(value) &&
@@ -316,6 +374,10 @@ function validateV2PkaProofMaterial(vector: RuntimePkaVector, key: UnknownRecord
   if (!hasRequiredCoveredFields(vector.covered, REQUIRED_V2_COVERED)) {
     errors.push('aid2 vector must cover required RFC 9421 components');
   }
+  // Positional/exact-set enforcement (mirrors SDK validateV2CoveredSet): the
+  // subset check above accepts a domain-bound vector but does not pin aid-domain
+  // to index 3 or reject extra components, so it is augmented here.
+  errors.push(...validateV2CoveredSetShape(vector));
 
   const request = isRecord(vector.request) ? vector.request : undefined;
   const response = isRecord(vector.response) ? vector.response : undefined;
