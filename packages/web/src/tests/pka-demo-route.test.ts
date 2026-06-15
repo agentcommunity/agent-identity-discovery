@@ -117,6 +117,27 @@ describe('/api/pka-demo', () => {
     expect(response.headers.get('Signature')).toBeNull();
   });
 
+  it('fails closed when aid-domain is covered but no AID-Domain header is sent', async () => {
+    // The covered set requests domain binding ("aid-domain";req) but the request
+    // omits the AID-Domain header, so there is no domain to bind. The route must
+    // reject (400) rather than silently sign an unbound proof — the fail-closed
+    // mirror of the SDK verifier.
+    const response = await GET(
+      new Request(PKA_DEMO_URL, {
+        headers: {
+          'Accept-Signature':
+            'aid-pka=("@method";req "@target-uri";req "@authority";req "aid-domain";req "@status");created;expires;keyid="sYkYRKJfa8y8rCgWHb-qxqR4LY93c_hbbL10YbvT88o";alg="ed25519";nonce="test-nonce-123";tag="aid-pka-v2"',
+          // No AID-Domain header.
+        },
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(response.headers.get('Signature-Input')).toBeNull();
+    expect(response.headers.get('Signature')).toBeNull();
+  });
+
   it('signs a domain-bound response for a served domain', async () => {
     const infoResponse = await GET(new Request(PKA_DEMO_URL));
     const info = (await infoResponse.json()) as { publicKey: string };

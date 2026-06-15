@@ -5,7 +5,7 @@
 This document describes the v1.5 workbench after the web focus cleanup and resolver hardening:
 
 - Security-aware discovery
-- Protocol-aware connection handling via modular registry (MCP, A2A, OpenAPI, GraphQL, gRPC, WebSocket, Local, Zeroconf)
+- Protocol-aware connection handling via modular registry (MCP, A2A, OpenAPI, GraphQL, gRPC, WebSocket, Local, Zeroconf, UCP)
 - A2A Agent Card fetching and display
 - Improved auth error UX with protocol-appropriate prompts
 - Signal-first resolver timeline with stage transitions (`running -> success/error/needs_auth`)

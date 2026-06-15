@@ -35,13 +35,22 @@ export function buildWellKnownJson(data: AidGeneratorFormData): Record<string, s
   return o;
 }
 
-export function validate(data: AidGeneratorFormData): ValidationResult {
+export function validate(data: AidGeneratorFormData & { kid?: string }): ValidationResult {
   const errors: ValidationResult['errors'] = [];
   const warnings: ValidationResult['warnings'] = [];
 
   // Required
   if (!data.uri) errors.push({ code: 'ERR_URI', message: 'URI is required' });
   if (!data.proto) errors.push({ code: 'ERR_PROTO', message: 'Protocol is required' });
+
+  // aid2 disallows the legacy kid/i alias. Mirror the SDK parser
+  // (parser.ts:322-324, throws ERR_INVALID_TXT) and the authoritative
+  // server validator (generator-validation.ts ERR_KID_NOT_ALLOWED) so a
+  // pasted/loaded record carrying i=/kid= is rejected in the client preview
+  // too, not silently dropped.
+  if (data.kid) {
+    errors.push({ code: 'ERR_KID_NOT_ALLOWED', message: 'Key ID (kid/i) is not used in AID v2' });
+  }
 
   // Protocol registry (subset here; extend if needed)
   const allowed: Record<string, readonly string[]> = {
@@ -109,6 +118,11 @@ export function parseRecordString(str: string): Partial<AidGeneratorFormData> {
       }),
   );
   const get = (...keys: string[]) => keys.map((k) => map.get(k)).find(Boolean);
+  // Note: the legacy kid/i alias is intentionally NOT read here. aid2 disallows
+  // it, so it must never rehydrate into creator state or round-trip into TXT
+  // output (pinned by web-v2-surface.test.ts). A pasted record carrying i=/kid=
+  // is rejected authoritatively by the server validator (ERR_KID_NOT_ALLOWED in
+  // generator-validation.ts) and mirrored by core.validate's kid check below.
   const out: Partial<AidGeneratorFormData> = {};
   const uri = get('u', 'uri');
   if (uri) out.uri = uri;

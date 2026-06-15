@@ -24,8 +24,6 @@ export const getSecurityInfo = async (
         verified: report.pka.verified,
         keyid: report.pka.keyid,
         alg: report.pka.alg,
-        createdSkewSec: report.pka.createdSkewSec,
-        covered: report.pka.covered,
         domainBound: report.pka.domainBound ?? undefined,
       },
       tls: report.tls,

@@ -20,8 +20,6 @@ const makeReport = (domainBound: boolean | null | undefined): DoctorReport =>
       kid: null,
       keyid: 'test-keyid',
       alg: 'EdDSA',
-      createdSkewSec: 0,
-      covered: [],
       domainBound,
     },
     tls: { checked: true, valid: true, daysRemaining: 90 },

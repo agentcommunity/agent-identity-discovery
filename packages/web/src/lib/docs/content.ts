@@ -79,6 +79,11 @@ function getDocFromFs(slug: string): DocPage | null {
       : path.join(process.cwd(), '..', 'docs');
 
     const normalized = slug.replaceAll(/^\/+|\/+$/g, '');
+    // Path-traversal guard: this dev-only fs fallback joins the catch-all slug
+    // into a filesystem path, so reject any '..' segment or backslash before
+    // touching the disk. (Production resolves via the pre-compiled JSON index
+    // and never reaches this branch.)
+    if (normalized.includes('..') || normalized.includes('\\')) return null;
     const candidates = normalized ? [normalized, `${normalized}/index`] : ['index'];
 
     let fileSlug: string | null = null;

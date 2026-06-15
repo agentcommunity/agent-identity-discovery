@@ -87,8 +87,22 @@ export async function GET(request: Request) {
         'Send a GET request with Accept-Signature to perform the AID v2 handshake.',
       publicKey: PUBLIC_KEY_X,
       keyid: KEYID,
-      spec: 'https://docs.agentcommunity.org/docs/reference/pka',
+      spec: 'https://aid.agentcommunity.org/docs/reference/pka',
     });
+  }
+
+  // Fail-closed: if the client covers "aid-domain";req in its signed set but
+  // sends no AID-Domain header, there is no domain to bind. Rather than silently
+  // sign an UNBOUND proof (which would let a covered-but-unbound mismatch slip
+  // through), reject — mirroring the SDK verifier's fail-closed enforcement.
+  if (domainBindingRequested && aidDomain === null) {
+    return NextResponse.json(
+      { error: 'Accept-Signature covers aid-domain but no AID-Domain header was sent.' },
+      {
+        status: 400,
+        headers: { 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' },
+      },
+    );
   }
 
   // Security boundary: only an allowlisted (fixed, safe) domain reaches the signing
