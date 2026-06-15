@@ -591,6 +591,19 @@ def _request_authority(uri: str) -> str:
     return host
 
 
+def _canonicalize_aid_domain(domain: str) -> str:
+    """Normalize an AID-Domain value: ASCII-lowercase, strip exactly one trailing dot,
+    and validate the charset [a-z0-9.:[]_-]. Raises ERR_SECURITY on invalid input."""
+    value = _ascii_lower_ct(domain.strip())
+    if value.endswith("."):
+        value = value[:-1]
+    if not value:
+        raise AidError("ERR_SECURITY", "Invalid AID-Domain value")
+    if not re.fullmatch(r"[a-z0-9.:\[\]_-]+", value):
+        raise AidError("ERR_SECURITY", "Invalid AID-Domain value")
+    return value
+
+
 def _build_v2_signature_base(
     covered: list[dict[str, object]],
     signature_params_raw: str,
@@ -599,6 +612,7 @@ def _build_v2_signature_base(
     target_uri: str,
     authority: str,
     status: int,
+    aid_domain: str | None = None,
 ) -> bytes:
     lines: list[str] = []
     for item in covered:
@@ -611,6 +625,10 @@ def _build_v2_signature_base(
             lines.append(f'"@target-uri"{suffix}: {target_uri}')
         elif _token_eq(name, "@authority"):
             lines.append(f'"@authority"{suffix}: {authority}')
+        elif _token_eq(name, "aid-domain"):
+            if aid_domain is None:
+                raise AidError("ERR_SECURITY", "Signature covers aid-domain but no AID-Domain was sent")
+            lines.append(f'"aid-domain"{suffix}: {aid_domain}')
         elif _token_eq(name, "@status"):
             lines.append(f'"@status"{suffix}: {status}')
         else:
@@ -628,8 +646,14 @@ def _derive_aid2_key_material(pka: str) -> tuple[bytes, str]:
     return public_key, keyid
 
 
-def _build_accept_signature_v2(keyid: str, nonce: str) -> str:
-    return f'aid-pka=("@method";req "@target-uri";req "@authority";req "@status");created;expires;keyid="{keyid}";alg="ed25519";nonce="{nonce}";tag="aid-pka-v2"'
+def _build_accept_signature_v2(keyid: str, nonce: str, domain_bound: bool = False) -> str:
+    if domain_bound:
+        covered = '"@method";req "@target-uri";req "@authority";req "aid-domain";req "@status"'
+        tag = "aid-pka-v2-db"
+    else:
+        covered = '"@method";req "@target-uri";req "@authority";req "@status"'
+        tag = "aid-pka-v2"
+    return f'aid-pka=({covered});created;expires;keyid="{keyid}";alg="ed25519";nonce="{nonce}";tag="{tag}"'
 
 
 def _perform_v1_pka_handshake(uri: str, pka: str, kid: str, *, timeout: float = 2.0) -> None:
@@ -701,17 +725,28 @@ def _perform_v1_pka_handshake(uri: str, pka: str, kid: str, *, timeout: float = 
     _verify_ed25519(pub, signature, base)
 
 
-def _perform_v2_pka_handshake(uri: str, pka: str, *, timeout: float = 2.0) -> None:
+def _perform_v2_pka_handshake(uri: str, pka: str, *, domain: str | None = None, timeout: float = 2.0) -> bool:
+    """Perform a v2 PKA handshake. Returns True if the response is domain-bound (aid-pka-v2-db)."""
     public_key, expected_keyid = _derive_aid2_key_material(pka)
     nonce = _b64url_encode(os.urandom(32))
     request_uri = _normalize_request_uri(uri)
     authority = _request_authority(request_uri)
+
+    # Canonicalize ONCE and thread the SAME value to both the request header and the sig base.
+    canonical_domain: str | None = None
+    if domain:
+        canonical_domain = _canonicalize_aid_domain(domain)
+
+    req_headers: dict[str, str] = {
+        "Accept-Signature": _build_accept_signature_v2(expected_keyid, nonce, domain_bound=canonical_domain is not None),
+        "Cache-Control": "no-store",
+    }
+    if canonical_domain is not None:
+        req_headers["AID-Domain"] = canonical_domain
+
     req = urllib.request.Request(
         request_uri,
-        headers={
-            "Accept-Signature": _build_accept_signature_v2(expected_keyid, nonce),
-            "Cache-Control": "no-store",
-        },
+        headers=req_headers,
         method="GET",
     )
 
@@ -753,8 +788,13 @@ def _perform_v2_pka_handshake(uri: str, pka: str, *, timeout: float = 2.0) -> No
         raise AidError("ERR_SECURITY", "Unsupported signature algorithm")
     if not isinstance(response_nonce, str) or not hmac.compare_digest(response_nonce.encode("utf-8"), nonce.encode("utf-8")):
         raise AidError("ERR_SECURITY", "Signature nonce mismatch")
-    if not isinstance(tag, str) or not hmac.compare_digest(tag.encode("utf-8"), b"aid-pka-v2"):
+    if not isinstance(tag, str):
         raise AidError("ERR_SECURITY", "Invalid signature tag")
+    is_db = _token_eq(tag, "aid-pka-v2-db")
+    if not is_db and not _token_eq(tag, "aid-pka-v2"):
+        raise AidError("ERR_SECURITY", "Invalid signature tag")
+    if is_db and canonical_domain is None:
+        raise AidError("ERR_SECURITY", "Unrequested domain-bound signature tag")
 
     covered = parsed["covered"]
     signature_params_raw = parsed["signature_params_raw"]
@@ -769,12 +809,15 @@ def _perform_v2_pka_handshake(uri: str, pka: str, *, timeout: float = 2.0) -> No
         target_uri=request_uri,
         authority=authority,
         status=status,
+        aid_domain=canonical_domain,
     )
     _verify_ed25519(public_key, signature, base)
+    return is_db
 
 
-def perform_pka_handshake(uri: str, pka: str, kid: str | None = None, *, timeout: float = 2.0) -> None:
+def perform_pka_handshake(uri: str, pka: str, kid: str | None = None, *, domain: str | None = None, timeout: float = 2.0) -> bool:
+    """Perform a PKA handshake. Returns True if the response is domain-bound (aid-pka-v2-db), False otherwise."""
     if kid is not None:
         _perform_v1_pka_handshake(uri, pka, kid, timeout=timeout)
-        return
-    _perform_v2_pka_handshake(uri, pka, timeout=timeout)
+        return False
+    return _perform_v2_pka_handshake(uri, pka, domain=domain, timeout=timeout)
