@@ -4,6 +4,8 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitAny": true,
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,

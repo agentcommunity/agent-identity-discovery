@@ -719,12 +719,116 @@ const verifyRequiredDocs = async (repoRoot) => {
   return missing;
 };
 
+// Domain-binding-specific base-4 covered components (without the optional aid-domain at index 3).
+const BASE_4_COVERED = ['@method;req', '@target-uri;req', '@authority;req', '@status'];
+const AID_DOMAIN_COMPONENT = 'aid-domain;req';
+const AID_DOMAIN_INDEX = 3; // must sit between @authority;req (2) and @status (4)
+
+/**
+ * Verify the structural contract of the two domain-bound PKA vectors:
+ *  - v2-db-rfc9421-domain-bound  (expect=pass): base-4 + aid-domain;req at index 3, tag aid-pka-v2
+ *  - v2-db-domain-mismatch       (expect=fail): same covered shape but signature mismatch → rejected
+ * This enforces the one-tag/coverage contract at the docs-authority layer in addition to SDK tests.
+ */
+const verifyDomainBoundPkaVectors = async (repoRoot) => {
+  const failures = [];
+  const vectorsPath = path.join(repoRoot, 'protocol', 'pka_vectors.json');
+  const payload = await readJson(vectorsPath);
+
+  // --- helper: validate covered set shape for domain-bound vectors ---
+  const checkCoveredShape = (vector, label) => {
+    if (!Array.isArray(vector.covered)) {
+      failures.push(`${label}: covered set must be an array`);
+      return;
+    }
+    const covered = vector.covered;
+    const expectedLength = BASE_4_COVERED.length + 1; // base-4 + aid-domain
+    if (covered.length !== expectedLength) {
+      failures.push(
+        `${label}: covered set must have ${expectedLength} components (base-4 + aid-domain;req), got ${covered.length}`,
+      );
+    }
+    // Base-4 components in positions 0,1,2,4 (aid-domain at 3)
+    const expectedCovered = [
+      BASE_4_COVERED[0],
+      BASE_4_COVERED[1],
+      BASE_4_COVERED[2],
+      AID_DOMAIN_COMPONENT,
+      BASE_4_COVERED[3],
+    ];
+    for (let i = 0; i < expectedCovered.length; i++) {
+      if (covered[i] !== expectedCovered[i]) {
+        failures.push(
+          `${label}: covered[${i}] must be "${expectedCovered[i]}", got "${covered[i]}"`,
+        );
+      }
+    }
+    if (covered[AID_DOMAIN_INDEX] !== AID_DOMAIN_COMPONENT) {
+      failures.push(
+        `${label}: aid-domain;req must be at index ${AID_DOMAIN_INDEX}, got "${covered[AID_DOMAIN_INDEX]}"`,
+      );
+    }
+  };
+
+  // --- v2-db-rfc9421-domain-bound (pass vector) ---
+  const boundVector = payload.vectors?.find((v) => v.id === 'v2-db-rfc9421-domain-bound');
+  if (!boundVector) {
+    failures.push('protocol/pka_vectors.json missing domain-bound pass vector v2-db-rfc9421-domain-bound');
+  } else {
+    if (boundVector.expect !== 'pass') {
+      failures.push('domain-bound pass vector v2-db-rfc9421-domain-bound must have expect=pass');
+    }
+    if (!boundVector.domain) {
+      failures.push('domain-bound pass vector v2-db-rfc9421-domain-bound must include a domain field');
+    }
+    checkCoveredShape(boundVector, 'v2-db-rfc9421-domain-bound');
+    // Tag must be the single aid-pka-v2 tag (not a separate db-specific tag)
+    if (!boundVector.response?.signature_input?.includes('tag="aid-pka-v2"')) {
+      failures.push(
+        'domain-bound pass vector v2-db-rfc9421-domain-bound response.signature_input must carry aid-pka-v2 tag (single-tag contract)',
+      );
+    }
+    // The AID-Domain value must appear in the signature base
+    if (
+      boundVector.signature_base &&
+      !boundVector.signature_base.includes(`"aid-domain";req:`)
+    ) {
+      failures.push(
+        'domain-bound pass vector v2-db-rfc9421-domain-bound signature_base must include the aid-domain;req line',
+      );
+    }
+  }
+
+  // --- v2-db-domain-mismatch (fail vector) ---
+  const mismatchVector = payload.vectors?.find((v) => v.id === 'v2-db-domain-mismatch');
+  if (!mismatchVector) {
+    failures.push('protocol/pka_vectors.json missing domain-bound fail vector v2-db-domain-mismatch');
+  } else {
+    if (mismatchVector.expect !== 'fail') {
+      failures.push('domain-bound mismatch vector v2-db-domain-mismatch must have expect=fail');
+    }
+    if (!mismatchVector.domain) {
+      failures.push('domain-bound mismatch vector v2-db-domain-mismatch must include a domain field');
+    }
+    checkCoveredShape(mismatchVector, 'v2-db-domain-mismatch');
+    // Tag must still be the single aid-pka-v2 tag
+    if (!mismatchVector.response?.signature_input?.includes('tag="aid-pka-v2"')) {
+      failures.push(
+        'domain-bound mismatch vector v2-db-domain-mismatch response.signature_input must carry aid-pka-v2 tag',
+      );
+    }
+  }
+
+  return failures;
+};
+
 const main = async () => {
   const repoRoot = process.cwd();
   const missingLinks = await findMissingLinks(repoRoot);
   const missingRequiredDocs = await verifyRequiredDocs(repoRoot);
   const versionMismatches = await verifyVersionAlignment(repoRoot);
   const canonicalVectorFailures = await verifyCanonicalV2PkaVector(repoRoot);
+  const domainBoundVectorFailures = await verifyDomainBoundPkaVectors(repoRoot);
   const v2ConstantsFailures = await verifyV2ConstantsAlignment(repoRoot);
   const independentCoverageFailures = await verifyIndependentV2Coverage(repoRoot);
   const v2GuidanceFailures = await verifyV2Guidance(repoRoot);
@@ -748,6 +852,14 @@ const main = async () => {
   if (canonicalVectorFailures.length > 0) {
     console.error('Canonical v2 PKA vector checks failed:');
     for (const failure of canonicalVectorFailures) {
+      console.error(`- ${failure}`);
+    }
+    process.exit(1);
+  }
+
+  if (domainBoundVectorFailures.length > 0) {
+    console.error('Domain-bound PKA vector structural checks failed:');
+    for (const failure of domainBoundVectorFailures) {
       console.error(`- ${failure}`);
     }
     process.exit(1);

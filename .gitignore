@@ -51,6 +51,10 @@ web_modules/
 # TypeScript cache
 *.tsbuildinfo
 
+# tsup transient bundled config artifacts (emitted when loading a TS config
+# that imports from another package, e.g. ../../tsup.config.base.ts)
+**/tsup.config.bundled_*.mjs
+
 # Optional eslint cache
 .eslintcache
 
