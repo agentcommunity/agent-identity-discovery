@@ -215,7 +215,7 @@ def test_discover_fails_on_multiple_valid_answers(monkeypatch):
         raise dns.resolver.NXDOMAIN()
 
     monkeypatch.setattr(dns.resolver, "resolve", _fake_resolve)
-    with pytest.raises(AidError, match="Multiple valid AID records found"):
+    with pytest.raises(AidError, match="Multiple valid aid1 AID records found"):
         discover("example.com")
 
 
@@ -236,7 +236,7 @@ def test_discover_keeps_same_version_aid2_ambiguity(monkeypatch):
         raise dns.resolver.NXDOMAIN()
 
     monkeypatch.setattr(dns.resolver, "resolve", _fake_resolve)
-    with pytest.raises(AidError, match="Multiple valid AID records found"):
+    with pytest.raises(AidError, match="Multiple valid aid2 AID records found"):
         discover("example.com")
 
 

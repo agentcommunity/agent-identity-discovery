@@ -10,8 +10,8 @@ public class DiscoveryV2Tests
             ?? throw new MissingMethodException("Discovery.ParseSingleValid");
         try
         {
-            var result = method.Invoke(null, new object?[] { txts, TimeSpan.FromSeconds(1), "_agent.example.com", null })!;
-            return ((ValueTuple<AidRecord, bool>)result).Item1;
+            var task = (Task<(AidRecord, bool)>)method.Invoke(null, new object?[] { txts, TimeSpan.FromSeconds(1), "_agent.example.com", null, CancellationToken.None })!;
+            return task.GetAwaiter().GetResult().Item1;
         }
         catch (TargetInvocationException ex) when (ex.InnerException is not null)
         {

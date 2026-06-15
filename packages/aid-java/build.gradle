@@ -20,6 +20,20 @@ dependencies {
 tasks.test {
   useJUnitPlatform()
   testLogging { events "failed", "skipped", "passed" }
+  // Wire the applied jacoco plugin into the real test task so coverage is actually produced.
+  // Without this, `jacoco` was applied but emitted no report, implying coverage tracking that
+  // did not exist. The report (build/reports/jacoco/test/html/index.html and the XML) is now
+  // generated whenever tests run. No hard coverage threshold is enforced here because CI runs a
+  // filtered subset of the suite; a gate belongs alongside a full-suite CI invocation.
+  finalizedBy(tasks.jacocoTestReport)
+}
+
+jacocoTestReport {
+  dependsOn(tasks.test)
+  reports {
+    xml.required = true
+    html.required = true
+  }
 }
 
 import org.gradle.api.tasks.compile.JavaCompile

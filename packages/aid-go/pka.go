@@ -765,18 +765,15 @@ func parseSignatureParams(raw string) (map[string]string, error) {
 	return params, nil
 }
 
+// isBareIntegerToken reports whether value is a digit-only token, matching the
+// TS reference grammar /^\d+$/. Signs are rejected: the v2 PKA profile only
+// permits non-negative created/expires timestamps, so a leading '-' is invalid
+// even though RFC 8941 sf-integer would otherwise allow it.
 func isBareIntegerToken(value string) bool {
 	if value == "" {
 		return false
 	}
-	start := 0
-	if value[0] == '-' {
-		if len(value) == 1 {
-			return false
-		}
-		start = 1
-	}
-	for i := start; i < len(value); i++ {
+	for i := 0; i < len(value); i++ {
 		if value[i] < '0' || value[i] > '9' {
 			return false
 		}

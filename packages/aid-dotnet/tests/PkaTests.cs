@@ -180,7 +180,7 @@ public class PkaTests
         var oldSend = Pka.SendAsyncForTesting;
         Pka.FillRandomBytesForTesting = bytes => Array.Copy(nonce, bytes, bytes.Length);
         Pka.NowUnixForTesting = () => vector.GetProperty("created").GetInt64();
-        Pka.SendAsyncForTesting = (_, _) =>
+        Pka.SendAsyncForTesting = (_, _, _) =>
         {
             var responseVector = vector.GetProperty("response");
             var response = new HttpResponseMessage((System.Net.HttpStatusCode)responseVector.GetProperty("status").GetInt32());
@@ -217,7 +217,7 @@ public class PkaTests
         Pka.FillRandomBytesForTesting = bytes => Array.Copy(nonce, bytes, bytes.Length);
         Pka.NowUnixForTesting = () => vector.GetProperty("created").GetInt64();
         var expectedAidDomain = vector.GetProperty("request").GetProperty("aid_domain").GetString()!;
-        Pka.SendAsyncForTesting = (request, _) =>
+        Pka.SendAsyncForTesting = (request, _, _) =>
         {
             // Assert the AID-Domain header is sent and equals the canonical domain
             Assert.True(request.Headers.Contains("AID-Domain"), "Expected AID-Domain header to be set");
@@ -260,7 +260,7 @@ public class PkaTests
         var oldSend = Pka.SendAsyncForTesting;
         Pka.FillRandomBytesForTesting = bytes => Array.Copy(nonce, bytes, bytes.Length);
         Pka.NowUnixForTesting = () => vector.GetProperty("created").GetInt64();
-        Pka.SendAsyncForTesting = (request, _) =>
+        Pka.SendAsyncForTesting = (request, _, _) =>
         {
             // No domain was passed to the handshake, so no AID-Domain header must be sent.
             Assert.False(request.Headers.Contains("AID-Domain"), "AID-Domain header must not be sent when no domain is provided");
@@ -303,7 +303,7 @@ public class PkaTests
         var oldSend = Pka.SendAsyncForTesting;
         Pka.FillRandomBytesForTesting = bytes => Array.Copy(nonce, bytes, bytes.Length);
         Pka.NowUnixForTesting = () => vector.GetProperty("created").GetInt64();
-        Pka.SendAsyncForTesting = (request, _) =>
+        Pka.SendAsyncForTesting = (request, _, _) =>
         {
             // The client committed to a domain, so AID-Domain must be sent even though the server
             // chooses to answer with a plain (unbound) proof.
@@ -362,7 +362,7 @@ public class PkaTests
         var oldSend = Pka.SendAsyncForTesting;
         Pka.FillRandomBytesForTesting = bytes => Array.Copy(nonce, bytes, bytes.Length);
         Pka.NowUnixForTesting = () => vector.GetProperty("created").GetInt64();
-        Pka.SendAsyncForTesting = (request, _) =>
+        Pka.SendAsyncForTesting = (request, _, _) =>
         {
             // The well-known fallback must thread the queried domain into the handshake
             // as the AID-Domain header (requesting a domain-bound proof).
@@ -499,7 +499,7 @@ public class PkaTests
         var oldSend = Pka.SendAsyncForTesting;
         Pka.FillRandomBytesForTesting = bytes => Array.Copy(nonce, bytes, bytes.Length);
         Pka.NowUnixForTesting = () => vector.GetProperty("created").GetInt64();
-        Pka.SendAsyncForTesting = (request, timeout) =>
+        Pka.SendAsyncForTesting = (request, timeout, _) =>
         {
             var expectedRequest = vector.GetProperty("request");
             Assert.Equal(expectedRequest.GetProperty("method").GetString(), request.Method.Method);
@@ -539,7 +539,7 @@ public class PkaTests
         var oldSend = Pka.SendAsyncForTesting;
         Pka.FillRandomBytesForTesting = bytes => Array.Copy(nonce, bytes, bytes.Length);
         Pka.NowUnixForTesting = () => vector.GetProperty("created").GetInt64();
-        Pka.SendAsyncForTesting = (request, timeout) =>
+        Pka.SendAsyncForTesting = (request, timeout, _) =>
         {
             var expectedRequest = vector.GetProperty("request");
             Assert.Equal(expectedRequest.GetProperty("method").GetString(), request.Method.Method);
@@ -576,7 +576,7 @@ public class PkaTests
         var oldSend = Pka.SendAsyncForTesting;
         Pka.FillRandomBytesForTesting = bytes => Array.Copy(nonce, bytes, bytes.Length);
         Pka.NowUnixForTesting = () => vector.GetProperty("created").GetInt64();
-        Pka.SendAsyncForTesting = (_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.Found));
+        Pka.SendAsyncForTesting = (_, _, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.Found));
         try
         {
             var record = vector.GetProperty("record");
@@ -956,7 +956,7 @@ public class PkaTests
 
         Pka.FillRandomBytesForTesting = bytes => Array.Copy(nonce, bytes, bytes.Length);
         Pka.NowUnixForTesting = () => vector.GetProperty("created").GetInt64();
-        Pka.SendAsyncForTesting = (request, _) =>
+        Pka.SendAsyncForTesting = (request, _, _) =>
         {
             Assert.Equal(targetUri, request.RequestUri!.ToString());
 
@@ -990,7 +990,7 @@ public class PkaTests
         var oldSend = Pka.SendAsyncForTesting;
         Pka.FillRandomBytesForTesting = bytes => Array.Copy(nonce, bytes, bytes.Length);
         Pka.NowUnixForTesting = () => vector.GetProperty("created").GetInt64();
-        Pka.SendAsyncForTesting = (_, _) =>
+        Pka.SendAsyncForTesting = (_, _, _) =>
         {
             var responseVector = vector.GetProperty("response");
             var response = new HttpResponseMessage((HttpStatusCode)responseVector.GetProperty("status").GetInt32());

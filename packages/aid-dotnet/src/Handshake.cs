@@ -10,7 +10,17 @@ public static class Pka
 {
     internal static Action<byte[]> FillRandomBytesForTesting { get; set; } = bytes => RandomNumberGenerator.Fill(bytes);
     internal static Func<long> NowUnixForTesting { get; set; } = () => DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-    internal static Func<HttpRequestMessage, TimeSpan, Task<HttpResponseMessage>> SendAsyncForTesting { get; set; } = SendWithDefaultClientAsync;
+    internal static Func<HttpRequestMessage, TimeSpan, CancellationToken, Task<HttpResponseMessage>> SendAsyncForTesting { get; set; } = SendWithDefaultClientAsync;
+
+    // Single shared client (with a redirect-blocking, connection-pooling handler) reused across
+    // all handshakes. Creating/disposing an HttpClient per call exhausts ephemeral ports under
+    // load; per-request timeouts are applied via a linked CancellationTokenSource instead of
+    // HttpClient.Timeout so the shared instance stays usable across differing timeouts.
+    private static readonly HttpClient SharedClient = new(new SocketsHttpHandler
+    {
+        AllowAutoRedirect = false,
+        PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+    });
 
     private static string AsciiToLower(string s)
     {
@@ -39,10 +49,11 @@ public static class Pka
         return value;
     }
 
-    private static async Task<HttpResponseMessage> SendWithDefaultClientAsync(HttpRequestMessage request, TimeSpan timeout)
+    private static async Task<HttpResponseMessage> SendWithDefaultClientAsync(HttpRequestMessage request, TimeSpan timeout, CancellationToken cancellationToken)
     {
-        using var http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = timeout };
-        return await http.SendAsync(request).ConfigureAwait(false);
+        using var timeoutCts = new CancellationTokenSource(timeout);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+        return await SharedClient.SendAsync(request, linked.Token).ConfigureAwait(false);
     }
 
     private static byte[] MultibaseDecode(string s)
@@ -174,17 +185,17 @@ public static class Pka
         return Encoding.UTF8.GetBytes(string.Join('\n', lines));
     }
 
-    public static async Task<bool> PerformHandshakeAsync(string uri, string pka, string kid, TimeSpan timeout, string? domain = null)
+    public static async Task<bool> PerformHandshakeAsync(string uri, string pka, string kid, TimeSpan timeout, string? domain = null, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrEmpty(kid))
         {
-            return await PerformV2HandshakeAsync(uri, pka, timeout, domain).ConfigureAwait(false);
+            return await PerformV2HandshakeAsync(uri, pka, timeout, domain, cancellationToken).ConfigureAwait(false);
         }
-        await PerformV1HandshakeAsync(uri, pka, kid, timeout).ConfigureAwait(false);
+        await PerformV1HandshakeAsync(uri, pka, kid, timeout, cancellationToken).ConfigureAwait(false);
         return false;
     }
 
-    private static async Task PerformV1HandshakeAsync(string uri, string pka, string kid, TimeSpan timeout)
+    private static async Task PerformV1HandshakeAsync(string uri, string pka, string kid, TimeSpan timeout, CancellationToken cancellationToken)
     {
         var u = new Uri(uri);
         var challengeBytes = new byte[32];
@@ -194,7 +205,7 @@ public static class Pka
         using var req = new HttpRequestMessage(HttpMethod.Get, uri);
         req.Headers.TryAddWithoutValidation("AID-Challenge", challenge);
         req.Headers.TryAddWithoutValidation("Date", date);
-        using var res = await SendAsyncForTesting(req, timeout).ConfigureAwait(false);
+        using var res = await SendAsyncForTesting(req, timeout, cancellationToken).ConfigureAwait(false);
         if (!res.IsSuccessStatusCode) throw new AidError(nameof(Constants.ERR_SECURITY), $"Handshake HTTP {(int)res.StatusCode}");
 
         var (covered, created, keyidRaw, keyidNorm, alg, signature, respDate) = ParseSignatureHeaders(res);
@@ -221,7 +232,7 @@ public static class Pka
         VerifyEd25519(pub, baseBytes, signature);
     }
 
-    private static async Task<bool> PerformV2HandshakeAsync(string uri, string pka, TimeSpan timeout, string? domain = null)
+    private static async Task<bool> PerformV2HandshakeAsync(string uri, string pka, TimeSpan timeout, string? domain, CancellationToken cancellationToken)
     {
         var (pub, expectedKeyid) = DeriveAid2KeyMaterial(pka);
         var requestUri = NormalizeRequestUri(uri);
@@ -241,7 +252,7 @@ public static class Pka
         {
             req.Headers.TryAddWithoutValidation("AID-Domain", canonicalDomain);
         }
-        using var res = await SendAsyncForTesting(req, timeout).ConfigureAwait(false);
+        using var res = await SendAsyncForTesting(req, timeout, cancellationToken).ConfigureAwait(false);
 
         var status = (int)res.StatusCode;
         if (status >= 300 && status < 400)

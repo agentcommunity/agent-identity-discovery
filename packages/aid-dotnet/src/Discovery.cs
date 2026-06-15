@@ -22,6 +22,16 @@ public sealed class DiscoveryResult
 
 public static class Discovery
 {
+    // Single shared client reused across all DoH lookups. Creating/disposing an HttpClient
+    // per call leaves connections in TIME_WAIT and can exhaust ephemeral ports under load.
+    // Per-request timeouts are applied via a linked CancellationTokenSource rather than
+    // HttpClient.Timeout so the shared instance stays usable across differing timeouts.
+    private static readonly HttpClient SharedClient = new(new SocketsHttpHandler
+    {
+        AllowAutoRedirect = false,
+        PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+    });
+
     private static string ToALabel(string domain)
     {
         try { return new IdnMapping().GetAscii(domain); }
@@ -39,17 +49,18 @@ public static class Discovery
         return names;
     }
 
-    private static async Task<(List<string> txts, int ttl)> QueryTxtDoHAsync(string fqdn, TimeSpan timeout)
+    private static async Task<(List<string> txts, int ttl)> QueryTxtDoHAsync(string fqdn, TimeSpan timeout, CancellationToken cancellationToken)
     {
         // Cloudflare DoH JSON endpoint
         var url = $"https://cloudflare-dns.com/dns-query?name={Uri.EscapeDataString(fqdn)}&type=TXT";
-        using var http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = timeout };
+        using var timeoutCts = new CancellationTokenSource(timeout);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
         using var req = new HttpRequestMessage(HttpMethod.Get, url);
         req.Headers.TryAddWithoutValidation("Accept", "application/dns-json");
-        using var res = await http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
+        using var res = await SharedClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, linked.Token).ConfigureAwait(false);
         if (!res.IsSuccessStatusCode)
             throw new AidError(nameof(Constants.ERR_DNS_LOOKUP_FAILED), $"DoH HTTP {(int)res.StatusCode}");
-        using var doc = await JsonDocument.ParseAsync(await res.Content.ReadAsStreamAsync().ConfigureAwait(false)).ConfigureAwait(false);
+        using var doc = await JsonDocument.ParseAsync(await res.Content.ReadAsStreamAsync(linked.Token).ConfigureAwait(false), cancellationToken: linked.Token).ConfigureAwait(false);
         var root = doc.RootElement;
         if (root.TryGetProperty("Answer", out var answer) && answer.ValueKind == JsonValueKind.Array)
         {
@@ -75,7 +86,7 @@ public static class Discovery
         throw new AidError(nameof(Constants.ERR_NO_RECORD), $"No TXT answers for {fqdn}");
     }
 
-    private static (AidRecord, bool) ParseSingleValid(IEnumerable<string> txts, TimeSpan timeout, string queryName, string? queriedDomain = null)
+    private static async Task<(AidRecord, bool)> ParseSingleValid(IEnumerable<string> txts, TimeSpan timeout, string queryName, string? queriedDomain = null, CancellationToken cancellationToken = default)
     {
         AidError? last = null;
         var byVersion = new Dictionary<string, List<AidRecord>>(StringComparer.Ordinal)
@@ -110,17 +121,38 @@ public static class Discovery
                 );
             }
             var valid = records[0];
+            EnforceDepExpiry(valid, queryName);
             bool domainBound = false;
             if (!string.IsNullOrEmpty(valid.Pka))
             {
-                domainBound = Pka.PerformHandshakeAsync(valid.Uri, valid.Pka!, valid.Kid ?? string.Empty, timeout, domain: queriedDomain).GetAwaiter().GetResult();
+                domainBound = await Pka.PerformHandshakeAsync(valid.Uri, valid.Pka!, valid.Kid ?? string.Empty, timeout, domain: queriedDomain, cancellationToken: cancellationToken).ConfigureAwait(false);
             }
             return (valid, domainBound);
         }
         throw last ?? new AidError(nameof(Constants.ERR_NO_RECORD), "No valid AID record in TXT answers");
     }
 
-    public static async Task<DiscoveryResult> DiscoverAsync(string domain, DiscoveryOptions? options = null)
+    // Mirrors the TS client: a record whose `dep` (deprecation) date is in the past is rejected
+    // as ERR_INVALID_TXT; a future-dated `dep` is a non-fatal warning. Unparseable dates are
+    // ignored here (format is already validated during Aid.Parse).
+    internal static void EnforceDepExpiry(AidRecord record, string queryName)
+    {
+        if (string.IsNullOrEmpty(record.Dep))
+        {
+            return;
+        }
+        if (!DateTimeOffset.TryParse(record.Dep, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var depDate))
+        {
+            return;
+        }
+        if (depDate < DateTimeOffset.UtcNow)
+        {
+            throw new AidError(nameof(Constants.ERR_INVALID_TXT), $"Record for {queryName} was deprecated on {record.Dep}");
+        }
+        Console.Error.WriteLine($"[AID] WARNING: Record for {queryName} is scheduled for deprecation on {record.Dep}");
+    }
+
+    public static async Task<DiscoveryResult> DiscoverAsync(string domain, DiscoveryOptions? options = null, CancellationToken cancellationToken = default)
     {
         options ??= new DiscoveryOptions();
         var alabel = ToALabel(domain);
@@ -132,8 +164,8 @@ public static class Discovery
         {
             try
             {
-                var (txts, ttl) = await QueryTxtDoHAsync(name, options.Timeout).ConfigureAwait(false);
-                var (rec, domainBound) = ParseSingleValid(txts, options.Timeout, name, alabel);
+                var (txts, ttl) = await QueryTxtDoHAsync(name, options.Timeout, cancellationToken).ConfigureAwait(false);
+                var (rec, domainBound) = await ParseSingleValid(txts, options.Timeout, name, alabel, cancellationToken).ConfigureAwait(false);
                 return new DiscoveryResult { Record = rec, Ttl = ttl, QueryName = name, DomainBound = domainBound };
             }
             catch (AidError e)
@@ -146,7 +178,7 @@ public static class Discovery
 
         if (options.WellKnownFallback && last is not null && (last.ErrorCode == nameof(Constants.ERR_NO_RECORD) || last.ErrorCode == nameof(Constants.ERR_DNS_LOOKUP_FAILED)))
         {
-            var (rec, domainBound) = await WellKnown.FetchAsync(alabel, options.WellKnownTimeout, queriedDomain: alabel).ConfigureAwait(false);
+            var (rec, domainBound) = await WellKnown.FetchAsync(alabel, options.WellKnownTimeout, queriedDomain: alabel, cancellationToken: cancellationToken).ConfigureAwait(false);
             return new DiscoveryResult { Record = rec, Ttl = Constants.DnsTtlMin, QueryName = $"{Constants.DnsSubdomain}.{alabel}", DomainBound = domainBound };
         }
         throw last ?? new AidError(nameof(Constants.ERR_DNS_LOOKUP_FAILED), "DNS query failed");

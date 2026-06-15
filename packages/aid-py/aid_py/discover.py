@@ -39,7 +39,7 @@ def _select_preferred_record(valid_records: list[dict], query_name: str) -> dict
         return selected_records[0]
     raise AidError(
         "ERR_INVALID_TXT",
-        f"Multiple valid AID records found for {query_name}; publish exactly one valid record per queried DNS name",
+        f"Multiple valid {selected_version} AID records found for {query_name}; publish exactly one valid record per queried DNS name",
     )
 
 
@@ -66,15 +66,12 @@ def _query_txt_record(fqdn: str, timeout: float) -> Tuple[list[str], int]:
         raise AidError("ERR_DNS_LOOKUP_FAILED", str(exc)) from None
 
     # dnspython joins multi-string automatically? Actually each answer.rdata.strings
-    ttl = answers.rrset.ttl if answers.rrset else DNS_TTL_DEFAULT
+    ttl = answers.rrset.ttl if answers.rrset else DNS_TTL_MIN
     txt_strings: list[str] = []
     for rdata in answers:
         # each rdata.strings is a tuple of bytes segments
         txt_strings.append("".join(seg.decode() for seg in rdata.strings))
     return txt_strings, ttl
-
-
-DNS_TTL_DEFAULT = 300  # fallback
 
 
 def discover(
@@ -104,7 +101,7 @@ def discover(
             DeprecationWarning,
             stacklevel=2,
         )
-        well_known_fallback = bool(kwargs["wellKnownFallback"])  # type: ignore[assignment]
+        well_known_fallback = bool(kwargs.pop("wellKnownFallback"))  # type: ignore[assignment]
     if "wellKnownTimeoutMs" in kwargs:
         import warnings
 
@@ -114,11 +111,19 @@ def discover(
             stacklevel=2,
         )
         try:
-            ms = float(kwargs["wellKnownTimeoutMs"])  # type: ignore[arg-type]
+            ms = float(kwargs.pop("wellKnownTimeoutMs"))  # type: ignore[arg-type]
         except Exception:
             ms = 0.0
         if ms > 0:
             well_known_timeout = ms / 1000.0  # type: ignore[assignment]
+
+    # Fail closed on unknown keyword arguments so typos of security-relevant
+    # options (e.g. a misspelled well_known_fallback) surface as errors instead
+    # of silently degrading to the default (network fallback enabled).
+    if kwargs:
+        raise TypeError(
+            f"discover() got unexpected keyword arguments: {sorted(kwargs)}"
+        )
 
     # IDN → A-label conversion per RFC5890
     try:

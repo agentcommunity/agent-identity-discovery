@@ -29,6 +29,8 @@ public final class Constants {
   public static final String AUTH_OAUTH2_CODE = "oauth2_code";
   public static final String AUTH_OAUTH2_DEVICE = "oauth2_device";
   public static final String AUTH_PAT = "pat";
+  // Error codes (numeric codes only; human-readable messages are intentionally omitted
+  // from Java/Rust/C# constants — use ErrorMessages in Go/Python/TypeScript for display).
   public static final int ERR_DNS_LOOKUP_FAILED = 1004;
   public static final int ERR_FALLBACK_FAILED = 1005;
   public static final int ERR_INVALID_TXT = 1001;

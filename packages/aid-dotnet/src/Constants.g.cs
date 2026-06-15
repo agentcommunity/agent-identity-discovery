@@ -30,6 +30,8 @@ namespace AidDiscovery {
     public const string AUTH_OAUTH2_CODE = "oauth2_code";
     public const string AUTH_OAUTH2_DEVICE = "oauth2_device";
     public const string AUTH_PAT = "pat";
+    // Error codes (numeric codes only; human-readable messages are intentionally omitted
+    // from C#/Rust/Java constants — use ErrorMessages in Go/Python/TypeScript for display).
     public const int ERR_DNS_LOOKUP_FAILED = 1004;
     public const int ERR_FALLBACK_FAILED = 1005;
     public const int ERR_INVALID_TXT = 1001;

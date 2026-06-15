@@ -107,13 +107,19 @@ async fn main() -> Result<(), aid_rs::AidError> {
 
 #### v2 handshake expectations (summary)
 
-- Covered fields set: `"@method";req`, `"@target-uri";req`, `"@authority";req`, and `"@status"`
+- Covered fields set: `"@method";req`, `"@target-uri";req`, `"@authority";req`, and `"@status"`. For a domain-bound proof, the set additionally covers `"aid-domain";req` inserted between `"@authority";req` and `"@status"`.
 - `alg="ed25519"`
 - `keyid` equals the RFC 7638 thumbprint derived from `k`
 - `created` and `expires` define a short validity window
 - `nonce` exactly matches the value sent in `Accept-Signature`
 - Response includes `Cache-Control: no-store`
 - `pka` is unpadded base64url for a 32-byte Ed25519 public key
+
+#### Domain binding
+
+When you pass an `AID-Domain` (the final argument to `perform_pka_handshake`, sent by `discover`/`discover_with_options` for `aid2` records), the client requests a domain-bound proof using the same single `aid-pka-v2` tag; the bound proof additionally covers `"aid-domain";req`. A response that covers `aid-domain` when no `AID-Domain` was sent is rejected (fail-closed).
+
+Note: the handshake verifies and enforces domain binding (`perform_pka_handshake` returns the `domainBound` boolean), but `discover`/`discover_with_options` do not yet surface it on the returned record — Rust currently ships verification-only parity, with `domainBound` surfacing as a fast-follow.
 
 ### v1 compatibility
 

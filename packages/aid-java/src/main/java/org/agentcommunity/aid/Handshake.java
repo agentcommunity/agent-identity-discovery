@@ -599,6 +599,20 @@ public final class Handshake {
     Matcher match = Pattern.compile("^\"([^\"]+)\"((?:;[A-Za-z0-9_*.-]+)*)$").matcher(raw);
     if (!match.find()) throw new AidError("ERR_SECURITY", "Invalid Signature-Input covered item");
     String name = match.group(1);
+    // Reject unknown component names at parse time, matching the TS and Go references
+    // (pka.ts/parseV2CoveredItem, pka.go/parseV2CoveredItem). Without this, an unknown name
+    // would only be caught later by validateV2CoveredSet's positional check, producing the
+    // generic "must cover required fields" message instead of a precise fail-fast error.
+    switch (name) {
+      case "@method":
+      case "@target-uri":
+      case "@authority":
+      case "@status":
+      case "aid-domain":
+        break;
+      default:
+        throw new AidError("ERR_SECURITY", "Unsupported covered field: " + name);
+    }
     String paramsRaw = match.group(2);
     boolean req = false;
     if (paramsRaw != null && !paramsRaw.isEmpty()) {

@@ -381,7 +381,10 @@ public class AidV2Test {
                     vector.get("created").asLong() + 30));
 
     assertEquals("ERR_SECURITY", err.errorCode);
-    assertTrue(err.getMessage().contains("required fields"));
+    // "date" is not a known covered component, so it is now rejected at parse time with a
+    // precise message, matching the TS and Go references (previously caught positionally by
+    // validateV2CoveredSet's generic "must cover required fields").
+    assertTrue(err.getMessage().contains("Unsupported covered field: date"));
   }
 
   @Test
@@ -633,7 +636,35 @@ public class AidV2Test {
                     vector.get("created").asLong() + 30));
 
     assertEquals("ERR_SECURITY", err.errorCode);
-    assertTrue(err.getMessage().contains("required fields"));
+    // Unknown component names (component names are case-sensitive, so "@METHOD" is unknown) are
+    // now rejected at parse time with a precise message, matching the TS and Go references.
+    assertTrue(err.getMessage().contains("Unsupported covered field"));
+  }
+
+  @Test
+  void rejectsUnknownAid2CoveredComponentNameAtParseTime() throws Exception {
+    JsonNode vector = loadPkaVector("v2-rfc9421-response-signature");
+    // Replace the @status component (slot 3 of the base covered set) with an unknown name.
+    String signatureInput =
+        canonicalVectorHeaders(vector)
+            .get("Signature-Input")
+            .replace("\"@status\"", "\"@bogus\";req");
+    Map<String, String> headers = signedVectorHeaders(vector, signatureInput);
+
+    AidError err =
+        assertThrows(
+            AidError.class,
+            () ->
+                Handshake.verifyV2Response(
+                    vector.get("record").get("u").asText(),
+                    vector.get("record").get("k").asText(),
+                    vector.get("nonce").asText(),
+                    vector.get("response").get("status").asInt(),
+                    headers,
+                    vector.get("created").asLong() + 30));
+
+    assertEquals("ERR_SECURITY", err.errorCode);
+    assertTrue(err.getMessage().contains("Unsupported covered field: @bogus"));
   }
 
   @Test
@@ -1065,6 +1096,141 @@ public class AidV2Test {
     return base.substring(0, signatureParamsIndex)
         + marker
         + signatureInput.substring(dictionaryPrefix.length());
+  }
+
+  // --- WellKnown.fetchBound coverage (java-9) ---------------------------------------------------
+  // These drive the public well-known fetcher end-to-end against a local HttpServer, covering the
+  // happy path, the content-type guard, the 64KB size guard, the JSON-must-be-an-object guard, and
+  // the narrow loopback-HTTP relaxation (allowInsecure true vs false). Previously only the internal
+  // helpers had coverage; fetchBound itself was unverified.
+
+  @Test
+  void wellKnownFetchBoundHappyPathParsesHttpsRecord() throws Exception {
+    HttpServer server = startWellKnownStub(
+        "application/json",
+        "{\"v\":\"aid1\",\"uri\":\"https://api.example.com/mcp\",\"proto\":\"mcp\"}");
+    try {
+      String host = "127.0.0.1:" + server.getAddress().getPort();
+      // allowInsecure=true so the stub is reached over http; the record itself is https.
+      WellKnown.Result result = WellKnown.fetchBound(host, Duration.ofSeconds(5), true, host);
+      assertEquals("aid1", result.record.v);
+      assertEquals("https://api.example.com/mcp", result.record.uri);
+      assertEquals("mcp", result.record.proto);
+      assertFalse(result.domainBound, "no pka means no domain-bound proof");
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  @Test
+  void wellKnownFetchBoundRejectsWrongContentType() throws Exception {
+    HttpServer server = startWellKnownStub(
+        "text/plain",
+        "{\"v\":\"aid1\",\"uri\":\"https://api.example.com/mcp\",\"proto\":\"mcp\"}");
+    try {
+      String host = "127.0.0.1:" + server.getAddress().getPort();
+      AidError err =
+          assertThrows(
+              AidError.class,
+              () -> WellKnown.fetchBound(host, Duration.ofSeconds(5), true, host));
+      assertEquals("ERR_FALLBACK_FAILED", err.errorCode);
+      assertTrue(err.getMessage().contains("content-type"));
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  @Test
+  void wellKnownFetchBoundRejectsOversizedBody() throws Exception {
+    StringBuilder big = new StringBuilder("{\"v\":\"aid1\",\"uri\":\"https://api.example.com/mcp\",\"proto\":\"mcp\",\"desc\":\"");
+    while (big.length() <= 64 * 1024) big.append('x');
+    big.append("\"}");
+    HttpServer server = startWellKnownStub("application/json", big.toString());
+    try {
+      String host = "127.0.0.1:" + server.getAddress().getPort();
+      AidError err =
+          assertThrows(
+              AidError.class,
+              () -> WellKnown.fetchBound(host, Duration.ofSeconds(5), true, host));
+      assertEquals("ERR_FALLBACK_FAILED", err.errorCode);
+      assertTrue(err.getMessage().contains("too large"));
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  @Test
+  void wellKnownFetchBoundRejectsNonObjectJson() throws Exception {
+    HttpServer server = startWellKnownStub("application/json", "{}");
+    try {
+      String host = "127.0.0.1:" + server.getAddress().getPort();
+      AidError err =
+          assertThrows(
+              AidError.class,
+              () -> WellKnown.fetchBound(host, Duration.ofSeconds(5), true, host));
+      assertEquals("ERR_FALLBACK_FAILED", err.errorCode);
+      assertTrue(err.getMessage().contains("must be an object"));
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  @Test
+  void wellKnownFetchBoundAllowsLoopbackHttpWhenInsecureEnabled() throws Exception {
+    // A remote-proto record carrying an http:// uri fails strict parse; the narrow loopback
+    // relaxation re-validates over https and then restores the original http uri.
+    HttpServer server = startWellKnownStub(
+        "application/json",
+        "{\"v\":\"aid1\",\"uri\":\"http://api.example.com/mcp\",\"proto\":\"mcp\"}");
+    try {
+      String host = "127.0.0.1:" + server.getAddress().getPort();
+      WellKnown.Result result = WellKnown.fetchBound(host, Duration.ofSeconds(5), true, host);
+      assertEquals("aid1", result.record.v);
+      assertEquals("http://api.example.com/mcp", result.record.uri, "original http uri is restored");
+      assertEquals("mcp", result.record.proto);
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  @Test
+  void wellKnownFetchBoundRejectsLoopbackHttpWhenInsecureDisabled() throws Exception {
+    // Same http:// remote-proto record, but the relaxation must NOT apply: the connection itself
+    // is https (allowInsecure=false), and even on the parse path the http uri stays rejected.
+    HttpServer server = startWellKnownStub(
+        "application/json",
+        "{\"v\":\"aid1\",\"uri\":\"http://api.example.com/mcp\",\"proto\":\"mcp\"}");
+    try {
+      String host = "127.0.0.1:" + server.getAddress().getPort();
+      // allowInsecure=false makes fetchBound use https://<host>/..., which the http stub cannot
+      // serve, so the fetch fails before parsing. This asserts the secure default does not silently
+      // fall back to plaintext.
+      AidError err =
+          assertThrows(
+              AidError.class,
+              () -> WellKnown.fetchBound(host, Duration.ofSeconds(5), false, host));
+      assertEquals("ERR_FALLBACK_FAILED", err.errorCode);
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  private static HttpServer startWellKnownStub(String contentType, String body) throws Exception {
+    HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    server.createContext(
+        "/.well-known/agent",
+        exchange -> {
+          byte[] payload = body.getBytes(StandardCharsets.UTF_8);
+          exchange.getResponseHeaders().add("Content-Type", contentType);
+          exchange.sendResponseHeaders(200, payload.length);
+          try (OutputStream output = exchange.getResponseBody()) {
+            output.write(payload);
+          } finally {
+            exchange.close();
+          }
+        });
+    server.start();
+    return server;
   }
 
   private static void assertRepeatedAidPkaHeaderRejected(String repeatedHeaderName) throws Exception {

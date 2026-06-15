@@ -150,8 +150,8 @@ except AidError as e:
 ### aid2 Notes (PKA + Fallback)
 
 - PKA handshake: For `aid2`, when a record includes `k` (`pka`), the client performs an Ed25519 HTTP Message Signatures handshake to verify endpoint control. The HTTP signature `keyid` is derived from the `aid2` key. `kid` (`i`) is legacy `aid1` compatibility only, not a v2 requirement. This requires an Ed25519 verification backend. Install one of:
-  - `pip install aid-discovery[pka]` (installs `PyNaCl` and `cryptography`)
-  - Or add `PyNaCl>=1.5` or `cryptography>=42` to your environment
+  - `pip install aid-discovery[pka]` (installs `cryptography`)
+  - Or add `cryptography>=42` or `PyNaCl>=1.5` to your environment (the verifier prefers `PyNaCl` if present and otherwise falls back to `cryptography`)
     If no backend is available, discovery raises `ERR_SECURITY` when PKA is present.
 
 - `.well-known` fallback: On DNS issues (`ERR_NO_RECORD` or `ERR_DNS_LOOKUP_FAILED`), the client may fetch `https://<domain>/.well-known/agent` (TLS-anchored). Disable with `well_known_fallback=False`.

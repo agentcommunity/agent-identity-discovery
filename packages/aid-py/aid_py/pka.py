@@ -708,7 +708,9 @@ def _perform_v1_pka_handshake(uri: str, pka: str, kid: str, *, timeout: float = 
     if not hmac.compare_digest(alg.encode('utf-8'), b"ed25519"):
         raise AidError("ERR_SECURITY", "Unsupported signature algorithm")
 
-    host = parsed.netloc
+    # Match TS reference (URL.host): hostname+port WITHOUT any userinfo component.
+    # urlparse().netloc includes userinfo (user:pass@host:port), so strip it.
+    host = parsed.netloc.rsplit("@", 1)[-1]
     base = _build_signature_base(
         covered,
         created=created,

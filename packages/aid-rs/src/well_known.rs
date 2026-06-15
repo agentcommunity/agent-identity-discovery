@@ -84,6 +84,9 @@ pub async fn fetch_well_known(domain: &str, timeout: Duration) -> Result<AidReco
         if rec.v == SPEC_VERSION_V1 {
             crate::pka::perform_pka_handshake(&rec.uri, &pka, rec.kid.as_deref().unwrap_or(""), timeout, None).await?;
         } else {
+            // The `bool` returned here is `domainBound`. As in discover.rs, Rust ships
+            // verification-only parity: the value is intentionally discarded (surfacing it via
+            // a DiscoveryResult is a documented fast-follow), not dropped by oversight.
             crate::pka::perform_pka_handshake(&rec.uri, &pka, "", timeout, Some(domain)).await?;
         }
     }

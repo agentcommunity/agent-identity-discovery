@@ -241,7 +241,7 @@ fn build_signature_base(
     host: &str,
     date: &str,
     challenge: &str,
-) -> Vec<u8> {
+) -> Result<Vec<u8>, AidError> {
     let mut lines: Vec<String> = Vec::new();
     for item in covered {
         let lower = ascii_to_lowercase(item);
@@ -267,14 +267,16 @@ fn build_signature_base(
             appended = true;
         }
         if !appended {
-            // This should not happen if parse_signature_headers is correct
-            return Vec::new();
+            // Defense-in-depth: parse_signature_headers already enforces the covered set, so
+            // this is unreachable in normal flow. Hard-fail rather than silently signing an
+            // incomplete base, matching the TS reference contract.
+            return Err(AidError::new("ERR_SECURITY", "Unsupported covered field in signature base"));
         }
     }
     let quoted = covered.iter().map(|c| format!("\"{}\"", c)).collect::<Vec<_>>().join(" ");
     let params = format!("({});created={};keyid={};alg=\"{}\"", quoted, created, keyid, alg);
     lines.push(format!("\"@signature-params\": {}", params));
-    lines.join("\n").into_bytes()
+    Ok(lines.join("\n").into_bytes())
 }
 
 fn generate_v1_challenge() -> Result<String, AidError> {
@@ -376,9 +378,40 @@ fn unquote_sf(value: &str) -> String {
     }
 }
 
+/// Split the top-level parameter section on `;`, ignoring semicolons that appear inside a
+/// quoted string (RFC 8941 structured-field strings). Mirrors the quote-awareness of
+/// `split_dict_members` so that a value like `keyid="a;b"` is not split mid-string, matching
+/// the TS structured-field tokenizer.
+fn split_params_quote_aware(params: &str) -> Vec<&str> {
+    let mut parts = Vec::new();
+    let mut start = 0usize;
+    let mut in_string = false;
+    let mut escaped = false;
+    for (idx, ch) in params.char_indices() {
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if ch == '\\' {
+                escaped = true;
+            } else if ch == '"' {
+                in_string = false;
+            }
+            continue;
+        }
+        if ch == '"' {
+            in_string = true;
+        } else if ch == ';' {
+            parts.push(&params[start..idx]);
+            start = idx + 1;
+        }
+    }
+    parts.push(&params[start..]);
+    parts
+}
+
 fn param_value_raw(params: &str, name: &str) -> Result<Option<String>, AidError> {
     let mut found: Option<String> = None;
-    for part in params.split(';').skip(1) {
+    for part in split_params_quote_aware(params).into_iter().skip(1) {
         let trimmed = part.trim();
         let (param_name, param_value) = match trimmed.find('=') {
             Some(eq) => (trimmed[..eq].trim(), Some(trimmed[eq + 1..].trim())),
@@ -403,7 +436,7 @@ fn param_value(params: &str, name: &str) -> Result<Option<String>, AidError> {
 
 fn validate_v2_signature_input_params(params: &str) -> Result<(), AidError> {
     let allowed = ["created", "expires", "keyid", "alg", "nonce", "tag"];
-    for part in params.split(';').skip(1) {
+    for part in split_params_quote_aware(params).into_iter().skip(1) {
         let trimmed = part.trim();
         let param_name = match trimmed.find('=') {
             Some(eq) => trimmed[..eq].trim(),
@@ -420,8 +453,9 @@ fn validate_v2_signature_input_params(params: &str) -> Result<(), AidError> {
 }
 
 fn parse_bare_i64_param(value: &str) -> Result<i64, AidError> {
-    let digits = value.strip_prefix('-').unwrap_or(value);
-    if digits.is_empty() || !digits.chars().all(|ch| ch.is_ascii_digit()) {
+    // Match the TS reference `/^\d+$/`: digit-only, no sign. A leading '-' (or any
+    // non-digit) is rejected at parse time rather than relying on the later skew check.
+    if value.is_empty() || !value.chars().all(|ch| ch.is_ascii_digit()) {
         return Err(AidError::new("ERR_SECURITY", "Invalid Signature-Input timestamp"));
     }
     value
@@ -586,7 +620,7 @@ fn build_accept_signature_v2(keyid: &str, nonce: &str, domain_bound: bool) -> St
     )
 }
 
-fn build_v2_signature_base(parsed: &V2ParsedHeaders, target_uri: &str, authority: &str, status: u16, domain: Option<&str>) -> Vec<u8> {
+fn build_v2_signature_base(parsed: &V2ParsedHeaders, target_uri: &str, authority: &str, status: u16, domain: Option<&str>) -> Result<Vec<u8>, AidError> {
     let mut lines = Vec::new();
     for item in &parsed.covered {
         match item.name.as_str() {
@@ -594,10 +628,12 @@ fn build_v2_signature_base(parsed: &V2ParsedHeaders, target_uri: &str, authority
             "@target-uri" => lines.push(format!("\"@target-uri\";req: {}", target_uri)),
             "@authority" => lines.push(format!("\"@authority\";req: {}", authority)),
             "aid-domain" => {
-                // Fail-closed: if aid-domain is covered but no domain was sent, return empty.
+                // Defense-in-depth: the caller already rejects an aid-domain-covered response
+                // when no AID-Domain was sent, so this is unreachable in normal flow. Hard-fail
+                // here rather than signing against an empty base, matching the TS reference.
                 match domain {
                     Some(d) => lines.push(format!("\"aid-domain\";req: {}", d)),
-                    None => return Vec::new(),
+                    None => return Err(AidError::new("ERR_SECURITY", "Signature covers aid-domain but no AID-Domain was sent")),
                 }
             }
             "@status" => lines.push(format!("\"@status\": {}", status)),
@@ -605,7 +641,7 @@ fn build_v2_signature_base(parsed: &V2ParsedHeaders, target_uri: &str, authority
         }
     }
     lines.push(format!("\"@signature-params\": {}", parsed.signature_params_raw));
-    lines.join("\n").into_bytes()
+    Ok(lines.join("\n").into_bytes())
 }
 
 fn authority_for_url(url: &reqwest::Url) -> Result<String, AidError> {
@@ -700,7 +736,7 @@ async fn perform_v2_pka_handshake_with_controls(
     if is_domain_bound && canonical_domain.is_none() {
         return Err(AidError::new("ERR_SECURITY", "Response covers aid-domain but no AID-Domain was sent"));
     }
-    let base = build_v2_signature_base(&parsed, &target_uri, &authority, status, canonical_domain.as_deref());
+    let base = build_v2_signature_base(&parsed, &target_uri, &authority, status, canonical_domain.as_deref())?;
     let vk = VerifyingKey::from_bytes(pubkey.as_slice().try_into().unwrap())
         .map_err(|_| AidError::new("ERR_SECURITY", "Invalid public key"))?;
     let sig = Signature::from_slice(&parsed.signature).map_err(|_| AidError::new("ERR_SECURITY", "Invalid signature"))?;
@@ -788,7 +824,7 @@ async fn perform_pka_handshake_with_controls(
         &host,
         response_date.as_deref().unwrap_or(&date),
         &challenge,
-    );
+    )?;
 
     let pubkey = multibase_decode(pka)?;
     if pubkey.len() != 32 {
@@ -916,7 +952,8 @@ mod tests {
             request["authority"].as_str().expect("authority"),
             response["status"].as_u64().expect("status") as u16,
             Some(domain),
-        );
+        )
+        .expect("build domain-bound v2 signature base");
         assert_eq!(
             String::from_utf8(base.clone()).expect("signature base utf8"),
             vector["signature_base"].as_str().expect("signature base"),
@@ -961,7 +998,8 @@ mod tests {
             request["authority"].as_str().expect("authority"),
             response["status"].as_u64().expect("status") as u16,
             Some(domain),
-        );
+        )
+        .expect("build domain-bound v2 signature base");
         let vk = VerifyingKey::from_bytes(public_key.as_slice().try_into().unwrap()).expect("valid public key");
         let sig = Signature::from_slice(&parsed.signature).expect("valid signature bytes");
         assert!(vk.verify(&base, &sig).is_err(), "domain-mismatch signature must fail Ed25519 verification");
@@ -1002,7 +1040,8 @@ mod tests {
             request["authority"].as_str().expect("authority"),
             response["status"].as_u64().expect("status") as u16,
             None,
-        );
+        )
+        .expect("build v2 signature base");
         assert_eq!(
             String::from_utf8(base.clone()).expect("signature base utf8"),
             vector["signature_base"].as_str().expect("signature base")
@@ -1172,6 +1211,62 @@ mod tests {
             assert_eq!(err.error_code, "ERR_SECURITY");
             assert!(err.message.contains("Invalid Signature-Input timestamp"));
         }
+    }
+
+    #[test]
+    fn rejects_negative_v2_created_and_expires_parameters() {
+        // Matches the TS reference `/^\d+$/`: a signed/negative timestamp is rejected at
+        // parse time rather than only being caught later by the skew window.
+        for timestamp_param in ["created", "expires"] {
+            let signature_input = v2_signature_input_with_extra("")
+                .replacen(&format!("{}=1", timestamp_param), &format!("{}=-1", timestamp_param), 1)
+                .replacen(&format!("{}=2", timestamp_param), &format!("{}=-2", timestamp_param), 1);
+            let headers = v2_parse_headers(&signature_input);
+            let err = parse_v2_signature_headers(&headers).expect_err("negative timestamp parameter must fail");
+            assert_eq!(err.error_code, "ERR_SECURITY");
+            assert!(err.message.contains("Invalid Signature-Input timestamp"));
+        }
+    }
+
+    #[test]
+    fn parse_bare_i64_param_rejects_sign_and_accepts_digits() {
+        assert_eq!(parse_bare_i64_param("1700000000").expect("digits parse"), 1_700_000_000);
+        assert_eq!(parse_bare_i64_param("0").expect("zero parses"), 0);
+        for bad in ["-1", "-0", "+1", "1.0", " 1", "1 ", "", "abc"] {
+            let err = parse_bare_i64_param(bad).expect_err("non-digit-only must fail");
+            assert_eq!(err.error_code, "ERR_SECURITY");
+        }
+    }
+
+    #[test]
+    fn canonicalize_aid_domain_normalizes_case_and_trailing_dot() {
+        // This value is bound into the signed AID-Domain line and the request header, so its
+        // normalization (lowercase + single trailing-dot strip) is security-relevant.
+        assert_eq!(canonicalize_aid_domain("Example.COM.").expect("valid"), "example.com");
+        assert_eq!(canonicalize_aid_domain("EXAMPLE.com").expect("valid"), "example.com");
+        assert_eq!(canonicalize_aid_domain("  example.com  ").expect("trimmed"), "example.com");
+        // Only ONE trailing dot is stripped; a remaining dot is a charset-valid character.
+        assert_eq!(canonicalize_aid_domain("example.com..").expect("one dot stripped"), "example.com.");
+        // IPv6 literal authority charset is permitted.
+        assert_eq!(canonicalize_aid_domain("[2001:DB8::1]").expect("ipv6 literal"), "[2001:db8::1]");
+    }
+
+    #[test]
+    fn canonicalize_aid_domain_rejects_empty_and_out_of_charset() {
+        for bad in ["", "   ", ".", "exa mple.com", "example.com/path", "exam\u{0000}ple"] {
+            let err = canonicalize_aid_domain(bad).expect_err("invalid AID-Domain must be rejected");
+            assert_eq!(err.error_code, "ERR_SECURITY");
+            assert_eq!(err.message, "Invalid AID-Domain value");
+        }
+    }
+
+    #[test]
+    fn param_section_split_is_quote_aware() {
+        // A quoted value containing ';' must not be split mid-string; the whole quoted
+        // value belongs to keyid, leaving no spurious unknown parameter.
+        let params = ";created=1;expires=2;keyid=\"a;b\";alg=\"ed25519\";nonce=\"n\";tag=\"aid-pka-v2\"";
+        validate_v2_signature_input_params(params).expect("quoted ';' inside keyid must not create an unknown param");
+        assert_eq!(param_value(params, "keyid").expect("keyid present"), Some("a;b".to_string()));
     }
 
     #[test]

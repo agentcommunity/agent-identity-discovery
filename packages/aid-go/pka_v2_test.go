@@ -467,6 +467,30 @@ func TestPKAV2RejectsQuotedSignatureInputTimestamps(t *testing.T) {
 	}
 }
 
+func TestPKAV2RejectsNegativeSignatureInputTimestamps(t *testing.T) {
+	// The v2 profile grammar for created/expires is digit-only (TS /^\d+$/);
+	// a leading '-' must be rejected at parse time even though RFC 8941
+	// sf-integer would otherwise permit a sign.
+	cases := map[string]struct {
+		original    string
+		replacement string
+	}{
+		"created": {original: `created=1`, replacement: `created=-1`},
+		"expires": {original: `expires=2`, replacement: `expires=-2`},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			headers := validPKAV2SignatureHeaders()
+			sigInput := strings.Replace(headers.Get("Signature-Input"), tc.original, tc.replacement, 1)
+			headers.Set("Signature-Input", sigInput)
+
+			if _, err := parseV2SignatureHeaders(headers); err == nil {
+				t.Fatalf("expected negative %s timestamp to be rejected", name)
+			}
+		})
+	}
+}
+
 func TestPKAV2RejectsRepeatedPhysicalSignatureHeaders(t *testing.T) {
 	cases := []string{"Signature-Input", "Signature"}
 	for _, headerName := range cases {
@@ -595,6 +619,83 @@ func TestPKAV2RejectsAidDomainCoverageWhenNoDomainSent(t *testing.T) {
 	}
 	if aidErr.Msg != "Response covers aid-domain but no AID-Domain was sent" {
 		t.Fatalf("unexpected message: %s", aidErr.Msg)
+	}
+}
+
+// loadAllPKAV2Vectors returns every aid2 vector from the shared corpus.
+func loadAllPKAV2Vectors(t *testing.T) []pkaV2Vector {
+	t.Helper()
+	path := filepath.Join("..", "..", "protocol", "pka_vectors.json")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read vectors: %v", err)
+	}
+	var root struct {
+		Vectors []json.RawMessage `json:"vectors"`
+	}
+	if err := json.Unmarshal(raw, &root); err != nil {
+		t.Fatalf("parse vectors: %v", err)
+	}
+	var out []pkaV2Vector
+	for _, item := range root.Vectors {
+		var vector pkaV2Vector
+		if err := json.Unmarshal(item, &vector); err != nil {
+			t.Fatalf("parse v2 vector: %v", err)
+		}
+		if vector.Record.V != SpecVersionV2 {
+			continue
+		}
+		out = append(out, vector)
+	}
+	if len(out) == 0 {
+		t.Fatalf("no aid2 vectors found in shared corpus")
+	}
+	return out
+}
+
+// TestPKAV2SharedVectors replays every shared aid2 PKA vector through the Go
+// handshake, mirroring the v1 TestPKAVectors loop. This guarantees that each
+// shared signature-base byte vector (no-store, expires-window math, uppercase
+// alg case-folding, IPv6 authority signing, keyid mismatch, domain binding,
+// etc.) is enforced in Go, not just the handful cherry-picked by id elsewhere.
+func TestPKAV2SharedVectors(t *testing.T) {
+	for _, v := range loadAllPKAV2Vectors(t) {
+		vector := v
+		t.Run(vector.ID, func(t *testing.T) {
+			withPKAV2VectorClockAndNonce(t, vector)
+
+			oldClient := httpClient
+			httpClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+				h := http.Header{}
+				// A missing-cache-control vector intentionally omits/replaces
+				// no-store; honor whatever the vector specifies.
+				if vector.Response.CacheControl != "" {
+					h.Set("Cache-Control", vector.Response.CacheControl)
+				}
+				h.Set("Signature-Input", vector.Response.SignatureInput)
+				h.Set("Signature", vector.Response.Signature)
+				return &http.Response{
+					StatusCode: vector.Response.Status,
+					Header:     h,
+					Body:       io.NopCloser(strings.NewReader("")),
+				}, nil
+			})}
+			t.Cleanup(func() { httpClient = oldClient })
+
+			_, err := performPKAHandshake(vector.Record.U, vector.Record.K, "", vector.Domain, time.Second)
+			switch vector.Expect {
+			case "pass":
+				if err != nil {
+					t.Fatalf("%s expected pass, got error: %v", vector.ID, err)
+				}
+			case "fail":
+				if err == nil {
+					t.Fatalf("%s expected fail, got success", vector.ID)
+				}
+			default:
+				t.Fatalf("%s has unknown expect %q", vector.ID, vector.Expect)
+			}
+		})
 	}
 }
 

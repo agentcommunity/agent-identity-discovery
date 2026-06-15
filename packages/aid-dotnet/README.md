@@ -3,7 +3,7 @@
 Minimal .NET library for Agent Identity & Discovery (AID) parsing, discovery, and constants.
 
 - Target framework: `net9.0`
-- No external runtime dependencies
+- Runtime dependency: `NSec.Cryptography` (Ed25519 signature verification)
 - DNS-first discovery included via DNS-over-HTTPS (DoH)
 
 ## v2 PKA Default

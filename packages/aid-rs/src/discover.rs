@@ -133,6 +133,12 @@ pub async fn discover_with_options(domain: &str, options: DiscoveryOptions) -> R
                             if rec.v == SPEC_VERSION_V1 {
                                 perform_pka_handshake(&rec.uri, &pka, rec.kid.as_deref().unwrap_or(""), options.timeout, None).await?;
                             } else {
+                                // The `bool` returned by perform_pka_handshake is `domainBound`.
+                                // Verification/rejection is at full parity (including fail-closed),
+                                // but Rust ships verification-only parity for now: surfacing the
+                                // domainBound value via a DiscoveryResult is an intentional
+                                // fast-follow (see tracking/plans/2026-06-14-sdk-parity-domain-binding-plan.md),
+                                // so the value is deliberately discarded here, not by oversight.
                                 perform_pka_handshake(&rec.uri, &pka, "", options.timeout, Some(&alabel)).await?;
                             }
                         }

@@ -16,22 +16,22 @@ func (e *AidError) Error() string {
 }
 
 func newAidError(symbol string, msg string) *AidError {
-    var code int
-    switch symbol {
-    case "ERR_NO_RECORD":
-        code = ErrNoRecord
-    case "ERR_INVALID_TXT":
-        code = ErrInvalidTxt
-    case "ERR_UNSUPPORTED_PROTO":
-        code = ErrUnsupportedProto
-    case "ERR_SECURITY":
-        code = ErrSecurity
-    case "ERR_DNS_LOOKUP_FAILED":
-        code = ErrDnsLookupFailed
-    case "ERR_FALLBACK_FAILED":
-        code = ErrFallbackFailed
-    default:
-        code = -1 // Unknown error
-    }
-    return &AidError{Symbol: symbol, Code: code, Msg: msg}
+	var code int
+	switch symbol {
+	case "ERR_NO_RECORD":
+		code = ErrNoRecord
+	case "ERR_INVALID_TXT":
+		code = ErrInvalidTxt
+	case "ERR_UNSUPPORTED_PROTO":
+		code = ErrUnsupportedProto
+	case "ERR_SECURITY":
+		code = ErrSecurity
+	case "ERR_DNS_LOOKUP_FAILED":
+		code = ErrDnsLookupFailed
+	case "ERR_FALLBACK_FAILED":
+		code = ErrFallbackFailed
+	default:
+		code = -1 // Unknown error
+	}
+	return &AidError{Symbol: symbol, Code: code, Msg: msg}
 }

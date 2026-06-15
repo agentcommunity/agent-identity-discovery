@@ -165,13 +165,14 @@ type AidError struct {
 
 ## Error Codes
 
-| Code | Symbol                  | Description                  |
-| ---- | ----------------------- | ---------------------------- |
-| 1000 | `ERR_NO_RECORD`         | No `_agent` TXT record found |
-| 1001 | `ERR_INVALID_TXT`       | Record found but malformed   |
-| 1002 | `ERR_UNSUPPORTED_PROTO` | Protocol not supported       |
-| 1003 | `ERR_SECURITY`          | Security policy violation    |
-| 1004 | `ERR_DNS_LOOKUP_FAILED` | DNS query failed             |
+| Code | Symbol                  | Description                                                |
+| ---- | ----------------------- | ---------------------------------------------------------- |
+| 1000 | `ERR_NO_RECORD`         | No `_agent` TXT record found                               |
+| 1001 | `ERR_INVALID_TXT`       | Record found but malformed                                 |
+| 1002 | `ERR_UNSUPPORTED_PROTO` | Protocol not supported                                     |
+| 1003 | `ERR_SECURITY`          | Security policy violation                                  |
+| 1004 | `ERR_DNS_LOOKUP_FAILED` | DNS query failed                                           |
+| 1005 | `ERR_FALLBACK_FAILED`   | The `.well-known` fallback failed or returned invalid data |
 
 ## Advanced Usage
 
@@ -325,11 +326,23 @@ MIT - see [LICENSE](https://github.com/agentcommunity/agent-identity-discovery/b
 
 ### v2 handshake expectations (summary)
 
-- Covered fields set: `"@method";req`, `"@target-uri";req`, `"@authority";req`, and `"@status"`
+- Base covered fields set: `"@method";req`, `"@target-uri";req`, `"@authority";req`, and `"@status"`
 - `alg` must be `ed25519`
 - `created` and `expires` define a short validity window
 - `keyid` equals the RFC 7638 thumbprint derived from `k`
 - `pka` is unpadded base64url for a 32-byte Ed25519 public key
+
+### Domain binding
+
+By default the client sends an `AID-Domain` request header carrying the queried
+domain. If the endpoint chooses to bind the proof to that domain, it returns a
+signature whose covered set additionally includes `"aid-domain";req` inserted
+between `"@authority";req` and `"@status"` (so the covered set is the four base
+components plus that one). Both the endpoint-only and domain-bound proofs use
+the same `aid-pka-v2` tag — domain binding is signalled purely by `aid-domain`
+coverage, not a distinct tag. When the proof is domain-bound, discovery returns
+`DiscoveryResult.DomainBound = true`. A response that covers `aid-domain`
+without the client having sent `AID-Domain` is rejected (fail closed).
 
 ### v1 compatibility
 
