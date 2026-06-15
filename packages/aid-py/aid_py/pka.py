@@ -458,7 +458,7 @@ def _parse_v2_covered_item(raw: str) -> dict[str, object]:
         raise AidError("ERR_SECURITY", "Invalid Signature-Input covered item")
     name = match.group(1)
     params = [part for part in match.group(2).split(";") if part]
-    if not _token_in(name, ("@method", "@target-uri", "@authority", "@status")):
+    if not _token_in(name, ("@method", "@target-uri", "@authority", "@status", "aid-domain")):
         raise AidError("ERR_SECURITY", f"Unsupported covered field: {name}")
     seen_params: set[str] = set()
     for param in params:
@@ -471,13 +471,15 @@ def _parse_v2_covered_item(raw: str) -> dict[str, object]:
     return {"raw": raw, "name": name, "req": req}
 
 
-def _validate_v2_covered_set(covered: list[dict[str, object]]) -> None:
-    expected = {
+def _validate_v2_covered_set(covered: list[dict[str, object]], *, is_domain_bound: bool = False) -> None:
+    expected: dict[str, bool] = {
         "@method": True,
         "@target-uri": True,
         "@authority": True,
         "@status": False,
     }
+    if is_domain_bound:
+        expected["aid-domain"] = True
     if len(covered) != len(expected):
         raise AidError("ERR_SECURITY", "Signature-Input must cover required fields")
     seen: set[str] = set()
@@ -518,7 +520,6 @@ def _parse_v2_signature_headers(headers) -> dict[str, object]:
     covered_raw = signature_params_raw[1:close_index].strip()
     params_raw = signature_params_raw[close_index + 1:]
     covered = [_parse_v2_covered_item(item) for item in _split_inner_list_items(covered_raw)]
-    _validate_v2_covered_set(covered)
 
     required = ("created", "expires", "keyid", "alg", "nonce", "tag")
     required_set = set(required)
@@ -532,6 +533,8 @@ def _parse_v2_signature_headers(headers) -> dict[str, object]:
         raise AidError("ERR_SECURITY", "Invalid Signature-Input")
     if not re.fullmatch(r"\d+", params["created"]) or not re.fullmatch(r"\d+", params["expires"]):
         raise AidError("ERR_SECURITY", "Invalid Signature-Input timestamp")
+    tag = params["tag"]
+    _validate_v2_covered_set(covered, is_domain_bound=_token_eq(tag, "aid-pka-v2-db"))
 
     signature_raw = _extract_dictionary_member(sig, "aid-pka")
     sig_match = re.fullmatch(r":\s*([^:]+?)\s*:", signature_raw)
