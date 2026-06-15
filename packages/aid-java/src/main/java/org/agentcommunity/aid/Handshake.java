@@ -21,6 +21,9 @@ public final class Handshake {
 
   private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
+  static final String AID_PKA_TAG_V2 = "aid-pka-v2";
+  static final String AID_PKA_TAG_V2_DB = "aid-pka-v2-db";
+
   private static String asciiToLower(String s) {
     char[] chars = s.toCharArray();
     for (int i = 0; i < chars.length; i++) {
@@ -198,12 +201,16 @@ public final class Handshake {
     }
   }
 
-  public static void performHandshake(String uri, String pka, String kid, Duration timeout) {
+  public static boolean performHandshake(String uri, String pka, String kid, Duration timeout) {
+    return performHandshake(uri, pka, kid, timeout, null);
+  }
+
+  public static boolean performHandshake(String uri, String pka, String kid, Duration timeout, String domain) {
     if (kid == null || kid.isEmpty()) {
-      performV2Handshake(uri, pka, timeout);
-      return;
+      return performV2Handshake(uri, pka, timeout, domain);
     }
     performV1Handshake(uri, pka, kid, timeout);
+    return false;
   }
 
   private static void performV1Handshake(String uri, String pka, String kid, Duration timeout) {
@@ -255,20 +262,37 @@ public final class Handshake {
     }
   }
 
-  private static void performV2Handshake(String uri, String pka, Duration timeout) {
+  static String canonicalizeAidDomain(String domain) {
+    if (domain == null) throw new AidError("ERR_SECURITY", "Invalid AID-Domain value");
+    String value = asciiToLower(domain.trim());
+    // Strip EXACTLY one trailing dot
+    if (value.endsWith(".")) {
+      value = value.substring(0, value.length() - 1);
+    }
+    if (value.isEmpty()) throw new AidError("ERR_SECURITY", "Invalid AID-Domain value");
+    if (!value.matches("^[a-z0-9.:\\[\\]_-]+$")) {
+      throw new AidError("ERR_SECURITY", "Invalid AID-Domain value");
+    }
+    return value;
+  }
+
+  private static boolean performV2Handshake(String uri, String pka, Duration timeout, String domain) {
+    String canonical = domain != null ? canonicalizeAidDomain(domain) : null;
     String expectedKeyid = deriveAid2Keyid(pka);
     byte[] nonceBytes = new byte[32];
     SECURE_RANDOM.nextBytes(nonceBytes);
     String nonce = base64UrlEncode(nonceBytes);
     String requestUri = normalizeRequestUri(uri);
     HttpClient http = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).connectTimeout(timeout).build();
-    HttpRequest req =
+    HttpRequest.Builder reqBuilder =
         HttpRequest.newBuilder(URI.create(requestUri))
             .timeout(timeout)
-            .header("Accept-Signature", buildAcceptSignatureV2(expectedKeyid, nonce))
-            .header("Cache-Control", "no-store")
-            .GET()
-            .build();
+            .header("Accept-Signature", buildAcceptSignatureV2(expectedKeyid, nonce, canonical != null))
+            .header("Cache-Control", "no-store");
+    if (canonical != null) {
+      reqBuilder = reqBuilder.header("AID-Domain", canonical);
+    }
+    HttpRequest req = reqBuilder.GET().build();
     HttpResponse<byte[]> res;
     try {
       res = http.send(req, HttpResponse.BodyHandlers.ofByteArray());
@@ -278,10 +302,21 @@ public final class Handshake {
     if (res.statusCode() >= 300 && res.statusCode() < 400) {
       throw new AidError("ERR_SECURITY", "PKA redirects are not allowed");
     }
-    verifyV2ResponseHeaders(requestUri, pka, nonce, res.statusCode(), res.headers().map(), System.currentTimeMillis() / 1000L);
+    return verifyV2ResponseHeaders(requestUri, pka, nonce, res.statusCode(), res.headers().map(), System.currentTimeMillis() / 1000L, canonical);
   }
 
   static String buildAcceptSignatureV2(String keyid, String nonce) {
+    return buildAcceptSignatureV2(keyid, nonce, false);
+  }
+
+  static String buildAcceptSignatureV2(String keyid, String nonce, boolean domainBound) {
+    if (domainBound) {
+      return "aid-pka=(\"@method\";req \"@target-uri\";req \"@authority\";req \"aid-domain\";req \"@status\");created;expires;keyid=\""
+          + keyid
+          + "\";alg=\"ed25519\";nonce=\""
+          + nonce
+          + "\";tag=\"aid-pka-v2-db\"";
+    }
     return "aid-pka=(\"@method\";req \"@target-uri\";req \"@authority\";req \"@status\");created;expires;keyid=\""
         + keyid
         + "\";alg=\"ed25519\";nonce=\""
@@ -296,16 +331,28 @@ public final class Handshake {
       int status,
       Map<String, String> headers,
       long nowEpochSeconds) {
-    verifyV2ResponseHeaders(uri, pka, expectedNonce, status, singletonHeaderValues(headers), nowEpochSeconds);
+    verifyV2ResponseHeaders(uri, pka, expectedNonce, status, singletonHeaderValues(headers), nowEpochSeconds, null);
   }
 
-  private static void verifyV2ResponseHeaders(
+  static void verifyV2Response(
+      String uri,
+      String pka,
+      String expectedNonce,
+      int status,
+      Map<String, String> headers,
+      long nowEpochSeconds,
+      String domain) {
+    verifyV2ResponseHeaders(uri, pka, expectedNonce, status, singletonHeaderValues(headers), nowEpochSeconds, domain);
+  }
+
+  private static boolean verifyV2ResponseHeaders(
       String uri,
       String pka,
       String expectedNonce,
       int status,
       Map<String, List<String>> headers,
-      long nowEpochSeconds) {
+      long nowEpochSeconds,
+      String domain) {
     if (status >= 300 && status < 400) {
       throw new AidError("ERR_SECURITY", "PKA redirects are not allowed");
     }
@@ -332,8 +379,17 @@ public final class Handshake {
     if (!MessageDigest.isEqual(parsed.nonce.getBytes(StandardCharsets.UTF_8), expectedNonce.getBytes(StandardCharsets.UTF_8))) {
       throw new AidError("ERR_SECURITY", "Signature nonce mismatch");
     }
-    if (!MessageDigest.isEqual(parsed.tag.getBytes(StandardCharsets.UTF_8), "aid-pka-v2".getBytes(StandardCharsets.UTF_8))) {
+    boolean isDomainBound = MessageDigest.isEqual(
+        parsed.tag.getBytes(StandardCharsets.UTF_8),
+        AID_PKA_TAG_V2_DB.getBytes(StandardCharsets.UTF_8));
+    boolean isV2 = MessageDigest.isEqual(
+        parsed.tag.getBytes(StandardCharsets.UTF_8),
+        AID_PKA_TAG_V2.getBytes(StandardCharsets.UTF_8));
+    if (!isDomainBound && !isV2) {
       throw new AidError("ERR_SECURITY", "Invalid signature tag");
+    }
+    if (isDomainBound && domain == null) {
+      throw new AidError("ERR_SECURITY", "Unrequested domain-bound signature tag");
     }
 
     byte[] base =
@@ -343,7 +399,8 @@ public final class Handshake {
             "GET",
             normalizeRequestUri(uri),
             requestAuthority(uri),
-            status);
+            status,
+            domain);
     PublicKey pk = publicKeyFromRawEd25519(publicKey);
     try {
       Signature verifier = Signature.getInstance("Ed25519");
@@ -355,6 +412,7 @@ public final class Handshake {
     } catch (Exception e) {
       throw new AidError("ERR_SECURITY", "PKA verification unavailable: " + e.getMessage());
     }
+    return isDomainBound;
   }
 
   private static V2SigData parseV2SignatureHeaders(Map<String, List<String>> headers) {
@@ -373,7 +431,6 @@ public final class Handshake {
     for (String item : splitInnerListItems(coveredRaw)) {
       covered.add(parseV2CoveredItem(item));
     }
-    validateV2CoveredSet(covered);
 
     Map<String, String> params = parseSignatureParams(paramsRaw);
     String createdRaw = requiredSignatureParam(params, "created");
@@ -382,6 +439,7 @@ public final class Handshake {
     String alg = unquoteSfString(requiredSignatureParam(params, "alg"));
     String nonce = unquoteSfString(requiredSignatureParam(params, "nonce"));
     String tag = unquoteSfString(requiredSignatureParam(params, "tag"));
+    validateV2CoveredSet(covered, tag);
     if (!createdRaw.matches("\\d+") || !expiresRaw.matches("\\d+")) {
       throw new AidError("ERR_SECURITY", "Invalid Signature-Input timestamp");
     }
@@ -540,8 +598,10 @@ public final class Handshake {
     return new V2CoveredItem(raw, name, req);
   }
 
-  private static void validateV2CoveredSet(List<V2CoveredItem> covered) {
-    if (covered.size() != 4) {
+  private static void validateV2CoveredSet(List<V2CoveredItem> covered, String tag) {
+    boolean domainBound = AID_PKA_TAG_V2_DB.equals(tag);
+    int expectedSize = domainBound ? 5 : 4;
+    if (covered.size() != expectedSize) {
       throw new AidError("ERR_SECURITY", "Signature-Input must cover required fields");
     }
     Map<String, Boolean> expected = new HashMap<>();
@@ -549,6 +609,9 @@ public final class Handshake {
     expected.put("@target-uri", true);
     expected.put("@authority", true);
     expected.put("@status", false);
+    if (domainBound) {
+      expected.put("aid-domain", true);
+    }
     Set<String> seen = new HashSet<>();
     for (V2CoveredItem item : covered) {
       Boolean expectedReq = expected.get(item.name);
@@ -677,7 +740,8 @@ public final class Handshake {
       String method,
       String targetUri,
       String authority,
-      int status) {
+      int status,
+      String domain) {
     StringBuilder sb = new StringBuilder();
     for (V2CoveredItem item : covered) {
       if ("@method".equals(item.name)) {
@@ -686,6 +750,11 @@ public final class Handshake {
         sb.append("\"@target-uri\";req: ").append(targetUri).append('\n');
       } else if ("@authority".equals(item.name)) {
         sb.append("\"@authority\";req: ").append(authority).append('\n');
+      } else if ("aid-domain".equals(item.name)) {
+        if (domain == null) {
+          throw new AidError("ERR_SECURITY", "Signature covers aid-domain but no AID-Domain was sent");
+        }
+        sb.append("\"aid-domain\";req: ").append(domain).append('\n');
       } else if ("@status".equals(item.name)) {
         sb.append("\"@status\": ").append(status).append('\n');
       } else {

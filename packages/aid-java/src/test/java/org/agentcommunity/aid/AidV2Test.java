@@ -754,9 +754,38 @@ public class AidV2Test {
     JsonNode vector = loadPkaVector("v2-rfc9421-response-signature");
     String header =
         Handshake.buildAcceptSignatureV2(
-            vector.get("key").get("jwk_thumbprint").asText(), vector.get("nonce").asText());
+            vector.get("key").get("jwk_thumbprint").asText(), vector.get("nonce").asText(), false);
 
     assertEquals(vector.get("request").get("accept_signature").asText(), header);
+  }
+
+  @Test
+  void buildsCanonicalAid2DbAcceptSignatureHeader() throws Exception {
+    JsonNode vector = loadPkaVector("v2-db-rfc9421-domain-bound");
+    String header =
+        Handshake.buildAcceptSignatureV2(
+            vector.get("key").get("jwk_thumbprint").asText(), vector.get("nonce").asText(), true);
+
+    assertEquals(vector.get("request").get("accept_signature").asText(), header);
+  }
+
+  @Test
+  void verifiesCanonicalAid2DbDomainBound() throws Exception {
+    JsonNode vector = loadPkaVector("v2-db-rfc9421-domain-bound");
+    Map<String, String> headers = new java.util.HashMap<>();
+    headers.put("Signature-Input", vector.get("response").get("signature_input").asText());
+    headers.put("Signature", vector.get("response").get("signature").asText());
+    headers.put("Cache-Control", vector.get("response").get("cache_control").asText());
+
+    // Should not throw
+    Handshake.verifyV2Response(
+        vector.get("record").get("u").asText(),
+        vector.get("record").get("k").asText(),
+        vector.get("nonce").asText(),
+        vector.get("response").get("status").asInt(),
+        headers,
+        vector.get("created").asLong() + 30,
+        vector.get("domain").asText());
   }
 
   @Test
@@ -826,6 +855,27 @@ public class AidV2Test {
     assertEquals("https://fallback.example.com/mcp", result.record.uri);
     assertEquals(Constants.DNS_TTL_MIN, result.ttl);
     assertEquals(Constants.DNS_SUBDOMAIN + ".example.com", result.queryName);
+  }
+
+  @Test
+  void rejectsAid2DbTagWithoutAidDomainCoverage() throws Exception {
+    JsonNode vector = loadPkaVector("v2-db-missing-aid-domain-coverage");
+
+    AidError err =
+        assertThrows(
+            AidError.class,
+            () ->
+                Handshake.verifyV2Response(
+                    vector.get("record").get("u").asText(),
+                    vector.get("record").get("k").asText(),
+                    vector.get("nonce").asText(),
+                    vector.get("response").get("status").asInt(),
+                    canonicalVectorHeaders(vector),
+                    vector.get("created").asLong() + 30,
+                    vector.get("domain").asText()));
+
+    assertEquals("ERR_SECURITY", err.errorCode);
+    assertTrue(err.getMessage().contains("required fields"), "message was: " + err.getMessage());
   }
 
   private static JsonNode loadPkaVector(String id) throws Exception {
