@@ -131,6 +131,42 @@ public class AidV2Test {
   }
 
   @Test
+  void dohQueryNamePreservesFullFqdn() {
+    // Regression for the substring(3) bug that stripped the leading slash AND the first two
+    // characters of every FQDN (turning "_agent.example.com" into "gent.example.com"), which made
+    // every DNS-first discovery query the wrong name and silently fall through to .well-known.
+    assertEquals("_agent.example.com", Discovery.dohQueryName("_agent.example.com"));
+    assertEquals("_agent._mcp.example.com", Discovery.dohQueryName("_agent._mcp.example.com"));
+
+    assertEquals(
+        "https://cloudflare-dns.com/dns-query?name=_agent.example.com&type=TXT",
+        Discovery.dohQueryUrl("_agent.example.com"));
+    assertEquals(
+        "https://cloudflare-dns.com/dns-query?name=_agent._mcp.example.com&type=TXT",
+        Discovery.dohQueryUrl("_agent._mcp.example.com"));
+  }
+
+  @Test
+  void parserAcceptsWellFormedRecordWithPastDeprecationTimestamp() {
+    // parity-1: parse() is format-only. A well-formed record whose `dep` is in the past must remain
+    // parseable (it is a discovery-layer "fail gracefully" concern, not a malformed record), and it
+    // must NOT raise ERR_INVALID_TXT just because the timestamp is in the past.
+    AidRecord record =
+        Parser.parse("v=aid1;u=https://api.example.com/mcp;p=mcp;e=2000-01-01T00:00:00Z");
+
+    assertEquals("aid1", record.v);
+    assertEquals("https://api.example.com/mcp", record.uri);
+    assertEquals("2000-01-01T00:00:00Z", record.dep);
+
+    // A malformed dep timestamp is still rejected as a format error.
+    AidError err =
+        assertThrows(
+            AidError.class,
+            () -> Parser.parse("v=aid1;u=https://api.example.com/mcp;p=mcp;e=not-a-timestamp"));
+    assertEquals("ERR_INVALID_TXT", err.errorCode);
+  }
+
+  @Test
   void parserRejectsInvalidAid2PkaEncodings() {
     List<String> invalidKeys =
         List.of(
@@ -777,15 +813,67 @@ public class AidV2Test {
     headers.put("Signature", vector.get("response").get("signature").asText());
     headers.put("Cache-Control", vector.get("response").get("cache_control").asText());
 
-    // Should not throw
-    Handshake.verifyV2Response(
-        vector.get("record").get("u").asText(),
-        vector.get("record").get("k").asText(),
-        vector.get("nonce").asText(),
-        vector.get("response").get("status").asInt(),
-        headers,
-        vector.get("created").asLong() + 30,
-        vector.get("domain").asText());
+    // Should not throw, AND must report domainBound=true (the covered set includes aid-domain;req).
+    boolean domainBound =
+        Handshake.verifyV2ResponseDomainBound(
+            vector.get("record").get("u").asText(),
+            vector.get("record").get("k").asText(),
+            vector.get("nonce").asText(),
+            vector.get("response").get("status").asInt(),
+            headers,
+            vector.get("created").asLong() + 30,
+            vector.get("domain").asText());
+
+    assertTrue(domainBound, "domain-bound vector must yield domainBound=true");
+  }
+
+  @Test
+  void verifiesCanonicalAid2PlainReportsDomainBoundFalse() throws Exception {
+    // java-5: the unbound vector (no aid-domain in the covered set) must yield domainBound=false,
+    // even when a domain is supplied. Mirrors the TS/Go assertion of the returned flag.
+    JsonNode vector = loadPkaVector("v2-rfc9421-response-signature");
+    Map<String, String> headers = new java.util.HashMap<>(canonicalVectorHeaders(vector));
+
+    boolean domainBound =
+        Handshake.verifyV2ResponseDomainBound(
+            vector.get("record").get("u").asText(),
+            vector.get("record").get("k").asText(),
+            vector.get("nonce").asText(),
+            vector.get("response").get("status").asInt(),
+            headers,
+            vector.get("created").asLong() + 30,
+            "example.com");
+
+    assertFalse(domainBound, "unbound vector must yield domainBound=false");
+  }
+
+  @Test
+  void rejectsAid2DbDomainCoverageWhenNoDomainSent() throws Exception {
+    // java-3 (fail-closed): a response whose signed covered set includes aid-domain MUST be rejected
+    // when the client did not send an AID-Domain header. Drives the domain-bound vector through the
+    // 6-arg (no-domain) overload and asserts the exact ERR_SECURITY message, at parity with Go/TS.
+    JsonNode vector = loadPkaVector("v2-db-rfc9421-domain-bound");
+    Map<String, String> headers = new java.util.HashMap<>();
+    headers.put("Signature-Input", vector.get("response").get("signature_input").asText());
+    headers.put("Signature", vector.get("response").get("signature").asText());
+    headers.put("Cache-Control", vector.get("response").get("cache_control").asText());
+
+    AidError err =
+        assertThrows(
+            AidError.class,
+            () ->
+                Handshake.verifyV2Response(
+                    vector.get("record").get("u").asText(),
+                    vector.get("record").get("k").asText(),
+                    vector.get("nonce").asText(),
+                    vector.get("response").get("status").asInt(),
+                    headers,
+                    vector.get("created").asLong() + 30));
+
+    assertEquals("ERR_SECURITY", err.errorCode);
+    // Pin the primary fail-closed guard's exact message at parity with Go/TS. (A second defense-in-
+    // depth guard in buildV2SignatureBase uses "Signature covers..."; this asserts the primary one.)
+    assertEquals("Response covers aid-domain but no AID-Domain was sent", err.getMessage());
   }
 
   @Test

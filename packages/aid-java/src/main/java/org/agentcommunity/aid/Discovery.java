@@ -5,9 +5,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.IDN;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -97,8 +99,19 @@ public final class Discovery {
     return status == 3;
   }
 
+  static String dohQueryUrl(String fqdn) {
+    return "https://cloudflare-dns.com/dns-query?name=" + dohQueryName(fqdn) + "&type=TXT";
+  }
+
+  // Percent-encodes the FQDN for use in the DoH `name` query parameter. DNS labels for AID query
+  // names only contain unreserved characters (`_`, `.`, alphanumerics, hyphen), so this is a
+  // pass-through for the names AID generates, but encoding keeps the URL well-formed regardless.
+  static String dohQueryName(String fqdn) {
+    return URLEncoder.encode(fqdn, StandardCharsets.UTF_8);
+  }
+
   private static DoHResponse queryTxtDoH(String fqdn, Duration timeout) {
-    String url = "https://cloudflare-dns.com/dns-query?name=" + URI.create("http://x/"+fqdn).getRawPath().substring(3) + "&type=TXT";
+    String url = dohQueryUrl(fqdn);
     HttpClient http = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).connectTimeout(timeout).build();
     HttpRequest req = HttpRequest.newBuilder(URI.create(url)).timeout(timeout).header("Accept", "application/dns-json").GET().build();
     try {

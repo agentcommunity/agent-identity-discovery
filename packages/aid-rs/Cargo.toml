@@ -16,8 +16,8 @@ ed25519-dalek = { version = "2", features = ["pkcs8"], optional = true }
 httpdate = { version = "1", optional = true }
 getrandom = { version = "0.2", optional = true }
 sha2 = { version = "0.10", optional = true }
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "http2"], optional = true }
-serde_json = { version = "1", optional = true }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "http2"] }
+serde_json = { version = "1" }
 tokio = { version = "1", features = ["time", "rt-multi-thread"] }
 hickory-resolver = { version = "0.24", default-features = false, features = ["tokio-runtime", "system-config"] }
 base64 = "0.22"
@@ -25,7 +25,7 @@ idna = "0.5"
 
 [features]
 default = []
-handshake = ["bs58", "ed25519-dalek", "getrandom", "httpdate", "sha2", "reqwest", "serde_json"]
+handshake = ["bs58", "ed25519-dalek", "getrandom", "httpdate", "sha2"]
 
 [dev-dependencies]
 httpmock = "0.7"

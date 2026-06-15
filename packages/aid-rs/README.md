@@ -36,7 +36,7 @@ aid-rs = { path = "../aid-rs" }
 
 ### One-liner discovery
 
-```rust
+```rust,no_run
 use aid_rs::discover;
 
 #[tokio::main]
@@ -49,7 +49,7 @@ async fn main() -> Result<(), aid_rs::AidError> {
 
 ### Options form
 
-```rust
+```rust,no_run
 use aid_rs::{discover_with_options, DiscoveryOptions};
 use std::time::Duration;
 
@@ -90,7 +90,7 @@ Enable the `handshake` feature to verify endpoint control when an `aid2` record 
 aid-rs = { path = "../aid-rs", features = ["handshake"] }
 ```
 
-```rust
+```rust,no_run
 #[cfg(feature = "handshake")]
 use aid_rs::perform_pka_handshake;
 
@@ -98,7 +98,9 @@ use aid_rs::perform_pka_handshake;
 #[tokio::main]
 async fn main() -> Result<(), aid_rs::AidError> {
     let rec = aid_rs::parse("v=aid2;uri=https://api.example.com/mcp;p=mcp;k=ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ")?;
-    perform_pka_handshake(&rec.uri, rec.pka.as_deref().unwrap(), "", std::time::Duration::from_secs(2)).await?;
+    // The final argument is the AID-Domain for v2 domain binding; pass `Some("example.com")`
+    // to bind the proof to the queried domain, or `None` to skip domain binding.
+    perform_pka_handshake(&rec.uri, rec.pka.as_deref().unwrap(), "", std::time::Duration::from_secs(2), None).await?;
     Ok(())
 }
 ```

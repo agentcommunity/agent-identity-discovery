@@ -1,186 +1,278 @@
-// src/test/java/your/pkg/HandshakeTest.java
 package org.agentcommunity.aid;
-
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.Test;
-
-import java.io.InputStream;
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
-import java.security.PrivateKey;
-import java.security.PublicKey;
-import java.security.Signature;
-import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sun.net.httpserver.HttpServer;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.KeyFactory;
+import java.security.PrivateKey;
+import java.security.Signature;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.time.Duration;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
+
+/**
+ * Drives the REAL {@link Handshake} V1 PKA path against the shared {@code protocol/pka_vectors.json}
+ * aid1 vectors via a local {@link HttpServer}, plus direct {@link Base58} edge-case coverage.
+ *
+ * <p>This replaces the former synthetic JWS toy (which imported nothing from the production package
+ * and read a private 3-entry vectors.json). It is the test the Java CI workflow runs, so it must
+ * exercise production code: {@code performV1Handshake}, the multibase/Base58 decode, the +/-300s
+ * created/Date acceptance windows, the keyid==DNS-kid check, and the alg=ed25519 check.
+ */
 public class HandshakeTest {
 
-  static class Vector {
-    public String id;
-    public String overrideAlg;     // "ed25519" or "rsa"
-    public String overrideKeyId;   // "g1" or "b2" etc
-    public String expect;          // "pass" or "fail"
-  }
+  static final byte[] ED25519_PKCS8_PREFIX =
+      new byte[] {
+        0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04,
+        0x20
+      };
 
-  static class Policy {
-    final String expectedAlg = "ed25519";
-    final String expectedKid = "g1";
-  }
-
-  static class KeyRing {
-    static class Entry {
-      final String alg;
-      final String kid;
-      final KeyPair kp;
-      Entry(String alg, String kid, KeyPair kp) { this.alg = alg; this.kid = kid; this.kp = kp; }
+  @Test
+  void drivesV1PkaVectorsAgainstRealHandshake() throws Exception {
+    JsonNode root = loadVectors();
+    int aid1Vectors = 0;
+    for (JsonNode vector : root.get("vectors")) {
+      if (!"aid1".equals(vector.get("record").get("v").asText())) continue;
+      aid1Vectors++;
+      runV1Vector(vector);
     }
-    final Map<String, Entry> byKid = new HashMap<>();
-    void put(String alg, String kid, KeyPair kp) { byKid.put(kid, new Entry(alg, kid, kp)); }
-    Entry getByKid(String kid) { return byKid.get(kid); }
-    Optional<Entry> anyByAlg(String alg) {
-      return byKid.values().stream().filter(e -> e.alg.equals(alg)).findFirst();
-    }
+    assertTrue(aid1Vectors >= 5, "expected the shared aid1 vectors to be exercised, found " + aid1Vectors);
   }
 
-  static final ObjectMapper MAPPER = new ObjectMapper();
-  static final Policy POLICY = new Policy();
-  static final KeyRing RING = initRing();
+  private static void runV1Vector(JsonNode vector) throws Exception {
+    String id = vector.get("id").asText();
+    String expect = vector.get("expect").asText();
+    boolean expectPass = "pass".equals(expect);
 
-  private static KeyRing initRing() {
+    // Compute the real Ed25519 public key from the seed and encode the PKA as multibase base58.
+    byte[] seed = Base64.getDecoder().decode(vector.get("key").get("seed_b64").asText());
+    byte[] publicKey = ed25519PublicKeyFromSeed(seed);
+    String pka = "z" + base58Encode(publicKey);
+    String recordKid = vector.get("record").get("i").asText();
+
+    List<String> covered = new ArrayList<>();
+    for (JsonNode c : vector.get("covered")) covered.add(c.asText());
+    String overrideAlg = vector.has("overrideAlg") ? vector.get("overrideAlg").asText() : null;
+    String overrideKeyId = vector.has("overrideKeyId") ? vector.get("overrideKeyId").asText() : null;
+    boolean skewDate = "date-skew".equals(id);
+    String skewHttpDate = vector.has("httpDate") ? vector.get("httpDate").asText() : null;
+
+    HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    int port = server.getAddress().getPort();
+    String uri = "http://127.0.0.1:" + port + "/mcp";
+
+    server.createContext(
+        "/mcp",
+        exchange -> {
+          try {
+            String challenge = exchange.getRequestHeaders().getFirst("AID-Challenge");
+            String requestDate = exchange.getRequestHeaders().getFirst("Date");
+
+            // Pass vectors sign within the acceptance window; the date-skew vector signs a created
+            // timestamp and HTTP Date far in the past to trip the +/-300s windows.
+            long created = skewDate ? vector.get("created").asLong() : System.currentTimeMillis() / 1000L;
+            String responseDate =
+                skewDate
+                    ? skewHttpDate
+                    : DateTimeFormatter.RFC_1123_DATE_TIME.format(
+                        ZonedDateTime.now(ZoneOffset.UTC));
+
+            String keyid = overrideKeyId != null ? overrideKeyId : recordKid;
+            String alg = overrideAlg != null ? overrideAlg : "ed25519";
+
+            String host = java.net.URI.create(uri).getAuthority();
+            byte[] base =
+                buildV1SignatureBase(covered, created, keyid, alg, uri, host, responseDate, challenge);
+            String signature = base64Std(signEd25519(seed, base));
+
+            String params =
+                "(" + quoted(covered) + ");created=" + created + ";keyid=" + keyid + ";alg=\"" + alg + "\"";
+            exchange.getResponseHeaders().add("Signature-Input", "sig=" + params);
+            exchange.getResponseHeaders().add("Signature", "sig=:" + signature + ":");
+            exchange.getResponseHeaders().add("Date", responseDate);
+            byte[] body = new byte[0];
+            exchange.sendResponseHeaders(200, body.length);
+            try (OutputStream output = exchange.getResponseBody()) {
+              output.write(body);
+            }
+          } catch (Exception e) {
+            byte[] body = String.valueOf(e.getMessage()).getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(500, body.length);
+            try (OutputStream output = exchange.getResponseBody()) {
+              output.write(body);
+            }
+          } finally {
+            exchange.close();
+          }
+        });
+
+    server.start();
     try {
-      KeyRing r = new KeyRing();
-      KeyPairGenerator ed = KeyPairGenerator.getInstance("Ed25519");
-      KeyPair edkp = ed.generateKeyPair();
-      r.put("ed25519", "g1", edkp);
+      if (expectPass) {
+        // V1 handshake returns false (domain binding is a v2 concept) and must not throw.
+        boolean domainBound = Handshake.performHandshake(uri, pka, recordKid, Duration.ofSeconds(5));
+        assertFalse(domainBound, id + ": V1 handshake must never be domain-bound");
+      } else {
+        AidError err =
+            assertThrows(
+                AidError.class,
+                () -> Handshake.performHandshake(uri, pka, recordKid, Duration.ofSeconds(5)),
+                id + ": expected the handshake to be rejected");
+        assertEquals("ERR_SECURITY", err.errorCode, id + ": " + err.getMessage());
+      }
+    } finally {
+      server.stop(0);
+    }
+  }
 
-      KeyPairGenerator rsa = KeyPairGenerator.getInstance("RSA");
-      rsa.initialize(2048);
-      KeyPair rsakp = rsa.generateKeyPair();
-      r.put("rsa", "b2", rsakp);
+  // --- Base58 direct coverage (java-6): round-trip, leading zeros, empty, invalid char ---
 
-      return r;
-    } catch (Exception e) {
-      throw new RuntimeException(e);
+  @Test
+  void base58DecodesEmptyToEmpty() {
+    assertEquals(0, Base58.decode("").length);
+  }
+
+  @Test
+  void base58PreservesLeadingZeroBytesAsOnes() {
+    // Each leading '1' in base58 maps to a leading 0x00 byte.
+    assertArrayEquals(new byte[] {0}, Base58.decode("1"));
+    assertArrayEquals(new byte[] {0, 0, 0}, Base58.decode("111"));
+  }
+
+  @Test
+  void base58RoundTripsArbitraryPayloads() {
+    byte[][] payloads =
+        new byte[][] {
+          {0x00, 0x01, 0x02, 0x03},
+          {(byte) 0xff, (byte) 0xff, (byte) 0xff},
+          {0x00, 0x00, (byte) 0x80, 0x7f, 0x10},
+          deterministicBytes(32)
+        };
+    for (byte[] payload : payloads) {
+      String encoded = base58Encode(payload);
+      assertArrayEquals(payload, Base58.decode(encoded), encoded);
     }
   }
 
   @Test
-  void vectorsHandshake() throws Exception {
-    List<Vector> vectors = loadVectors("/vectors.json");
+  void base58RejectsInvalidCharacters() {
+    // '0', 'O', 'I', 'l' are excluded from the base58 alphabet.
+    for (String bad : List.of("0", "O", "I", "l", "abc0")) {
+      AidError err = assertThrows(AidError.class, () -> Base58.decode(bad), bad);
+      assertEquals("ERR_SECURITY", err.errorCode, bad);
+    }
+  }
 
-    for (Vector v : vectors) {
-      String alg = v.overrideAlg != null ? v.overrideAlg.toLowerCase(Locale.ROOT) : POLICY.expectedAlg;
-      String kid = v.overrideKeyId != null ? v.overrideKeyId : POLICY.expectedKid;
+  // --- helpers ---
 
-      // Pick a signing key that matches the chosen alg and kid if possible
-      KeyRing.Entry entry = RING.getByKid(kid);
-      if (entry == null || !entry.alg.equals(alg)) {
-        // If kid maps to an entry with different alg, fall back to any key with the requested alg
-        entry = RING.anyByAlg(alg).orElseThrow(() -> new IllegalStateException("No key for alg=" + alg));
-      }
+  private static JsonNode loadVectors() throws Exception {
+    Path path = Path.of("protocol/pka_vectors.json");
+    if (!Files.exists(path)) {
+      path = Path.of("../../protocol/pka_vectors.json");
+    }
+    return new ObjectMapper().readTree(Files.readString(path, StandardCharsets.UTF_8));
+  }
 
-      // Build header and sign a compact JWS-like structure for testing
-      String headerJson = "{\"alg\":\"" + alg + "\",\"kid\":\"" + kid + "\"}";
-      byte[] payload = "hello".getBytes();
-      String jws = sign(headerJson, payload, alg, entry.kp.getPrivate());
-
-      boolean validated = false;
-      boolean verified = false;
-      String failStage = null;
-      String failMsg = null;
-
-      try {
-        validateHeader(headerJson, POLICY);
-        validated = true;
-
-        verified = verify(jws, RING);
-        if (!verified) {
-          failStage = "verify";
-          failMsg = "signature verify failed";
-        }
-      } catch (ValidationException ve) {
-        failStage = "validate";
-        failMsg = ve.getMessage();
-      }
-
-      // Diagnostics to make the failing vector obvious in CI logs
-      System.out.printf(
-          Locale.ROOT,
-          "vector=%s expect=%s alg=%s kid=%s validated=%s verified=%s failStage=%s failMsg=%s%n",
-          v.id, v.expect, alg, kid, validated, verified, failStage, failMsg
-      );
-
-      if ("pass".equalsIgnoreCase(v.expect)) {
-        assertTrue(validated, v.id + ": expected validation to pass");
-        assertTrue(verified, v.id + ": expected signature verification to pass");
-      } else {
-        // Failure vectors must fail at validation, not verify
-        assertEquals("validate", failStage,
-            v.id + ": expected failure at validation but got " + failStage + " (" + failMsg + ")");
+  private static byte[] buildV1SignatureBase(
+      List<String> covered,
+      long created,
+      String keyid,
+      String alg,
+      String targetUri,
+      String host,
+      String date,
+      String challenge) {
+    StringBuilder sb = new StringBuilder();
+    for (String item : covered) {
+      switch (item.toLowerCase(java.util.Locale.ROOT)) {
+        case "aid-challenge" -> sb.append("\"AID-Challenge\": ").append(challenge).append('\n');
+        case "@method" -> sb.append("\"@method\": ").append("GET").append('\n');
+        case "@target-uri" -> sb.append("\"@target-uri\": ").append(targetUri).append('\n');
+        case "host" -> sb.append("\"host\": ").append(host).append('\n');
+        case "date" -> sb.append("\"date\": ").append(date).append('\n');
+        default -> throw new IllegalArgumentException("unsupported covered field: " + item);
       }
     }
+    String params =
+        "(" + quoted(covered) + ");created=" + created + ";keyid=" + keyid + ";alg=\"" + alg + "\"";
+    sb.append("\"@signature-params\": ").append(params);
+    return sb.toString().getBytes(StandardCharsets.UTF_8);
   }
 
-  private static List<Vector> loadVectors(String resourcePath) throws Exception {
-    try (InputStream in = HandshakeTest.class.getResourceAsStream(resourcePath)) {
-      assertNotNull(in, "missing " + resourcePath);
-      return MAPPER.readValue(in, new TypeReference<List<Vector>>() {});
+  private static String quoted(List<String> covered) {
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < covered.size(); i++) {
+      if (i > 0) sb.append(' ');
+      sb.append('"').append(covered.get(i)).append('"');
     }
+    return sb.toString();
   }
 
-  private static void validateHeader(String headerJson, Policy p) throws Exception {
-    Map<?, ?> h = MAPPER.readValue(headerJson, Map.class);
-    String alg = Objects.toString(h.get("alg"), null);
-    String kid = Objects.toString(h.get("kid"), null);
-    if (!Objects.equals(alg, p.expectedAlg)) {
-      throw new ValidationException("alg mismatch expected=" + p.expectedAlg + " got=" + alg);
+  private static byte[] ed25519PublicKeyFromSeed(byte[] seed) {
+    // The JDK signs with a seed-derived Ed25519 key but never exposes the raw public key, so derive
+    // it via the RFC 8032 construction (see Ed25519 test helper) to build the multibase PKA.
+    return Ed25519.publicKeyFromSeed(seed);
+  }
+
+  private static PrivateKey privateKeyFromSeed(byte[] seed) throws Exception {
+    byte[] pkcs8 = new byte[ED25519_PKCS8_PREFIX.length + seed.length];
+    System.arraycopy(ED25519_PKCS8_PREFIX, 0, pkcs8, 0, ED25519_PKCS8_PREFIX.length);
+    System.arraycopy(seed, 0, pkcs8, ED25519_PKCS8_PREFIX.length, seed.length);
+    return KeyFactory.getInstance("Ed25519").generatePrivate(new PKCS8EncodedKeySpec(pkcs8));
+  }
+
+  private static byte[] signEd25519(byte[] seed, byte[] message) throws Exception {
+    Signature signer = Signature.getInstance("Ed25519");
+    signer.initSign(privateKeyFromSeed(seed));
+    signer.update(message);
+    return signer.sign();
+  }
+
+  private static String base64Std(byte[] data) {
+    return Base64.getEncoder().encodeToString(data);
+  }
+
+  private static byte[] deterministicBytes(int n) {
+    byte[] out = new byte[n];
+    for (int i = 0; i < n; i++) out[i] = (byte) (i * 7 + 3);
+    return out;
+  }
+
+  // Mirrors the reference base58 encode used by the Go/TS vector drivers so the produced PKA is the
+  // multibase form the production multibaseDecode/Base58.decode expects.
+  private static String base58Encode(byte[] data) {
+    final String alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+    int zeros = 0;
+    while (zeros < data.length && data[zeros] == 0) zeros++;
+    int size = data.length * 138 / 100 + 1;
+    byte[] b = new byte[size];
+    for (byte value : data) {
+      int carry = value & 0xff;
+      for (int j = size - 1; j >= 0; j--) {
+        carry += 256 * (b[j] & 0xff);
+        b[j] = (byte) (carry % 58);
+        carry /= 58;
+      }
     }
-    if (!Objects.equals(kid, p.expectedKid)) {
-      throw new ValidationException("kid mismatch expected=" + p.expectedKid + " got=" + kid);
-    }
-  }
-
-  private static String sign(String headerJson, byte[] payload, String alg, PrivateKey priv) throws Exception {
-    String h = Base64.getUrlEncoder().withoutPadding().encodeToString(headerJson.getBytes());
-    String p = Base64.getUrlEncoder().withoutPadding().encodeToString(payload);
-    byte[] input = (h + "." + p).getBytes();
-    Signature s = "ed25519".equals(alg) ? Signature.getInstance("Ed25519")
-        : "rsa".equals(alg) ? Signature.getInstance("SHA256withRSA")
-        : null;
-    if (s == null) throw new IllegalArgumentException("unsupported alg: " + alg);
-    s.initSign(priv);
-    s.update(input);
-    String sig = Base64.getUrlEncoder().withoutPadding().encodeToString(s.sign());
-    return h + "." + p + "." + sig;
-  }
-
-  private static boolean verify(String jws, KeyRing ring) throws Exception {
-    String[] parts = jws.split("\\.");
-    if (parts.length != 3) return false;
-    String headerJson = new String(Base64.getUrlDecoder().decode(parts[0]));
-    Map<?, ?> h = MAPPER.readValue(headerJson, Map.class);
-    String alg = Objects.toString(h.get("alg"), null);
-    String kid = Objects.toString(h.get("kid"), null);
-
-    KeyRing.Entry e = ring.getByKid(kid);
-    if (e == null || !Objects.equals(alg, e.alg)) return false;
-
-    byte[] input = (parts[0] + "." + parts[1]).getBytes();
-    byte[] sig = Base64.getUrlDecoder().decode(parts[2]);
-
-    Signature v = "ed25519".equals(alg) ? Signature.getInstance("Ed25519")
-        : "rsa".equals(alg) ? Signature.getInstance("SHA256withRSA")
-        : null;
-    if (v == null) return false;
-    v.initVerify(e.kp.getPublic());
-    v.update(input);
-    return v.verify(sig);
-  }
-
-  static class ValidationException extends Exception {
-    ValidationException(String m) { super(m); }
+    int it = 0;
+    while (it < size && b[it] == 0) it++;
+    StringBuilder out = new StringBuilder();
+    out.append("1".repeat(zeros));
+    for (; it < size; it++) out.append(alphabet.charAt(b[it] & 0xff));
+    return out.toString();
   }
 }
-

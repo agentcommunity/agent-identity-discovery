@@ -51,6 +51,12 @@ class AidError(ValueError):
 # ---------------------------------------------------------------------------
 
 
+# NOTE: ``domain_bound`` is not a spec field carried in the TXT record. It is a
+# runtime-only flag injected by ``discover()`` after the PKA handshake to report
+# whether endpoint control was cryptographically bound to the queried domain
+# (parity with Go ``DiscoveryResult.DomainBound`` / TS). It is declared here so
+# the key is typed rather than off-schema; ``parse()``/``validate_record()`` never
+# set it, so records produced purely from parsing do not carry it.
 class AidRecord(TypedDict, total=False):
     v: str
     uri: str
@@ -61,6 +67,7 @@ class AidRecord(TypedDict, total=False):
     dep: str
     pka: str
     kid: str
+    domain_bound: bool
 
 
 class AidRecordV1(TypedDict, total=False):
@@ -73,6 +80,7 @@ class AidRecordV1(TypedDict, total=False):
     dep: str
     pka: str
     kid: str
+    domain_bound: bool
 
 
 class AidRecordV2(TypedDict, total=False):
@@ -84,6 +92,7 @@ class AidRecordV2(TypedDict, total=False):
     docs: str
     dep: str
     pka: str
+    domain_bound: bool
 
 
 RawAidRecord = Dict[str, str]

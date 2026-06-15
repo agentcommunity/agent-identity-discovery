@@ -2,7 +2,7 @@
 
 > Official Go implementation of the [Agent Identity & Discovery (AID)](https://github.com/agentcommunity/agent-identity-discovery) specification.
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/agentcommunity/agent-identity-discovery/aid-go.svg)](https://pkg.go.dev/github.com/agentcommunity/agent-identity-discovery/aid-go)
+[![Go Reference](https://pkg.go.dev/badge/github.com/agentcommunity/aid-go.svg)](https://pkg.go.dev/github.com/agentcommunity/aid-go)
 [![Go 1.23+](https://img.shields.io/badge/go-1.23+-blue.svg)](https://golang.org/dl/)
 
 AID enables you to discover AI agents by domain name using DNS TXT records. Type a domain, get the agent's endpoint and protocol - that's it.
@@ -10,7 +10,7 @@ AID enables you to discover AI agents by domain name using DNS TXT records. Type
 ## Installation
 
 ```bash
-go get -u github.com/agentcommunity/agent-identity-discovery/aid-go
+go get -u github.com/agentcommunity/aid-go
 ```
 
 ## Quick Start
@@ -23,7 +23,7 @@ import (
     "log"
     "time"
 
-    "github.com/agentcommunity/agent-identity-discovery/aid-go"
+    "github.com/agentcommunity/aid-go"
 )
 
 func main() {
@@ -57,20 +57,44 @@ Discovers an agent by looking up the `_agent` TXT record for the exact host you 
 - `uint32`: DNS TTL in seconds (0 if unavailable)
 - `error`: Error if discovery fails
 
-### `func DiscoverWithOptions(domain string, timeout time.Duration, opts DiscoveryOptions) (AidRecord, uint32, error)`
+### `func DiscoverWithOptions(domain string, timeout time.Duration, opts DiscoveryOptions) (DiscoveryResult, error)`
 
-Enhanced discovery with protocol-specific DNS lookup and `.well-known` controls, still scoped to the exact host you passed in.
+Enhanced discovery with protocol-specific DNS lookup and `.well-known` controls, still scoped to the exact host you passed in. Returns a single `DiscoveryResult` struct plus an error.
 
 ```go
-rec, ttl, err := aid.DiscoverWithOptions(
+res, err := aid.DiscoverWithOptions(
     "example.com",
     5*time.Second,
     aid.DiscoveryOptions{
         Protocol:          "mcp",      // queries exact-host base first; protocol-specific probing is diagnostic/base-failure-only where configured
         WellKnownFallback: true,        // only on ERR_NO_RECORD / ERR_DNS_LOOKUP_FAILED
-        WellKnownTimeout:  2*time.Second,
+        WellKnownTimeout:  2 * time.Second,
     },
 )
+if err != nil {
+    log.Fatalf("Discovery failed: %v", err)
+}
+
+fmt.Printf("Protocol: %s\n", res.Record.Proto)
+fmt.Printf("TTL: %d seconds\n", res.TTL)
+fmt.Printf("Domain-bound PKA proof: %t\n", res.DomainBound)
+```
+
+**Returns:**
+
+- `DiscoveryResult`: Struct with the resolved record and metadata (see below)
+- `error`: Error if discovery fails
+
+### `type DiscoveryResult`
+
+Carries the resolved record, its TTL, and whether the PKA handshake produced a domain-bound proof for the queried domain:
+
+```go
+type DiscoveryResult struct {
+    Record      AidRecord // Parsed and validated record
+    TTL         uint32    // DNS TTL in seconds (0 if unavailable)
+    DomainBound bool      // true when the PKA handshake proved control of the queried domain
+}
 ```
 
 ### `func Parse(txt string) (AidRecord, error)`
@@ -112,6 +136,10 @@ type AidRecord struct {
     Proto string `json:"proto"`           // Protocol identifier
     Auth  string `json:"auth,omitempty"`  // Authentication method (optional)
     Desc  string `json:"desc,omitempty"`  // Human-readable description (optional)
+    Docs  string `json:"docs,omitempty"`  // Absolute https:// documentation URL (optional)
+    Dep   string `json:"dep,omitempty"`   // ISO 8601 UTC deprecation timestamp (optional)
+    Pka   string `json:"pka,omitempty"`   // Public Key for Attestation (optional)
+    Kid   string `json:"kid,omitempty"`   // Key ID for legacy aid1 PKA; not used by aid2 (optional)
 }
 ```
 
@@ -157,7 +185,7 @@ import (
     "fmt"
     "time"
 
-    "github.com/agentcommunity/agent-identity-discovery/aid-go"
+    "github.com/agentcommunity/aid-go"
 )
 
 func main() {
@@ -192,7 +220,7 @@ import (
     "fmt"
     "log"
 
-    "github.com/agentcommunity/agent-identity-discovery/aid-go"
+    "github.com/agentcommunity/aid-go"
 )
 
 func main() {
@@ -216,7 +244,7 @@ package main
 import (
     "fmt"
 
-    "github.com/agentcommunity/agent-identity-discovery/aid-go"
+    "github.com/agentcommunity/aid-go"
 )
 
 func main() {
@@ -248,7 +276,7 @@ import (
     "fmt"
     "time"
 
-    "github.com/agentcommunity/agent-identity-discovery/aid-go"
+    "github.com/agentcommunity/aid-go"
 )
 
 func main() {

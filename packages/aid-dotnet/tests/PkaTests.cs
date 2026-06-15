@@ -248,6 +248,102 @@ public class PkaTests
     }
 
     [Fact]
+    public async Task V2DbRejectsAidDomainCoverageWhenNoDomainSent()
+    {
+        // Fail-closed: the response covers aid-domain (re-signed domain-bound proof) but the client
+        // never committed to a domain via AID-Domain. Under the single-tag model this is meaningless
+        // and MUST be rejected (Handshake.cs PerformV2HandshakeAsync fail-closed rule).
+        var vector = V2Vector("v2-db-rfc9421-domain-bound");
+        var nonce = Base64UrlDecode(vector.GetProperty("nonce").GetString()!);
+        var oldFill = Pka.FillRandomBytesForTesting;
+        var oldNow = Pka.NowUnixForTesting;
+        var oldSend = Pka.SendAsyncForTesting;
+        Pka.FillRandomBytesForTesting = bytes => Array.Copy(nonce, bytes, bytes.Length);
+        Pka.NowUnixForTesting = () => vector.GetProperty("created").GetInt64();
+        Pka.SendAsyncForTesting = (request, _) =>
+        {
+            // No domain was passed to the handshake, so no AID-Domain header must be sent.
+            Assert.False(request.Headers.Contains("AID-Domain"), "AID-Domain header must not be sent when no domain is provided");
+
+            var responseVector = vector.GetProperty("response");
+            var response = new HttpResponseMessage((HttpStatusCode)responseVector.GetProperty("status").GetInt32());
+            response.Headers.TryAddWithoutValidation("Cache-Control", responseVector.GetProperty("cache_control").GetString());
+            response.Headers.TryAddWithoutValidation("Signature-Input", responseVector.GetProperty("signature_input").GetString());
+            response.Headers.TryAddWithoutValidation("Signature", responseVector.GetProperty("signature").GetString());
+            return Task.FromResult(response);
+        };
+        try
+        {
+            var record = vector.GetProperty("record");
+            // Note: no domain argument -> client sends no AID-Domain.
+            var ex = await Assert.ThrowsAsync<AidError>(() =>
+                Pka.PerformHandshakeAsync(record.GetProperty("u").GetString()!, record.GetProperty("k").GetString()!, string.Empty, TimeSpan.FromSeconds(1))
+            );
+            Assert.Equal(nameof(Constants.ERR_SECURITY), ex.ErrorCode);
+            Assert.Contains("Response covers aid-domain but no AID-Domain was sent", ex.Message);
+        }
+        finally
+        {
+            Pka.FillRandomBytesForTesting = oldFill;
+            Pka.NowUnixForTesting = oldNow;
+            Pka.SendAsyncForTesting = oldSend;
+        }
+    }
+
+    [Fact]
+    public async Task V2DbPlainResponseToDomainBoundRequestReportsDomainBoundFalse()
+    {
+        // The client sends a domain (requesting a domain-bound proof) but the server replies with the
+        // plain 4-component v2 response (no aid-domain coverage). The handshake must still succeed and
+        // report domainBound=false so callers can decide whether the weaker proof is acceptable.
+        var vector = V2Vector("v2-rfc9421-response-signature");
+        var nonce = Base64UrlDecode(vector.GetProperty("nonce").GetString()!);
+        var oldFill = Pka.FillRandomBytesForTesting;
+        var oldNow = Pka.NowUnixForTesting;
+        var oldSend = Pka.SendAsyncForTesting;
+        Pka.FillRandomBytesForTesting = bytes => Array.Copy(nonce, bytes, bytes.Length);
+        Pka.NowUnixForTesting = () => vector.GetProperty("created").GetInt64();
+        Pka.SendAsyncForTesting = (request, _) =>
+        {
+            // The client committed to a domain, so AID-Domain must be sent even though the server
+            // chooses to answer with a plain (unbound) proof.
+            Assert.True(request.Headers.Contains("AID-Domain"), "Expected AID-Domain header when a domain is provided");
+            Assert.Equal("example.com", request.Headers.GetValues("AID-Domain").Single());
+
+            var responseVector = vector.GetProperty("response");
+            var response = new HttpResponseMessage((HttpStatusCode)responseVector.GetProperty("status").GetInt32());
+            response.Headers.TryAddWithoutValidation("Cache-Control", responseVector.GetProperty("cache_control").GetString());
+            response.Headers.TryAddWithoutValidation("Signature-Input", responseVector.GetProperty("signature_input").GetString());
+            response.Headers.TryAddWithoutValidation("Signature", responseVector.GetProperty("signature").GetString());
+            return Task.FromResult(response);
+        };
+        try
+        {
+            var record = vector.GetProperty("record");
+            var domainBound = await Pka.PerformHandshakeAsync(record.GetProperty("u").GetString()!, record.GetProperty("k").GetString()!, string.Empty, TimeSpan.FromSeconds(1), domain: "example.com");
+            Assert.False(domainBound, "Expected DomainBound=false for a plain (unbound) v2 response");
+        }
+        finally
+        {
+            Pka.FillRandomBytesForTesting = oldFill;
+            Pka.NowUnixForTesting = oldNow;
+            Pka.SendAsyncForTesting = oldSend;
+        }
+    }
+
+    [Theory]
+    [InlineData("bad domain")]
+    [InlineData("")]
+    public void CanonicalizeAidDomainRejectsInvalidValues(string value)
+    {
+        // CanonicalizeAidDomain must reject empty or charset-invalid domains with ERR_SECURITY before
+        // they ever reach the signature base (Handshake.cs CanonicalizeAidDomain throw).
+        var ex = Assert.Throws<AidError>(() => Pka.CanonicalizeAidDomain(value));
+        Assert.Equal(nameof(Constants.ERR_SECURITY), ex.ErrorCode);
+        Assert.Contains("Invalid AID-Domain value", ex.Message);
+    }
+
+    [Fact]
     public async Task WellKnownFallbackSendsAidDomainAndSurfacesDomainBound()
     {
         var vector = V2Vector("v2-db-rfc9421-domain-bound");

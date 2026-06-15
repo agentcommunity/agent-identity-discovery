@@ -1306,4 +1306,293 @@ mod tests {
         .expect("controlled v1 handshake should verify");
         handshake.assert_hits(1);
     }
+
+    // ---- v2 handshake end-to-end (mock-server) helpers ----
+
+    const V2_TEST_NONCE: &str = "oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8";
+
+    /// A signing key plus its v2 `k` (base64url-no-pad public key / JWK `x`).
+    fn v2_test_key() -> (SigningKey, String) {
+        let seed = [7u8; 32];
+        let sk = SigningKey::from_bytes(&seed);
+        let vk = VerifyingKey::from(&sk);
+        let k = B64URL.encode(vk.as_bytes());
+        (sk, k)
+    }
+
+    /// Build the `Signature-Input`/`Signature` header pair for a v2 response, signing the
+    /// canonical base the verifier reconstructs. `domain` is `Some` for a domain-bound proof.
+    /// The covered set mirrors `build_accept_signature_v2`/`build_v2_signature_base`.
+    fn sign_v2_response(
+        sk: &SigningKey,
+        keyid: &str,
+        target_uri: &str,
+        authority: &str,
+        status: u16,
+        created: i64,
+        expires: i64,
+        nonce: &str,
+        domain: Option<&str>,
+    ) -> (String, String) {
+        let covered = if domain.is_some() {
+            "(\"@method\";req \"@target-uri\";req \"@authority\";req \"aid-domain\";req \"@status\")"
+        } else {
+            "(\"@method\";req \"@target-uri\";req \"@authority\";req \"@status\")"
+        };
+        let signature_params_raw = format!(
+            "{};created={};expires={};keyid=\"{}\";alg=\"ed25519\";nonce=\"{}\";tag=\"aid-pka-v2\"",
+            covered, created, expires, keyid, nonce
+        );
+        let mut lines = vec![
+            "\"@method\";req: GET".to_string(),
+            format!("\"@target-uri\";req: {}", target_uri),
+            format!("\"@authority\";req: {}", authority),
+        ];
+        if let Some(d) = domain {
+            lines.push(format!("\"aid-domain\";req: {}", d));
+        }
+        lines.push(format!("\"@status\": {}", status));
+        lines.push(format!("\"@signature-params\": {}", signature_params_raw));
+        let base = lines.join("\n").into_bytes();
+        let signature = sk.sign(&base);
+        let sig_input = format!("aid-pka={}", signature_params_raw);
+        let sig_header = format!("aid-pka=:{}:", B64.encode(signature.to_bytes()));
+        (sig_input, sig_header)
+    }
+
+    fn v2_test_controls(now: i64) -> HandshakeControls {
+        HandshakeControls {
+            v2_nonce: Some(V2_TEST_NONCE.to_string()),
+            now_epoch_seconds: Some(now),
+            ..HandshakeControls::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn v2_handshake_happy_path_domain_bound_sends_aid_domain_header() {
+        let server = MockServer::start();
+        let (sk, k) = v2_test_key();
+        let (_pk, keyid) = derive_v2_key_material(&k).expect("derive v2 key material");
+        let now: i64 = 1_767_139_230;
+        let created = now;
+        let expires = now + 60;
+        let target_uri = server.url("/mcp");
+        let authority = server.address().to_string();
+        let domain = "example.com";
+        let (sig_input, sig_header) =
+            sign_v2_response(&sk, &keyid, &target_uri, &authority, 401, created, expires, V2_TEST_NONCE, Some(domain));
+
+        let handshake = server.mock(|when, then| {
+            when.method("GET").path("/mcp").header("AID-Domain", domain);
+            then.status(401)
+                .header("Cache-Control", "no-store")
+                .header("Signature-Input", sig_input)
+                .header("Signature", sig_header);
+        });
+
+        let bound = perform_v2_pka_handshake_with_controls(
+            &server.url("/mcp"),
+            &k,
+            Duration::from_secs(2),
+            &v2_test_controls(now),
+            Some(domain),
+        )
+        .await
+        .expect("domain-bound v2 handshake should verify");
+        assert!(bound, "domain-bound handshake returns Ok(true)");
+        // The mock only matches when the AID-Domain request header is present, so a hit
+        // proves the client sent it.
+        handshake.assert_hits(1);
+    }
+
+    #[tokio::test]
+    async fn v2_handshake_fails_closed_when_response_covers_aid_domain_but_client_sent_none() {
+        let server = MockServer::start();
+        let (sk, k) = v2_test_key();
+        let (_pk, keyid) = derive_v2_key_material(&k).expect("derive v2 key material");
+        let now: i64 = 1_767_139_230;
+        let created = now;
+        let expires = now + 60;
+        let target_uri = server.url("/mcp");
+        let authority = server.address().to_string();
+        // Server signs a domain-covering proof, but the client (below) sends no domain.
+        let (sig_input, sig_header) =
+            sign_v2_response(&sk, &keyid, &target_uri, &authority, 401, created, expires, V2_TEST_NONCE, Some("example.com"));
+
+        let _handshake = server.mock(|when, then| {
+            when.method("GET").path("/mcp");
+            then.status(401)
+                .header("Cache-Control", "no-store")
+                .header("Signature-Input", sig_input)
+                .header("Signature", sig_header);
+        });
+
+        let err = perform_v2_pka_handshake_with_controls(
+            &server.url("/mcp"),
+            &k,
+            Duration::from_secs(2),
+            &v2_test_controls(now),
+            None,
+        )
+        .await
+        .expect_err("response covering aid-domain with no AID-Domain sent must be rejected");
+        assert_eq!(err.error_code, "ERR_SECURITY");
+        assert_eq!(err.message, "Response covers aid-domain but no AID-Domain was sent");
+    }
+
+    #[tokio::test]
+    async fn v2_handshake_rejects_missing_cache_control_no_store() {
+        let server = MockServer::start();
+        let (sk, k) = v2_test_key();
+        let (_pk, keyid) = derive_v2_key_material(&k).expect("derive v2 key material");
+        let now: i64 = 1_767_139_230;
+        let target_uri = server.url("/mcp");
+        let authority = server.address().to_string();
+        let (sig_input, sig_header) =
+            sign_v2_response(&sk, &keyid, &target_uri, &authority, 401, now, now + 60, V2_TEST_NONCE, None);
+
+        let _handshake = server.mock(|when, then| {
+            when.method("GET").path("/mcp");
+            then.status(401)
+                .header("Signature-Input", sig_input)
+                .header("Signature", sig_header);
+        });
+
+        let err = perform_v2_pka_handshake_with_controls(
+            &server.url("/mcp"),
+            &k,
+            Duration::from_secs(2),
+            &v2_test_controls(now),
+            None,
+        )
+        .await
+        .expect_err("missing Cache-Control: no-store must be rejected");
+        assert_eq!(err.error_code, "ERR_SECURITY");
+        assert!(err.message.contains("no-store"));
+    }
+
+    #[tokio::test]
+    async fn v2_handshake_rejects_nonce_mismatch() {
+        let server = MockServer::start();
+        let (sk, k) = v2_test_key();
+        let (_pk, keyid) = derive_v2_key_material(&k).expect("derive v2 key material");
+        let now: i64 = 1_767_139_230;
+        let target_uri = server.url("/mcp");
+        let authority = server.address().to_string();
+        // Sign with a different nonce than the controlled one the client sends.
+        let other_nonce = "ZGlmZmVyZW50LW5vbmNlLXZhbHVlLWZvci10ZXN0aW5n";
+        let (sig_input, sig_header) =
+            sign_v2_response(&sk, &keyid, &target_uri, &authority, 401, now, now + 60, other_nonce, None);
+
+        let _handshake = server.mock(|when, then| {
+            when.method("GET").path("/mcp");
+            then.status(401)
+                .header("Cache-Control", "no-store")
+                .header("Signature-Input", sig_input)
+                .header("Signature", sig_header);
+        });
+
+        let err = perform_v2_pka_handshake_with_controls(
+            &server.url("/mcp"),
+            &k,
+            Duration::from_secs(2),
+            &v2_test_controls(now),
+            None,
+        )
+        .await
+        .expect_err("nonce mismatch must be rejected");
+        assert_eq!(err.error_code, "ERR_SECURITY");
+        assert!(err.message.contains("nonce"));
+    }
+
+    #[tokio::test]
+    async fn v2_handshake_rejects_tag_mismatch() {
+        let server = MockServer::start();
+        let (sk, k) = v2_test_key();
+        let (_pk, keyid) = derive_v2_key_material(&k).expect("derive v2 key material");
+        let now: i64 = 1_767_139_230;
+        let target_uri = server.url("/mcp");
+        let authority = server.address().to_string();
+        let (sig_input, sig_header) =
+            sign_v2_response(&sk, &keyid, &target_uri, &authority, 401, now, now + 60, V2_TEST_NONCE, None);
+        // Corrupt only the tag value; signature still covers the (wrong) params via the
+        // signed @signature-params line, so this exercises the tag check specifically.
+        let tampered_input = sig_input.replace("tag=\"aid-pka-v2\"", "tag=\"aid-pka-v1\"");
+
+        let _handshake = server.mock(|when, then| {
+            when.method("GET").path("/mcp");
+            then.status(401)
+                .header("Cache-Control", "no-store")
+                .header("Signature-Input", tampered_input)
+                .header("Signature", sig_header);
+        });
+
+        let err = perform_v2_pka_handshake_with_controls(
+            &server.url("/mcp"),
+            &k,
+            Duration::from_secs(2),
+            &v2_test_controls(now),
+            None,
+        )
+        .await
+        .expect_err("tag mismatch must be rejected");
+        assert_eq!(err.error_code, "ERR_SECURITY");
+        assert!(err.message.contains("tag"));
+    }
+
+    #[tokio::test]
+    async fn v2_handshake_rejects_keyid_mismatch() {
+        let server = MockServer::start();
+        let (sk, k) = v2_test_key();
+        let now: i64 = 1_767_139_230;
+        let target_uri = server.url("/mcp");
+        let authority = server.address().to_string();
+        // Sign with a keyid that does not match the thumbprint derived from `k`.
+        let (sig_input, sig_header) =
+            sign_v2_response(&sk, "not-the-real-thumbprint", &target_uri, &authority, 401, now, now + 60, V2_TEST_NONCE, None);
+
+        let _handshake = server.mock(|when, then| {
+            when.method("GET").path("/mcp");
+            then.status(401)
+                .header("Cache-Control", "no-store")
+                .header("Signature-Input", sig_input)
+                .header("Signature", sig_header);
+        });
+
+        let err = perform_v2_pka_handshake_with_controls(
+            &server.url("/mcp"),
+            &k,
+            Duration::from_secs(2),
+            &v2_test_controls(now),
+            None,
+        )
+        .await
+        .expect_err("keyid mismatch must be rejected");
+        assert_eq!(err.error_code, "ERR_SECURITY");
+        assert!(err.message.contains("keyid"));
+    }
+
+    #[tokio::test]
+    async fn v2_handshake_rejects_redirect() {
+        let server = MockServer::start();
+        let (_sk, k) = v2_test_key();
+        let now: i64 = 1_767_139_230;
+
+        let _redirect = server.mock(|when, then| {
+            when.method("GET").path("/mcp");
+            then.status(302).header("Location", "https://evil.example.com/mcp");
+        });
+
+        let err = perform_v2_pka_handshake_with_controls(
+            &server.url("/mcp"),
+            &k,
+            Duration::from_secs(2),
+            &v2_test_controls(now),
+            Some("example.com"),
+        )
+        .await
+        .expect_err("redirect responses must be rejected");
+        assert_eq!(err.error_code, "ERR_SECURITY");
+        assert!(err.message.contains("redirect"));
+    }
 }

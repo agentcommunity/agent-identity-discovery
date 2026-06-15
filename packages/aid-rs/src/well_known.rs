@@ -1,8 +1,7 @@
-#![cfg(feature = "handshake")]
-
 use crate::errors::AidError;
 use crate::parser::parse;
 use crate::record::AidRecord;
+#[cfg(feature = "handshake")]
 use crate::constants_gen::SPEC_VERSION_V1;
 use reqwest::redirect::Policy;
 use reqwest::Client;
@@ -78,7 +77,9 @@ pub async fn fetch_well_known(domain: &str, timeout: Duration) -> Result<AidReco
     })?;
     let txt = canonicalize_to_txt(obj);
     let rec = parse(&txt)?;
-    // Perform PKA handshake when present
+    // Perform PKA handshake when present (only when the handshake feature is enabled;
+    // the well-known fetch itself works under default features, matching Go/Python).
+    #[cfg(feature = "handshake")]
     if let Some(pka) = rec.pka.clone() {
         if rec.v == SPEC_VERSION_V1 {
             crate::pka::perform_pka_handshake(&rec.uri, &pka, rec.kid.as_deref().unwrap_or(""), timeout, None).await?;

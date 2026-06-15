@@ -10,7 +10,6 @@ use idna::domain_to_ascii;
 #[cfg(feature = "handshake")]
 use crate::pka::perform_pka_handshake;
 
-#[cfg(feature = "handshake")]
 use crate::well_known::fetch_well_known;
 
 /// Discover an AID record for the given domain using DNS TXT at _agent.<domain>.
@@ -146,12 +145,12 @@ pub async fn discover_with_options(domain: &str, options: DiscoveryOptions) -> R
         }
     }
 
-    // Fallback
+    // Fallback to HTTPS .well-known. The fetch works under default features; the PKA
+    // handshake it performs (if the record carries a key) is only enforced when the
+    // `handshake` feature is enabled. This matches Go/Python, where fallback is
+    // unconditional and not behind a build feature.
     if options.well_known_fallback {
-        #[cfg(feature = "handshake")]
-        {
-            return fetch_well_known(&alabel, options.well_known_timeout).await;
-        }
+        return fetch_well_known(&alabel, options.well_known_timeout).await;
     }
     Err(last_err.unwrap_or_else(|| AidError::new("ERR_DNS_LOOKUP_FAILED", "DNS query failed")))
 }

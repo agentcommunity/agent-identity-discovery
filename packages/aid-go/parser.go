@@ -12,7 +12,7 @@ import (
 const aid2PkaPublicKeySize = 32
 
 // parseRaw splits a TXT record string into key=value map.
-func parseRaw(txt string) map[string]string {
+func parseRaw(txt string) (map[string]string, error) {
 	record := make(map[string]string)
 	pairs := strings.Split(txt, ";")
 	for _, p := range pairs {
@@ -22,13 +22,19 @@ func parseRaw(txt string) map[string]string {
 		}
 		parts := strings.SplitN(p, "=", 2)
 		if len(parts) != 2 {
-			panic("invalid pair") // will be caught by validate
+			return nil, newAidError("ERR_INVALID_TXT", "Invalid key-value pair: "+p)
 		}
 		key := strings.ToLower(strings.TrimSpace(parts[0]))
 		value := strings.TrimSpace(parts[1])
+		if key == "" || value == "" {
+			return nil, newAidError("ERR_INVALID_TXT", "Empty key or value in pair: "+p)
+		}
+		if _, exists := record[key]; exists {
+			return nil, newAidError("ERR_INVALID_TXT", "Duplicate key: "+key)
+		}
 		record[key] = value
 	}
-	return record
+	return record, nil
 }
 
 // ValidateRecord validates raw map returning AidRecord or error.
@@ -253,7 +259,10 @@ func decodeUnpaddedBase64URL(value string) ([]byte, error) {
 
 // Parse parses and validates a TXT record string.
 func Parse(txt string) (AidRecord, error) {
-	raw := parseRaw(txt)
+	raw, err := parseRaw(txt)
+	if err != nil {
+		return AidRecord{}, err
+	}
 	return ValidateRecord(raw)
 }
 

@@ -19,13 +19,19 @@ pip install aid-discovery
 from aid_py import discover, AidError
 
 try:
-    # Discover an agent by domain
-    result = discover("supabase.agentcommunity.org")
+    # discover() returns a (record, ttl) tuple.
+    # record is a dict (TypedDict); access fields by key.
+    record, ttl = discover("supabase.agentcommunity.org")
 
-    print(f"Protocol: {result.record.proto}")  # "mcp"
-    print(f"URI: {result.record.uri}")         # "https://api.supabase.com/mcp"
-    print(f"Description: {result.record.desc}") # "Supabase MCP"
-    print(f"TTL: {result.ttl} seconds")
+    print(f"Protocol: {record['proto']}")          # "mcp"
+    print(f"URI: {record['uri']}")                 # "https://api.supabase.com/mcp"
+    print(f"Description: {record.get('desc')}")    # "Supabase MCP" (optional)
+    print(f"TTL: {ttl} seconds")
+
+    # PKA domain-binding result (True only when an Ed25519 handshake
+    # cryptographically bound endpoint control to the queried domain):
+    if record.get("domain_bound"):
+        print("Endpoint control is bound to this domain")
 
 except AidError as e:
     print(f"Discovery failed: {e}")
@@ -47,7 +53,11 @@ Discovers an agent by looking up the `_agent` TXT record for the exact host you 
 
 **Returns:**
 
-- `DiscoveryResult`: Object containing the parsed record and TTL
+- `(record, ttl)` tuple, where:
+  - `record` (`dict`): the parsed and validated AID record. Access fields by key (e.g. `record["proto"]`, `record["uri"]`). See [Data Types → `AidRecord`](#aidrecord) for the available keys.
+  - `ttl` (`int`): DNS TTL in seconds.
+
+  Unpack it directly: `record, ttl = discover(domain)`.
 
 **Raises:**
 
@@ -63,7 +73,7 @@ Parses and validates a raw TXT record string.
 
 **Returns:**
 
-- `AidRecord`: Parsed and validated record
+- `AidRecord`: Parsed and validated record (a `dict` / `TypedDict`; access fields by key)
 
 **Raises:**
 
@@ -73,20 +83,18 @@ Parses and validates a raw TXT record string.
 
 ### `AidRecord`
 
-Represents a parsed AID record with the following attributes:
+A parsed AID record. At runtime this is a plain `dict` (a `TypedDict`), so access fields by key (`record["proto"]`), not by attribute. Optional fields may be absent — use `record.get("desc")`. Keys:
 
-- `v` (str): Protocol version (defaults to "aid2"; "aid1" is supported for legacy compatibility)
+- `v` (str): Protocol version (`"aid2"`; `"aid1"` is supported for legacy compatibility)
 - `uri` (str): Agent endpoint URI
-- `proto` (str): Protocol identifier (e.g., "mcp", "openapi")
+- `proto` (str): Protocol identifier (e.g., `"mcp"`, `"openapi"`)
 - `auth` (str, optional): Authentication method
 - `desc` (str, optional): Human-readable description
-
-### `DiscoveryResult`
-
-Contains discovery results:
-
-- `record` (AidRecord): The parsed AID record
-- `ttl` (int): DNS TTL in seconds
+- `docs` (str, optional): Absolute `https://` documentation URL
+- `dep` (str, optional): ISO 8601 UTC deprecation timestamp
+- `pka` (str, optional): Public key for attestation (base64url)
+- `kid` (str, optional): Key id (`aid1` only)
+- `domain_bound` (bool, optional): Set by `discover()` after a PKA handshake. `True` when endpoint control was cryptographically bound to the queried domain. Not a TXT-record field — records returned by `parse()` do not include it.
 
 ### `AidError`
 
@@ -114,8 +122,8 @@ Exception raised when discovery or parsing fails:
 from aid_py import discover, AidError
 
 try:
-    result = discover("example.com")
-    # Use result.record...
+    record, ttl = discover("example.com")
+    # Use record["proto"], record["uri"], ...
 except AidError as e:
     if e.code == 1000:  # ERR_NO_RECORD
         print("No agent found for this domain")
@@ -134,7 +142,7 @@ txt_record = "v=aid2;u=https://api.example.com/agent;p=mcp;s=Example Agent"
 
 try:
     record = parse(txt_record)
-    print(f"Parsed: {record.proto} agent at {record.uri}")
+    print(f"Parsed: {record['proto']} agent at {record['uri']}")
 except AidError as e:
     print(f"Invalid record: {e}")
 ```

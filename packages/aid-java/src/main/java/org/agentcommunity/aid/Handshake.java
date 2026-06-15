@@ -348,6 +348,20 @@ public final class Handshake {
     verifyV2ResponseHeaders(uri, pka, expectedNonce, status, singletonHeaderValues(headers), nowEpochSeconds, domain);
   }
 
+  // Returning variant: surfaces the authenticated domainBound signal (derived from the signed
+  // covered set) so callers/tests can assert bound vs unbound at parity with Go/TS.
+  static boolean verifyV2ResponseDomainBound(
+      String uri,
+      String pka,
+      String expectedNonce,
+      int status,
+      Map<String, String> headers,
+      long nowEpochSeconds,
+      String domain) {
+    return verifyV2ResponseHeaders(
+        uri, pka, expectedNonce, status, singletonHeaderValues(headers), nowEpochSeconds, domain);
+  }
+
   private static boolean verifyV2ResponseHeaders(
       String uri,
       String pka,

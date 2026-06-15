@@ -24,7 +24,7 @@ public static class Pka
         });
     }
 
-    private static string CanonicalizeAidDomain(string domain)
+    internal static string CanonicalizeAidDomain(string domain)
     {
         var value = AsciiToLower(domain.Trim());
         // Strip exactly one trailing dot
