@@ -243,6 +243,109 @@ public class PkaTests
         }
     }
 
+    [Fact]
+    public async Task WellKnownFallbackSendsAidDomainAndSurfacesDomainBound()
+    {
+        var vector = V2Vector("v2-db-rfc9421-domain-bound");
+        var nonce = Base64UrlDecode(vector.GetProperty("nonce").GetString()!);
+        var record = vector.GetProperty("record");
+        var recordUri = record.GetProperty("u").GetString()!;
+        var recordPka = record.GetProperty("k").GetString()!;
+        var queriedDomain = vector.GetProperty("domain").GetString()!; // "example.com"
+
+        // Serve the well-known JSON (v2 record) on a loopback HTTP server.
+        var json = $"{{\"v\":\"aid2\",\"u\":\"{recordUri}\",\"p\":\"mcp\",\"k\":\"{recordPka}\"}}";
+        using var server = new WellKnownServer(json);
+
+        var oldFill = Pka.FillRandomBytesForTesting;
+        var oldNow = Pka.NowUnixForTesting;
+        var oldSend = Pka.SendAsyncForTesting;
+        Pka.FillRandomBytesForTesting = bytes => Array.Copy(nonce, bytes, bytes.Length);
+        Pka.NowUnixForTesting = () => vector.GetProperty("created").GetInt64();
+        Pka.SendAsyncForTesting = (request, _) =>
+        {
+            // The well-known fallback must thread the queried domain into the handshake
+            // as the AID-Domain header (requesting a domain-bound proof).
+            Assert.True(request.Headers.Contains("AID-Domain"), "Expected AID-Domain header to be set on well-known fallback handshake");
+            Assert.Equal(queriedDomain, request.Headers.GetValues("AID-Domain").Single());
+            Assert.Equal(recordUri, request.RequestUri!.ToString());
+
+            var responseVector = vector.GetProperty("response");
+            var response = new HttpResponseMessage((HttpStatusCode)responseVector.GetProperty("status").GetInt32());
+            response.Headers.TryAddWithoutValidation("Cache-Control", responseVector.GetProperty("cache_control").GetString());
+            response.Headers.TryAddWithoutValidation("Signature-Input", responseVector.GetProperty("signature_input").GetString());
+            response.Headers.TryAddWithoutValidation("Signature", responseVector.GetProperty("signature").GetString());
+            return Task.FromResult(response);
+        };
+        try
+        {
+            // domain (host for the well-known GET) is the loopback server; queriedDomain is the canonical domain.
+            var (rec, domainBound) = await WellKnown.FetchAsync($"127.0.0.1:{server.Port}", TimeSpan.FromSeconds(3), allowInsecure: true, queriedDomain: queriedDomain);
+            Assert.Equal(recordUri, rec.Uri);
+            Assert.True(domainBound, "Expected DomainBound=true from well-known fallback for aid-pka-v2-db response");
+        }
+        finally
+        {
+            Pka.FillRandomBytesForTesting = oldFill;
+            Pka.NowUnixForTesting = oldNow;
+            Pka.SendAsyncForTesting = oldSend;
+        }
+    }
+
+    private sealed class WellKnownServer : IDisposable
+    {
+        private readonly HttpListener _listener;
+        private readonly CancellationTokenSource _cts = new();
+        private readonly Task _loop;
+        public readonly int Port;
+        private readonly string _json;
+
+        public WellKnownServer(string json)
+        {
+            _json = json;
+            using var l = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
+            l.Start();
+            Port = ((IPEndPoint)l.LocalEndpoint).Port;
+            l.Stop();
+            _listener = new HttpListener();
+            _listener.Prefixes.Add($"http://127.0.0.1:{Port}/");
+            _listener.Start();
+            _loop = Task.Run(LoopAsync);
+        }
+
+        private async Task LoopAsync()
+        {
+            while (!_cts.IsCancellationRequested)
+            {
+                HttpListenerContext ctx;
+                try { ctx = await _listener.GetContextAsync(); }
+                catch { break; }
+                _ = Task.Run(() => HandleAsync(ctx));
+            }
+        }
+
+        private async Task HandleAsync(HttpListenerContext ctx)
+        {
+            if (ctx.Request.Url!.AbsolutePath == "/.well-known/agent")
+            {
+                var bytes = Encoding.UTF8.GetBytes(_json);
+                ctx.Response.StatusCode = 200;
+                ctx.Response.ContentType = "application/json";
+                await ctx.Response.OutputStream.WriteAsync(bytes, 0, bytes.Length);
+                ctx.Response.Close();
+                return;
+            }
+            ctx.Response.StatusCode = 404; ctx.Response.Close();
+        }
+
+        public void Dispose()
+        {
+            _cts.Cancel();
+            _listener.Stop();
+            _listener.Close();
+        }
+    }
+
     // ---- end new tests ----
 
     [Fact]
@@ -268,7 +371,7 @@ public class PkaTests
             try
             {
                 // .well-known fetch triggers handshake
-                var rec = await WellKnown.FetchAsync(domain, TimeSpan.FromSeconds(3), allowInsecure: true);
+                var (rec, _) = await WellKnown.FetchAsync(domain, TimeSpan.FromSeconds(3), allowInsecure: true);
                 if (expect == "fail")
                 {
                     // For a failing vector, ensure handshake fails by calling again with bad kid

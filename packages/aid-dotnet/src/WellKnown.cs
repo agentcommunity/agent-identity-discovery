@@ -32,7 +32,7 @@ public static class WellKnown
         return sb.ToString().TrimEnd(';');
     }
 
-    public static async Task<AidRecord> FetchAsync(string domain, TimeSpan timeout, bool allowInsecure = false)
+    public static async Task<(AidRecord Record, bool DomainBound)> FetchAsync(string domain, TimeSpan timeout, bool allowInsecure = false, string? queriedDomain = null)
     {
         var scheme = allowInsecure ? "http" : "https";
         var url = $"{scheme}://{domain}/.well-known/agent";
@@ -69,10 +69,11 @@ public static class WellKnown
             // Restore http URI in the resulting record
             record = new AidRecord(validated.V, uri!, validated.Proto, validated.Auth, validated.Desc, validated.Docs, validated.Dep, validated.Pka, validated.Kid);
         }
+        bool domainBound = false;
         if (record.Pka is not null)
         {
-            await Pka.PerformHandshakeAsync(record.Uri, record.Pka, record.Kid ?? string.Empty, timeout).ConfigureAwait(false);
+            domainBound = await Pka.PerformHandshakeAsync(record.Uri, record.Pka, record.Kid ?? string.Empty, timeout, domain: queriedDomain).ConfigureAwait(false);
         }
-        return record;
+        return (record, domainBound);
     }
 }

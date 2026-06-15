@@ -146,8 +146,8 @@ public static class Discovery
 
         if (options.WellKnownFallback && last is not null && (last.ErrorCode == nameof(Constants.ERR_NO_RECORD) || last.ErrorCode == nameof(Constants.ERR_DNS_LOOKUP_FAILED)))
         {
-            var rec = await WellKnown.FetchAsync(alabel, options.WellKnownTimeout).ConfigureAwait(false);
-            return new DiscoveryResult { Record = rec, Ttl = Constants.DnsTtlMin, QueryName = $"{Constants.DnsSubdomain}.{alabel}" };
+            var (rec, domainBound) = await WellKnown.FetchAsync(alabel, options.WellKnownTimeout, queriedDomain: alabel).ConfigureAwait(false);
+            return new DiscoveryResult { Record = rec, Ttl = Constants.DnsTtlMin, QueryName = $"{Constants.DnsSubdomain}.{alabel}", DomainBound = domainBound };
         }
         throw last ?? new AidError(nameof(Constants.ERR_DNS_LOOKUP_FAILED), "DNS query failed");
     }
