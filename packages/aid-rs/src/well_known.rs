@@ -81,9 +81,9 @@ pub async fn fetch_well_known(domain: &str, timeout: Duration) -> Result<AidReco
     // Perform PKA handshake when present
     if let Some(pka) = rec.pka.clone() {
         if rec.v == SPEC_VERSION_V1 {
-            crate::pka::perform_pka_handshake(&rec.uri, &pka, rec.kid.as_deref().unwrap_or(""), timeout).await?;
+            crate::pka::perform_pka_handshake(&rec.uri, &pka, rec.kid.as_deref().unwrap_or(""), timeout, None).await?;
         } else {
-            crate::pka::perform_pka_handshake(&rec.uri, &pka, "", timeout).await?;
+            crate::pka::perform_pka_handshake(&rec.uri, &pka, "", timeout, Some(domain)).await?;
         }
     }
     Ok(rec)

@@ -55,7 +55,7 @@ async fn rust_pka_kid_mismatch_fails() {
     });
 
     let url = server.url("/bad");
-    let res = perform_pka_handshake(&url, &pka, kid, Duration::from_secs(2)).await;
+    let res = perform_pka_handshake(&url, &pka, kid, Duration::from_secs(2), None).await;
     assert!(res.is_err());
 }
 
@@ -92,7 +92,7 @@ async fn rust_pka_missing_fields_fails() {
             .header("Signature-Input", params.clone())
             .header("Signature", format!("sig=:{}:", sig_missing_b64));
     });
-    let res = perform_pka_handshake(&server.url("/bad2"), &pka, kid, std::time::Duration::from_secs(2)).await;
+    let res = perform_pka_handshake(&server.url("/bad2"), &pka, kid, std::time::Duration::from_secs(2), None).await;
     assert!(res.is_err());
 }
 
@@ -125,6 +125,6 @@ async fn rust_pka_date_skew_fails() {
             .header("Signature-Input", sig_input_skew.clone())
             .header("Signature", format!("sig=:{}:", sig_skew_b64));
     });
-    let res = perform_pka_handshake(&server.url("/bad3"), &pka, kid, std::time::Duration::from_secs(2)).await;
+    let res = perform_pka_handshake(&server.url("/bad3"), &pka, kid, std::time::Duration::from_secs(2), None).await;
     assert!(res.is_err());
 }

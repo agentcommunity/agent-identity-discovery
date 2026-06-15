@@ -85,6 +85,24 @@ fn ascii_to_lowercase(s: &str) -> String {
         .collect()
 }
 
+/// Canonicalize an AID-Domain value: ASCII-lowercase, strip exactly one trailing dot,
+/// validate charset [a-z0-9.:[\]_-].
+fn canonicalize_aid_domain(domain: &str) -> Result<String, AidError> {
+    let mut value = ascii_to_lowercase(domain.trim());
+    if value.ends_with('.') {
+        value = value[..value.len() - 1].to_string();
+    }
+    if value.is_empty() {
+        return Err(AidError::new("ERR_SECURITY", "Invalid AID-Domain value"));
+    }
+    for c in value.chars() {
+        if !(c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | ':' | '[' | ']' | '_')) {
+            return Err(AidError::new("ERR_SECURITY", "Invalid AID-Domain value"));
+        }
+    }
+    Ok(value)
+}
+
 fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
     if a.len() != b.len() {
         return false;
@@ -544,20 +562,34 @@ fn has_no_store(headers: &HeaderMap) -> bool {
         .unwrap_or(false)
 }
 
-fn build_accept_signature_v2(keyid: &str, nonce: &str) -> String {
-    format!(
-        "aid-pka=(\"@method\";req \"@target-uri\";req \"@authority\";req \"@status\");created;expires;keyid=\"{}\";alg=\"ed25519\";nonce=\"{}\";tag=\"aid-pka-v2\"",
-        keyid, nonce
-    )
+fn build_accept_signature_v2(keyid: &str, nonce: &str, domain_bound: bool) -> String {
+    if domain_bound {
+        format!(
+            "aid-pka=(\"@method\";req \"@target-uri\";req \"@authority\";req \"aid-domain\";req \"@status\");created;expires;keyid=\"{}\";alg=\"ed25519\";nonce=\"{}\";tag=\"aid-pka-v2-db\"",
+            keyid, nonce
+        )
+    } else {
+        format!(
+            "aid-pka=(\"@method\";req \"@target-uri\";req \"@authority\";req \"@status\");created;expires;keyid=\"{}\";alg=\"ed25519\";nonce=\"{}\";tag=\"aid-pka-v2\"",
+            keyid, nonce
+        )
+    }
 }
 
-fn build_v2_signature_base(parsed: &V2ParsedHeaders, target_uri: &str, authority: &str, status: u16) -> Vec<u8> {
+fn build_v2_signature_base(parsed: &V2ParsedHeaders, target_uri: &str, authority: &str, status: u16, domain: Option<&str>) -> Vec<u8> {
     let mut lines = Vec::new();
     for item in &parsed.covered {
         match item.name.as_str() {
             "@method" => lines.push("\"@method\";req: GET".to_string()),
             "@target-uri" => lines.push(format!("\"@target-uri\";req: {}", target_uri)),
             "@authority" => lines.push(format!("\"@authority\";req: {}", authority)),
+            "aid-domain" => {
+                // Fail-closed: if aid-domain is covered but no domain was sent, return empty.
+                match domain {
+                    Some(d) => lines.push(format!("\"aid-domain\";req: {}", d)),
+                    None => return Vec::new(),
+                }
+            }
             "@status" => lines.push(format!("\"@status\": {}", status)),
             _ => {}
         }
@@ -588,8 +620,15 @@ async fn perform_v2_pka_handshake_with_controls(
     pka: &str,
     timeout: Duration,
     controls: &HandshakeControls,
-) -> Result<(), AidError> {
+    domain: Option<&str>,
+) -> Result<bool, AidError> {
     let (pubkey, expected_keyid) = derive_v2_key_material(pka)?;
+    // Canonicalize ONCE and reuse the same value for both the AID-Domain header
+    // and the signature base so header and rebuilt base always match.
+    let canonical_domain: Option<String> = match domain {
+        Some(d) => Some(canonicalize_aid_domain(d)?),
+        None => None,
+    };
     let mut u = reqwest::Url::parse(uri).map_err(|_| AidError::new("ERR_SECURITY", "Invalid URI for handshake"))?;
     u.set_fragment(None);
     let target_uri = u.to_string();
@@ -603,10 +642,14 @@ async fn perform_v2_pka_handshake_with_controls(
         Some(value) => value,
         None => generate_v2_nonce()?,
     };
-    let res = client
+    let mut req = client
         .get(u.clone())
-        .header("Accept-Signature", build_accept_signature_v2(&expected_keyid, &nonce))
-        .header("Cache-Control", "no-store")
+        .header("Accept-Signature", build_accept_signature_v2(&expected_keyid, &nonce, canonical_domain.is_some()))
+        .header("Cache-Control", "no-store");
+    if let Some(ref d) = canonical_domain {
+        req = req.header("AID-Domain", d.as_str());
+    }
+    let res = req
         .send()
         .await
         .map_err(|e| AidError::new("ERR_SECURITY", e.to_string()))?;
@@ -637,20 +680,24 @@ async fn perform_v2_pka_handshake_with_controls(
     if !constant_time_eq(parsed.nonce.as_bytes(), nonce.as_bytes()) {
         return Err(AidError::new("ERR_SECURITY", "Signature nonce mismatch"));
     }
-    if !constant_time_eq(parsed.tag.as_bytes(), b"aid-pka-v2") {
+    let is_domain_bound = constant_time_eq(parsed.tag.as_bytes(), b"aid-pka-v2-db");
+    if !is_domain_bound && !constant_time_eq(parsed.tag.as_bytes(), b"aid-pka-v2") {
         return Err(AidError::new("ERR_SECURITY", "Invalid signature tag"));
     }
-    let base = build_v2_signature_base(&parsed, &target_uri, &authority, status);
+    if is_domain_bound && canonical_domain.is_none() {
+        return Err(AidError::new("ERR_SECURITY", "Unrequested domain-bound signature tag"));
+    }
+    let base = build_v2_signature_base(&parsed, &target_uri, &authority, status, canonical_domain.as_deref());
     let vk = VerifyingKey::from_bytes(pubkey.as_slice().try_into().unwrap())
         .map_err(|_| AidError::new("ERR_SECURITY", "Invalid public key"))?;
     let sig = Signature::from_slice(&parsed.signature).map_err(|_| AidError::new("ERR_SECURITY", "Invalid signature"))?;
     vk.verify(&base, &sig)
         .map_err(|_| AidError::new("ERR_SECURITY", "PKA signature verification failed"))?;
-    Ok(())
+    Ok(is_domain_bound)
 }
 
-pub async fn perform_pka_handshake(uri: &str, pka: &str, kid: &str, timeout: Duration) -> Result<(), AidError> {
-    perform_pka_handshake_with_controls(uri, pka, kid, timeout, &HandshakeControls::default()).await
+pub async fn perform_pka_handshake(uri: &str, pka: &str, kid: &str, timeout: Duration, domain: Option<&str>) -> Result<bool, AidError> {
+    perform_pka_handshake_with_controls(uri, pka, kid, timeout, &HandshakeControls::default(), domain).await
 }
 
 async fn perform_pka_handshake_with_controls(
@@ -659,9 +706,10 @@ async fn perform_pka_handshake_with_controls(
     kid: &str,
     timeout: Duration,
     controls: &HandshakeControls,
-) -> Result<(), AidError> {
+    domain: Option<&str>,
+) -> Result<bool, AidError> {
     if kid.is_empty() {
-        return perform_v2_pka_handshake_with_controls(uri, pka, timeout, controls).await;
+        return perform_v2_pka_handshake_with_controls(uri, pka, timeout, controls, domain).await;
     }
     let u = reqwest::Url::parse(uri).map_err(|_| AidError::new("ERR_SECURITY", "Invalid URI for handshake"))?;
     let host_str = u.host_str().ok_or_else(|| AidError::new("ERR_SECURITY", "Invalid URI for handshake"))?;
@@ -738,7 +786,7 @@ async fn perform_pka_handshake_with_controls(
     let sig = Signature::from_slice(&signature).map_err(|_| AidError::new("ERR_SECURITY", "Invalid signature"))?;
     vk.verify(&base, &sig)
         .map_err(|_| AidError::new("ERR_SECURITY", "PKA signature verification failed"))?;
-    Ok(())
+    Ok(false)
 }
 
 #[cfg(test)]
@@ -839,6 +887,49 @@ mod tests {
     }
 
     #[test]
+    fn verifies_v2_db_domain_bound_vector() {
+        let vector = v2_vector("v2-db-rfc9421-domain-bound");
+        let record = &vector["record"];
+        let key = &vector["key"];
+        let response = &vector["response"];
+        let request = &vector["request"];
+        let domain = vector["domain"].as_str().expect("domain");
+
+        let k = record["k"].as_str().expect("record k");
+        let (public_key, keyid) = derive_v2_key_material(k).expect("derive v2 key material");
+        assert_eq!(keyid, key["jwk_thumbprint"].as_str().expect("thumbprint"));
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "Signature-Input",
+            response["signature_input"].as_str().expect("signature input").parse().unwrap(),
+        );
+        headers.insert("Signature", response["signature"].as_str().expect("signature").parse().unwrap());
+        headers.insert("Cache-Control", response["cache_control"].as_str().expect("cache control").parse().unwrap());
+        assert!(has_no_store(&headers));
+
+        let parsed = parse_v2_signature_headers(&headers).expect("parse v2 db signature headers");
+        assert_eq!(parsed.tag, "aid-pka-v2-db");
+
+        let base = build_v2_signature_base(
+            &parsed,
+            request["target_uri"].as_str().expect("target uri"),
+            request["authority"].as_str().expect("authority"),
+            response["status"].as_u64().expect("status") as u16,
+            Some(domain),
+        );
+        assert_eq!(
+            String::from_utf8(base.clone()).expect("signature base utf8"),
+            vector["signature_base"].as_str().expect("signature base"),
+            "signature base mismatch"
+        );
+
+        let vk = VerifyingKey::from_bytes(public_key.as_slice().try_into().unwrap()).expect("valid public key");
+        let sig = Signature::from_slice(&parsed.signature).expect("valid signature bytes");
+        vk.verify(&base, &sig).expect("domain-bound v2 signature verifies");
+    }
+
+    #[test]
     fn verifies_canonical_v2_rfc9421_vector() {
         let vector = canonical_v2_vector();
         let record = &vector["record"];
@@ -872,6 +963,7 @@ mod tests {
             request["target_uri"].as_str().expect("target uri"),
             request["authority"].as_str().expect("authority"),
             response["status"].as_u64().expect("status") as u16,
+            None,
         );
         assert_eq!(
             String::from_utf8(base.clone()).expect("signature base utf8"),
@@ -1170,6 +1262,7 @@ mod tests {
                 v1_date: Some(date),
                 ..HandshakeControls::default()
             },
+            None,
         )
         .await
         .expect("controlled v1 handshake should verify");

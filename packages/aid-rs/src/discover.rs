@@ -132,9 +132,9 @@ pub async fn discover_with_options(domain: &str, options: DiscoveryOptions) -> R
                     {
                         if let Some(pka) = rec.pka.clone() {
                             if rec.v == SPEC_VERSION_V1 {
-                                perform_pka_handshake(&rec.uri, &pka, rec.kid.as_deref().unwrap_or(""), options.timeout).await?;
+                                perform_pka_handshake(&rec.uri, &pka, rec.kid.as_deref().unwrap_or(""), options.timeout, None).await?;
                             } else {
-                                perform_pka_handshake(&rec.uri, &pka, "", options.timeout).await?;
+                                perform_pka_handshake(&rec.uri, &pka, "", options.timeout, Some(&alabel)).await?;
                             }
                         }
                     }
