@@ -2,6 +2,8 @@ package org.agentcommunity.aid;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -10,8 +12,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 
@@ -28,16 +28,13 @@ public class ParityTest {
     public String errorCode;
   }
 
+  private static final ObjectMapper MAPPER = new ObjectMapper();
+
   @Test
   public void parsesValidExamplesFromGolden() throws IOException {
-    // Load golden.json
-    Path golden = Path.of("test-fixtures/golden.json");
-    if (!Files.exists(golden)) {
-      golden = Path.of("../../test-fixtures/golden.json");
-    }
-    String json = Files.readString(golden, StandardCharsets.UTF_8);
+    JsonNode root = MAPPER.readTree(readGolden());
 
-    List<GoldenRecord> records = parseGolden(json);
+    List<GoldenRecord> records = parseGolden(root);
 
     for (GoldenRecord gr : records) {
       AidRecord r = Parser.parse(gr.raw);
@@ -49,7 +46,7 @@ public class ParityTest {
       }
     }
 
-    for (InvalidRecord ir : parseInvalid(json)) {
+    for (InvalidRecord ir : parseInvalid(root)) {
       AidError err = assertThrows(AidError.class, () -> Parser.parse(ir.raw), ir.name);
       assertEquals(ir.errorCode, err.errorCode, ir.name);
     }
@@ -84,44 +81,42 @@ public class ParityTest {
     assertTrue(err.code >= 1000 && err.code <= 2000);
   }
 
-  // Minimal parser for the known golden.json shape
-  private static List<GoldenRecord> parseGolden(String json) {
+  private static String readGolden() throws IOException {
+    Path golden = Path.of("test-fixtures/golden.json");
+    if (!Files.exists(golden)) {
+      golden = Path.of("../../test-fixtures/golden.json");
+    }
+    return Files.readString(golden, StandardCharsets.UTF_8);
+  }
+
+  // Parse the records[] array with a real JSON parser so every fixture is exercised.
+  // (The previous hand-rolled regex dropped pka-missing-kid and produced a bogus
+  // cross-entry "simple" match, silently skipping real cases.)
+  private static List<GoldenRecord> parseGolden(JsonNode root) {
     List<GoldenRecord> list = new ArrayList<>();
-    // Match each record object inside records: [ { ... }, { ... } ]
-    Pattern recordPattern = Pattern.compile("\\{\\s*\\\"name\\\"\\s*:\\s*\\\"(.*?)\\\"\\s*,\\s*\\\"raw\\\"\\s*:\\s*\\\"(.*?)\\\"\\s*,\\s*\\\"expected\\\"\\s*:\\s*\\{(.*?)\\}\\s*\\}", Pattern.DOTALL);
-    Matcher m = recordPattern.matcher(json);
-    while (m.find()) {
+    for (JsonNode n : root.path("records")) {
       GoldenRecord gr = new GoldenRecord();
-      gr.name = unescape(m.group(1));
-      gr.raw = unescape(m.group(2));
-      String expected = m.group(3);
-      // Extract simple key-value pairs like "v":"aid1","uri":"...","proto":"...","desc":"..."
-      Pattern kv = Pattern.compile("\\\"(v|uri|proto|desc)\\\"\\s*:\\s*\\\"(.*?)\\\"");
-      Matcher km = kv.matcher(expected);
-      while (km.find()) {
-        gr.expected.put(km.group(1), unescape(km.group(2)));
+      gr.name = n.path("name").asText();
+      gr.raw = n.path("raw").asText();
+      JsonNode expected = n.path("expected");
+      for (String key : new String[] {"v", "uri", "proto", "desc"}) {
+        JsonNode v = expected.get(key);
+        if (v != null && !v.isNull()) {
+          gr.expected.put(key, v.asText());
+        }
       }
       list.add(gr);
     }
     return list;
   }
 
-  private static String unescape(String s) {
-    return s.replace("\\\\", "\\").replace("\\\"", "\"");
-  }
-
-  private static List<InvalidRecord> parseInvalid(String json) {
+  private static List<InvalidRecord> parseInvalid(JsonNode root) {
     List<InvalidRecord> list = new ArrayList<>();
-    Pattern invalidPattern =
-        Pattern.compile(
-            "\\{\\s*\\\"name\\\"\\s*:\\s*\\\"(.*?)\\\"\\s*,\\s*\\\"raw\\\"\\s*:\\s*\\\"(.*?)\\\"\\s*,\\s*\\\"errorCode\\\"\\s*:\\s*\\\"(.*?)\\\"\\s*\\}",
-            Pattern.DOTALL);
-    Matcher m = invalidPattern.matcher(json);
-    while (m.find()) {
+    for (JsonNode n : root.path("invalid")) {
       InvalidRecord ir = new InvalidRecord();
-      ir.name = unescape(m.group(1));
-      ir.raw = unescape(m.group(2));
-      ir.errorCode = unescape(m.group(3));
+      ir.name = n.path("name").asText();
+      ir.raw = n.path("raw").asText();
+      ir.errorCode = n.path("errorCode").asText();
       list.add(ir);
     }
     return list;

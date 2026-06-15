@@ -20,6 +20,15 @@ dependencies {
 tasks.test {
   useJUnitPlatform()
   testLogging { events "failed", "skipped", "passed" }
+  // The parity/handshake tests load these shared cross-language fixtures by relative
+  // path (ParityTest -> test-fixtures/golden.json; HandshakeTest/AidV2Test ->
+  // protocol/pka_vectors.json). Declare them as task inputs so Gradle's up-to-date
+  // check re-runs the suite when a fixture changes. Without this, a fixtures-only edit
+  // leaves :aid-java:test UP-TO-DATE and the cross-language parity gate silently no-ops.
+  inputs.files(
+    rootProject.file("test-fixtures/golden.json"),
+    rootProject.file("protocol/pka_vectors.json")
+  ).withPropertyName("sharedFixtures")
   // Wire the applied jacoco plugin into the real test task so coverage is actually produced.
   // Without this, `jacoco` was applied but emitted no report, implying coverage tracking that
   // did not exist. The report (build/reports/jacoco/test/html/index.html and the XML) is now
