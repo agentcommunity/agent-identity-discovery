@@ -1,8 +1,8 @@
 # @agentcommunity/aid-conformance
 
-## 2.0.1
+## 2.1.0
 
-### Patch Changes
+### Minor Changes
 
 - 0717dd4: Update conformance fixtures and runner coverage for the AID v2 PKA domain-binding profile. The suite now exercises the single `aid-pka-v2` tag model, `"aid-domain";req` coverage, and domain-bound result surfacing.
 - Updated dependencies [0717dd4]

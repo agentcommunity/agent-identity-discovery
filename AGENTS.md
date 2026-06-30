@@ -101,10 +101,10 @@ LOCAL_URI_SCHEMES
 RawAidRecord
 ```
 
-### v2.0 notes (Final)
+### v2.1 notes (Final)
 
-- Release baseline: `packages/docs/specification.md` is v2.0.0.
-- Contract baseline: `protocol/constants.yml` schemaVersion is 2.0.0 and specVersion is `aid2`.
+- Release baseline: `packages/docs/specification.md` is v2.1.0.
+- Contract baseline: `protocol/constants.yml` schemaVersion is 2.1.0 and specVersion is `aid2`.
 - New records default to `v=aid2`; clients retain `aid1` compatibility during the migration window.
 - Current keys: `docs` (`d`), `dep` (`e`), and `pka` (`k`). `kid` (`i`) is legacy `aid1` only.
 - Aliases: clients must accept single-letter keys for all fields.

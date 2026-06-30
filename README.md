@@ -33,7 +33,7 @@ It uses a single DNS `TXT` record to make any agent service—whether it speaks 
 
 **Built by the team at [agentcommunity.org](https://agentcommunity.org)**
 
-### v2.0 Release Status
+### v2.1 Release Status
 
 AID v2 is the current normative protocol surface in `packages/docs/specification.md`. `packages/docs/specification_v2_explained.md` remains as non-normative design history.
 
@@ -45,7 +45,7 @@ AID v2 is the current normative protocol surface in `packages/docs/specification
 - **Domain binding:** for `aid2` PKA, clients send the queried host in the `AID-Domain` header by default and report a `domainBound` indicator (`true` only for a verified domain-bound proof — one whose `aid-pka-v2` covered set includes `"aid-domain";req`). Requesting binding does not by itself mitigate unauthorized association — only `domain-binding=require` enforces it. See specification Appendix B.7.
 - **No v1 defaults in v2:** no signed HTTP `Date`, no `AID-Challenge`, no base58 `z...` key, and no DNS `kid`/`i`.
 
-### v2.0 Highlights
+### v2.1 Highlights
 
 - ✅ **DNS-first discovery** with canonical base lookup at `_agent.<domain>`
 - ✅ **Well-known fallback** (HTTPS-only, JSON, ≤64KB, ~2s timeout, no redirects; TTL=300 on success)
