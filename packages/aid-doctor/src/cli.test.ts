@@ -199,17 +199,29 @@ describe('AID Doctor CLI', () => {
       expect(processExitSpy).toHaveBeenCalledWith(0);
     });
 
-    it('defaults domainBindingPolicy to prefer for the check command', async () => {
+    it('leaves domainBindingPolicy unset by default so security-mode strict can require it', async () => {
       const runCheck = vi.fn().mockResolvedValue(makeReport());
       const { createCliProgram } = await importCliWithMocks(runCheck);
       const program = createCliProgram();
 
       await program.parseAsync(['check', 'example.com'], { from: 'user' });
 
-      expect(runCheck).toHaveBeenCalledWith(
-        'example.com',
-        expect.objectContaining({ domainBindingPolicy: 'prefer' }),
-      );
+      const opts = runCheck.mock.calls[0]?.[1];
+      expect(opts).not.toHaveProperty('domainBindingPolicy');
+    });
+
+    it('does not weaken --security-mode strict with an implicit domain-binding prefer', async () => {
+      const runCheck = vi.fn().mockResolvedValue(makeReport());
+      const { createCliProgram } = await importCliWithMocks(runCheck);
+      const program = createCliProgram();
+
+      await program.parseAsync(['check', 'example.com', '--security-mode', 'strict'], {
+        from: 'user',
+      });
+
+      const opts = runCheck.mock.calls[0]?.[1];
+      expect(opts).toMatchObject({ securityMode: 'strict' });
+      expect(opts).not.toHaveProperty('domainBindingPolicy');
     });
 
     it('maps --domain-binding to domainBindingPolicy for the json command', async () => {
@@ -704,6 +716,7 @@ describe('AID Doctor CLI', () => {
         pka: { ...makeReport().pka, present: true, verified: true, domainBound: false },
       });
       expect(out).toContain('Enable domain binding');
+      expect(out).toContain('attests that it serves the queried domain');
     });
 
     it('does not show binding label or domain-binding suggestion for verified aid1 record with domainBound=false', () => {

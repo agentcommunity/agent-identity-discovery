@@ -36,10 +36,13 @@ const LANGUAGES: Lang[] = [
   {
     id: 'go',
     label: 'Go',
-    cmd: 'go get github.com/agentcommunity/aid-go',
-    shell: true,
+    cmd: 'import "github.com/agentcommunity/aid-go"',
+    shell: false,
     docsHref: '/docs/quickstart/quickstart_go',
-    ext: { label: 'pkg.go.dev', href: 'https://pkg.go.dev/github.com/agentcommunity/aid-go' },
+    ext: {
+      label: 'source',
+      href: 'https://github.com/agentcommunity/agent-identity-discovery/tree/main/packages/aid-go',
+    },
   },
   {
     id: 'rust',

@@ -301,6 +301,23 @@ describe('runCheck domain-binding policy', () => {
     expect(report.cacheEntry).toBeNull();
   });
 
+  it('strict security mode requires domain-binding when no explicit policy overrides it', async () => {
+    mockedPerformPKAHandshake.mockResolvedValueOnce({ domainBound: false });
+    nextDiscovery = aid2Discovery();
+
+    const report = await runCheck('example.com', {
+      timeoutMs: 1,
+      allowFallback: true,
+      wellKnownTimeoutMs: 1,
+      checkDowngrade: true,
+      securityMode: 'strict',
+    });
+
+    expect(report.pka.verified).toBe(false);
+    expect(report.exitCode).not.toBe(0);
+    expect(report.cacheEntry).toBeNull();
+  });
+
   it('require domain-binding does NOT fail on a bound v2 proof', async () => {
     mockedPerformPKAHandshake.mockResolvedValueOnce({ domainBound: true });
     nextDiscovery = aid2Discovery();
@@ -317,17 +334,19 @@ describe('runCheck domain-binding policy', () => {
     expect(report.exitCode).toBe(0);
   });
 
-  it('off domain-binding does not pass a domain to the handshake (suppresses AID-Domain)', async () => {
+  it('off domain-binding does not pass a domain to the handshake and records binding as unknown', async () => {
     mockedPerformPKAHandshake.mockResolvedValueOnce({ domainBound: false });
     nextDiscovery = aid2Discovery();
 
-    await runCheck('example.com', {
+    const report = await runCheck('example.com', {
       timeoutMs: 1,
       allowFallback: true,
       wellKnownTimeoutMs: 1,
       domainBindingPolicy: 'off',
     });
 
+    expect(report.pka.verified).toBe(true);
+    expect(report.pka.domainBound).toBeNull();
     // performPKAHandshake(uri, pka, kid, domain) — 4th arg must be undefined when policy is 'off'
     expect(mockedPerformPKAHandshake).toHaveBeenCalledWith(
       expect.anything(),

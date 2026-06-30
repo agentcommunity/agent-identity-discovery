@@ -73,6 +73,8 @@ function initReport(domain: string, protocol?: string): DoctorReport {
 
 export async function runCheck(domain: string, opts: CheckOptions): Promise<DoctorReport> {
   const report = initReport(domain, opts.protocol);
+  const effectiveDomainBindingPolicy =
+    opts.domainBindingPolicy ?? (opts.securityMode === 'strict' ? 'require' : 'prefer');
 
   try {
     const dnsRes = await runBaseDiscovery(domain, {
@@ -85,7 +87,7 @@ export async function runCheck(domain: string, opts: CheckOptions): Promise<Doct
       ...(opts.securityMode ? { securityMode: opts.securityMode } : {}),
       ...(opts.dnssecPolicy ? { dnssecPolicy: opts.dnssecPolicy } : {}),
       ...(opts.pkaPolicy ? { pkaPolicy: opts.pkaPolicy } : {}),
-      ...(opts.domainBindingPolicy ? { domainBindingPolicy: opts.domainBindingPolicy } : {}),
+      domainBindingPolicy: effectiveDomainBindingPolicy,
       ...(opts.downgradePolicy ? { downgradePolicy: opts.downgradePolicy } : {}),
       ...(opts.wellKnownPolicy ? { wellKnownPolicy: opts.wellKnownPolicy } : {}),
       ...(opts.previousSecurity ? { previousSecurity: opts.previousSecurity } : {}),
@@ -231,19 +233,20 @@ export async function runCheck(domain: string, opts: CheckOptions): Promise<Doct
           //  - 'off'    -> suppress AID-Domain (no domain passed; binding never attested)
           //  - others   -> send AID-Domain so the endpoint can prove/refuse the binding
           const bindingDomain =
-            opts.domainBindingPolicy === 'off' ? undefined : normalizeDomainHost(domain);
+            effectiveDomainBindingPolicy === 'off' ? undefined : normalizeDomainHost(domain);
           const pkaResult = await performPKAHandshake(
             record.uri,
             record.pka,
             undefined,
             bindingDomain,
           );
-          report.pka.domainBound = pkaResult.domainBound;
+          report.pka.domainBound =
+            effectiveDomainBindingPolicy === 'off' ? null : pkaResult.domainBound;
           // 'require' rejects an endpoint-proof-only (unbound) record. Throwing the
           // existing PKA-failure error reuses the catch below: it sets verified=false,
           // pushes the standard error, and assigns the same failing exit code BEFORE the
           // downgrade/cache block runs — so a rejected record is never persisted as verified.
-          if (opts.domainBindingPolicy === 'require' && pkaResult.domainBound === false) {
+          if (effectiveDomainBindingPolicy === 'require' && pkaResult.domainBound === false) {
             throw new AidError(
               'ERR_SECURITY',
               'Domain binding required but the endpoint returned an unbound (endpoint-proof only) proof.',

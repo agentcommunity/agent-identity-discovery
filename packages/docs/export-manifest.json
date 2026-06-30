@@ -19,13 +19,13 @@
     },
     {
       "path": "Reference/packages.md",
-      "bytes": 2981,
-      "sha256": "f4cd1811a38c771a466f837e3eaffa36624aa0a18a9ed1e2ac199edcbd0be653"
+      "bytes": 3311,
+      "sha256": "5253a5fe031e5377f59ff7241aed35a5e952d52cd102c20a24ec20442bd8713c"
     },
     {
       "path": "Reference/pka.md",
-      "bytes": 9373,
-      "sha256": "54c0d883ebe9d92137a4fd65fae2bde4805042e648743c2415a3046e414357db"
+      "bytes": 9496,
+      "sha256": "aea358ea9778275d2a9ed8a13574d4d8597cb030ff06f53317240f3e698a39b7"
     },
     {
       "path": "Reference/protocols.md",
@@ -54,8 +54,8 @@
     },
     {
       "path": "Tooling/aid_doctor.md",
-      "bytes": 8452,
-      "sha256": "2ed0d1f1c1fc8328bb8f314fbb722cea3260f0849091c1c081fb90e14b89c2cb"
+      "bytes": 8896,
+      "sha256": "fca22ee2c9c3bf096cd9eb531a858d7ff753e6653c3197af740a0d189c89ff3e"
     },
     {
       "path": "Tooling/aid_engine.md",
@@ -89,8 +89,8 @@
     },
     {
       "path": "index.md",
-      "bytes": 4785,
-      "sha256": "ea00f6d37757fde5b3b50d4c875ce0fc1d48f395d035ba4540168c4e4def73fa"
+      "bytes": 4980,
+      "sha256": "1714583a031c12b85c2797eef08a95029947e746c269bbfd98a5965f01a6e38b"
     },
     {
       "path": "quickstart/index.md",
@@ -109,8 +109,8 @@
     },
     {
       "path": "quickstart/quickstart_dotnet.md",
-      "bytes": 2197,
-      "sha256": "d53c450086a9f6645f750b126de1e87c2e93d63b2334961b014a0ec3fc75a00d"
+      "bytes": 2193,
+      "sha256": "447354659dd0c477b934351fde8b0fdf045fd9a52e7e31e67d25ba47220f15bf"
     },
     {
       "path": "quickstart/quickstart_go.md",
@@ -139,8 +139,8 @@
     },
     {
       "path": "quickstart/quickstart_rust.md",
-      "bytes": 2536,
-      "sha256": "ae29d576496c6ebdc5ea83f84ec0a3bf2ee2ae86a7b4efcbd65cbd1b501d493f"
+      "bytes": 2633,
+      "sha256": "00cc5893d7db8b7bb9a6ba50f411374cd30b57388ffa91a9e3b5fa99a2c2db36"
     },
     {
       "path": "quickstart/quickstart_ts.md",
@@ -149,14 +149,14 @@
     },
     {
       "path": "specification.md",
-      "bytes": 36207,
-      "sha256": "cff85d84b38eeef4289b83570288ca3d2bd8ee612c85e3be2a08446183424447"
+      "bytes": 36340,
+      "sha256": "396d0e2c1910092aa2e7bd6a176bfee110fc54dab1e702f28bcbb18e4055659f"
     },
     {
       "path": "specification_v2_explained.md",
-      "bytes": 39679,
-      "sha256": "7c5140cc846885a4eba17ff71600576845b98e21f48a23e199f24aab2fbf5e97"
+      "bytes": 39725,
+      "sha256": "984e7f27479642c67427b58c3502631b27817ba76823059c51fa6148114934c3"
     }
   ],
-  "aggregateSha256": "fba4e360a48cbe3e7c9ab685a66386a349ded6d36b0eb23c2337d3634282cf76"
+  "aggregateSha256": "27ca8093749d8a035e82cbb1db79b2edba3023038491ca87f06812d96256c7b6"
 }

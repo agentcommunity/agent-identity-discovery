@@ -1,7 +1,9 @@
 name: Release (npm OIDC + PyPI OIDC)
 
 # ─── Manual-release runbook for registries without automation ─────────────────
-# Rust (crates.io):
+# Rust (crates.io) — blocked until the `aid-rs` crate name is transferred to
+# this project or the crate is renamed; crates.io currently has an unrelated
+# `aid-rs` package:
 #   cd packages/aid-rs
 #   cargo publish --token <CRATES_IO_TOKEN>
 #

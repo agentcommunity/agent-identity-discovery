@@ -484,7 +484,7 @@ Signers MUST emit `alg="ed25519"` lowercase. Verifiers MUST compare the semantic
 
 ### B.4 Covered Components
 
-The v2 PKA response signature covers exactly:
+The v2 PKA response signature covers either the base profile or the domain-binding profile:
 
 - `"@method";req`
 - `"@target-uri";req`

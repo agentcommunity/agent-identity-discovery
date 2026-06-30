@@ -163,23 +163,28 @@ except AidError as e:
 <details>
 <summary><strong>Go</strong></summary>
 
+> **Not yet published as a standalone Go module.** Consume the SDK from source (`packages/aid-go`) until the `github.com/agentcommunity/aid-go` module repository and tags are published.
+
 ```bash
-go get -u github.com/agentcommunity/agent-identity-discovery/aid-go
+go mod edit -require=github.com/agentcommunity/aid-go@v0.0.0
+go mod edit -replace=github.com/agentcommunity/aid-go=../agent-identity-discovery/packages/aid-go
 ```
 
 ```go
 import (
 	"fmt"
 	"log"
-	"github.com/agentcommunity/agent-identity-discovery/aid-go"
+	"time"
+
+	aid "github.com/agentcommunity/aid-go"
 )
 
 func main() {
-	result, err := aid.Discover("supabase.agentcommunity.org")
+	record, ttl, err := aid.Discover("supabase.agentcommunity.org", 5*time.Second)
 	if err != nil {
 		log.Fatalf("AID Error: %v", err)
 	}
-	fmt.Printf("Found %s agent at %s (TTL: %d)\n", result.Record.Proto, result.Record.URI, result.TTL)
+	fmt.Printf("Found %s agent at %s (TTL: %d)\n", record.Proto, record.URI, ttl)
     //=> Found mcp agent at https://api.supabase.com/mcp (TTL: 60)
 }
 ```
@@ -199,10 +204,10 @@ This repository uses a PNPM/Turborepo monorepo structure. It contains the full s
 | [**@agentcommunity/aid-doctor**](https://www.npmjs.com/package/@agentcommunity/aid-doctor)           | Public  | Official CLI for checking, validating, and generating AID records (wraps aid-engine) |
 | [**@agentcommunity/aid-conformance**](https://www.npmjs.com/package/@agentcommunity/aid-conformance) | Public  | Conformance suite exporting fixtures and a CLI runner                                |
 | [**aid-discovery (Python)**](https://pypi.org/project/aid-discovery/)                                | Public  | Official Python library                                                              |
-| [**aid-go**](https://pkg.go.dev/github.com/agentcommunity/agent-identity-discovery/aid-go)           | Public  | Official Go library                                                                  |
-| [**aid-rs (Rust)**](./packages/aid-rs)                                                               | Public  | Parser + discovery (handshake behind feature flag)                                   |
-| [**aid-dotnet (.NET)**](./packages/aid-dotnet)                                                       | Public  | Parser + discovery + PKA + well-known                                                |
-| [**aid-java (Java)**](./packages/aid-java)                                                           | Public  | Parser + discovery + PKA + well-known                                                |
+| [**aid-go**](./packages/aid-go)                                                                      | Source  | Official Go library; standalone module repo/tags not published yet                   |
+| [**aid-rs (Rust)**](./packages/aid-rs)                                                               | Source  | Parser + discovery; crates.io name not published by us yet                           |
+| [**aid-dotnet (.NET)**](./packages/aid-dotnet)                                                       | Source  | Parser + discovery + PKA + well-known; NuGet package not published yet               |
+| [**aid-java (Java)**](./packages/aid-java)                                                           | Source  | Parser + discovery + PKA + well-known; Maven Central package not published yet       |
 | [**@agentcommunity/aid-web**](./packages/web)                                                        | Private | The Next.js app for the website and workbench                                        |
 | **@agentcommunity/e2e-tests**                                                                        | Private | E2E tests validating our live showcase domains                                       |
 | **(test runners)**                                                                                   | Private | Internal packages for orchestrating Python and Go tests via Turbo                    |

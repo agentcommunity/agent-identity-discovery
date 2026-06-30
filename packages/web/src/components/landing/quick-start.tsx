@@ -17,13 +17,18 @@ const { record } = await discover('example.com')
 console.log(record.uri) // https://api.example.com/mcp`,
   python: `from aid_py import discover
 
-record = discover('example.com')
-print(record.uri) # https://api.example.com/mcp`,
-  go: `import "github.com/agentcommunity/aid-go"
+record, ttl = discover('example.com')
+print(record["uri"]) # https://api.example.com/mcp`,
+  go: `import (
+    "fmt"
+    "time"
 
-rec, err := aid.Discover("example.com")
+    aid "github.com/agentcommunity/aid-go"
+)
+
+record, _, err := aid.Discover("example.com", 5*time.Second)
 if err != nil { /* handle */ }
-fmt.Println(rec.Record.URI) // https://api.example.com/mcp`,
+fmt.Println(record.URI) // https://api.example.com/mcp`,
   rust: `use aid_rs::discover;
 use std::time::Duration;
 

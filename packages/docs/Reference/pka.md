@@ -82,14 +82,14 @@ The signature must not cover HTTP `Date`.
 
 ## Covered Components
 
-The AID v2 PKA signature covers exactly:
+The base AID v2 PKA signature covers exactly:
 
 - `"@method";req`
 - `"@target-uri";req`
 - `"@authority";req`
 - `"@status"`
 
-`@method`, `@target-uri`, and `@authority` are request-derived and therefore use `;req`. `@status` is response-derived and does not use `;req`.
+`@method`, `@target-uri`, and `@authority` are request-derived and therefore use `;req`. `@status` is response-derived and does not use `;req`. The domain-binding profile below extends this base covered set with `"aid-domain";req`; the tag remains `aid-pka-v2`.
 
 A signed non-`200` status can still prove endpoint authenticity. For example, a signed `401` can prove the endpoint before the OAuth or auth.md layer continues.
 

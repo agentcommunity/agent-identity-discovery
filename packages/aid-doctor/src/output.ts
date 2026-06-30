@@ -33,7 +33,7 @@ function generateActionableSuggestions(report: DoctorReport): string[] {
 
   if (record.parsed?.v === 'aid2' && pka.present && pka.verified && pka.domainBound === false) {
     suggestions.push(
-      `${icon} ${chalk.bold('Enable domain binding:')} Your endpoint proof is valid but not domain-bound. Configure your endpoint to echo the AID-Domain header in its HTTP Message Signature to prove exclusive ownership of this domain's identity.`,
+      `${icon} ${chalk.bold('Enable domain binding:')} Your endpoint proof is valid but not domain-bound. Configure your endpoint to cover the AID-Domain header in its HTTP Message Signature so the endpoint attests that it serves the queried domain.`,
     );
   }
 

@@ -77,7 +77,7 @@ aid-doctor check <domain> \
 - Base-first resolution. If `--protocol` is set, you may probe `_agent._<proto>.<domain>` for diagnostics.
 - Shows numbered steps with ✅/❌/⚠️/💡 and a final summary.
 - Honors `AID_SKIP_SECURITY=1` in CI to skip TLS inspection when needed.
-- `--domain-binding` sets the domain-binding policy for the PKA handshake (default: `prefer`). When `prefer` or `require`, `aid-doctor` sends `AID-Domain: <domain>` on the PKA request and reports the result as `domain-bound` or `endpoint-proof only` in human output. When `require` and the endpoint returns an unbound proof, `aid-doctor` exits with `ERR_SECURITY`. Omit the flag to use the default (`prefer`).
+- `--domain-binding` sets the domain-binding policy for the PKA handshake. Omit the flag for the active security preset default: `balanced` uses `prefer`, while `strict` uses `require`. When `prefer` or `require`, `aid-doctor` sends `AID-Domain: <domain>` on the PKA request and reports the result as `domain-bound` or `endpoint-proof only` in human output. When `require` and the endpoint returns an unbound proof, `aid-doctor` exits with `ERR_SECURITY`. When `off`, `aid-doctor` suppresses `AID-Domain`; JSON reports `domainBound: null` because binding was not attempted.
 
 ### json
 
@@ -138,7 +138,7 @@ aid-doctor pka verify --key <base64url-jwk-x>
 - TLS: first-hop redirect policy enforced; cert issuer/SAN/dates/days remaining (warns if < 21 days).
 - PKA: Performs the v2 endpoint-proof handshake when `k` is present, using the derived RFC 7638 JWK thumbprint as `keyid`.
 - PKA compatibility: Performs the legacy v1.1 handshake when an `aid1` record includes `pka`/`kid`.
-- Domain binding: When `--domain-binding prefer` (default) or `--domain-binding require` is active, sends `AID-Domain: <domain>` on the PKA request. Human output labels the result `domain-bound` (the verified `aid-pka-v2` proof covers `"aid-domain";req`) or `endpoint-proof only` (the `aid-pka-v2` covered set omits `aid-domain`, unbound). JSON output includes `domainBound: true | false` in the `pka` object. A `BINDING_LOSS` warning is emitted when a domain previously returned a domain-bound proof (`domainBound: true`) but the current check returns an unbound one — indicating a server-side regression in binding support.
+- Domain binding: When `domain-binding=prefer` (the balanced default) or `domain-binding=require` (the strict default) is active, sends `AID-Domain: <domain>` on the PKA request. Human output labels the result `domain-bound` (the verified `aid-pka-v2` proof covers `"aid-domain";req`) or `endpoint-proof only` (the `aid-pka-v2` covered set omits `aid-domain`, unbound). JSON output includes `domainBound` in the `pka` object as `true`, `false`, or `null`. When `domain-binding=off`, `AID-Domain` is suppressed and JSON reports `domainBound: null`. A `BINDING_LOSS` warning is emitted when a domain previously returned a domain-bound proof (`domainBound: true`) but the current check returns an unbound one — indicating a server-side regression in binding support.
 - Downgrade: warns if a domain previously had PKA and now removed or changed it (`--check-downgrade` flag required).
 
 ---
@@ -182,7 +182,7 @@ aid-doctor pka verify --key <base64url-jwk-x>
 - Publish short keys (`u,p,a,s,d,e,k`) as the canonical v2 TXT format.
 - Enable DNSSEC at your registrar; it improves integrity.
 - Add `k`/`pka` for endpoint proof. In v2, the HTTP signature `keyid` is derived from `k`; legacy v1 compatibility records still use `kid`.
-- Domain binding is on by default: `aid-doctor` sends `AID-Domain` whenever PKA is performed. Use `--domain-binding off` to disable, or `--domain-binding require` to enforce hard binding (exits with `ERR_SECURITY` on unbound proofs). Check for `BINDING_LOSS` warnings in CI to catch server-side regressions.
+- Domain binding is on by default: `aid-doctor` sends `AID-Domain` whenever PKA is performed. The `balanced` preset accepts and reports unbound proofs; the `strict` preset requires binding. Use `--domain-binding off` to suppress `AID-Domain` and leave `domainBound` unknown, or `--domain-binding require` to enforce hard binding (exits with `ERR_SECURITY` on unbound proofs). Check for `BINDING_LOSS` warnings in CI to catch server-side regressions.
 - For dev-only loopback `.well-known`, set `AID_ALLOW_INSECURE_WELL_KNOWN=1`.
 - Use `--save-draft` with `generate` to save records for later deployment.
 - Error messages are standardized for consistent troubleshooting experience.

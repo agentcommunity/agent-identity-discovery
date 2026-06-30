@@ -449,14 +449,14 @@ Signers **MUST** emit `alg="ed25519"` lowercase. Verifiers **MUST** compare the 
 
 ### **B.4. Covered Components**
 
-The v2 PKA response signature covers:
+The base v2 PKA response signature covers:
 
 - `"@method";req`
 - `"@target-uri";req`
 - `"@authority";req`
 - `"@status"`
 
-`@method`, `@target-uri`, and `@authority` are request-derived components and therefore use `;req`. `@status` is response-derived and does not use `;req`.
+`@method`, `@target-uri`, and `@authority` are request-derived components and therefore use `;req`. `@status` is response-derived and does not use `;req`. The domain-binding profile in Appendix B.7 extends this base covered set with `"aid-domain";req`; the tag remains `aid-pka-v2`.
 
 `@status` signs the status actually returned. PKA does not require status `200`. A signed `401` can still prove endpoint authenticity before the OAuth/auth.md handoff continues.
 

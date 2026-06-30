@@ -111,7 +111,7 @@ export function createCliProgram(): Command {
     .option('--pka-policy <policy>', 'PKA policy: if-present | require')
     .option('--downgrade-policy <policy>', 'Downgrade policy: off | warn | fail')
     .option('--well-known-policy <policy>', 'Well-known policy: auto | disable')
-    .option('--domain-binding <policy>', 'Domain binding policy: off | prefer | require', 'prefer')
+    .option('--domain-binding <policy>', 'Domain binding policy: off | prefer | require')
     .option('--show-details', 'Show TLS/DNSSEC/PKA short details', false)
     .option('--dump-well-known [path]', 'On fallback failure, print or save body snippet', false)
     .option(
@@ -166,7 +166,7 @@ export function createCliProgram(): Command {
             pkaPolicy: options.pkaPolicy,
             downgradePolicy: options.downgradePolicy,
             wellKnownPolicy: options.wellKnownPolicy,
-            domainBindingPolicy: options.domainBinding,
+            ...(options.domainBinding ? { domainBindingPolicy: options.domainBinding } : {}),
             showDetails: options.showDetails,
             probeProtoSubdomain: options.probeProtoSubdomain,
             probeProtoEvenIfBase: options.probeProtoEvenIfBase,
@@ -218,7 +218,7 @@ export function createCliProgram(): Command {
     .option('--pka-policy <policy>', 'PKA policy: if-present | require')
     .option('--downgrade-policy <policy>', 'Downgrade policy: off | warn | fail')
     .option('--well-known-policy <policy>', 'Well-known policy: auto | disable')
-    .option('--domain-binding <policy>', 'Domain binding policy: off | prefer | require', 'prefer')
+    .option('--domain-binding <policy>', 'Domain binding policy: off | prefer | require')
     .option('--show-details', 'Show TLS/DNSSEC/PKA short details', false)
     .option('--dump-well-known [path]', 'On fallback failure, print or save body snippet', false)
     .option(
@@ -263,7 +263,7 @@ export function createCliProgram(): Command {
             pkaPolicy: options.pkaPolicy,
             downgradePolicy: options.downgradePolicy,
             wellKnownPolicy: options.wellKnownPolicy,
-            domainBindingPolicy: options.domainBinding,
+            ...(options.domainBinding ? { domainBindingPolicy: options.domainBinding } : {}),
             showDetails: options.showDetails || false,
             probeProtoSubdomain: false, // JSON command doesn't support proto probing for now
             probeProtoEvenIfBase: false,

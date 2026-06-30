@@ -6,7 +6,7 @@ icon: material/language-csharp
 
 # .NET
 
-> **Not yet published to NuGet.** Consume the SDK from source (see `packages/aid-dotnet/`) until a NuGet package is available. The `dotnet add package` command will be added here once the package is published.
+> **Not yet published to NuGet.** Consume the SDK from source (see `packages/aid-dotnet/`) until a NuGet package is available. Package-install instructions will be added here once the package is published.
 
 ## Discover by Domain
 
