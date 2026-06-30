@@ -85,11 +85,15 @@ public class HandshakeTest {
             // Pass vectors sign within the acceptance window; the date-skew vector signs a created
             // timestamp and HTTP Date far in the past to trip the +/-300s windows.
             long created = skewDate ? vector.get("created").asLong() : System.currentTimeMillis() / 1000L;
-            String responseDate =
-                skewDate
-                    ? skewHttpDate
-                    : DateTimeFormatter.RFC_1123_DATE_TIME.format(
-                        ZonedDateTime.now(ZoneOffset.UTC));
+            String responseDate;
+            if (skewDate) {
+              responseDate = skewHttpDate;
+            } else if (requestDate != null) {
+              responseDate = requestDate;
+            } else {
+              responseDate =
+                  DateTimeFormatter.RFC_1123_DATE_TIME.format(ZonedDateTime.now(ZoneOffset.UTC));
+            }
 
             String keyid = overrideKeyId != null ? overrideKeyId : recordKid;
             String alg = overrideAlg != null ? overrideAlg : "ed25519";
@@ -101,9 +105,9 @@ public class HandshakeTest {
 
             String params =
                 "(" + quoted(covered) + ");created=" + created + ";keyid=" + keyid + ";alg=\"" + alg + "\"";
-            exchange.getResponseHeaders().add("Signature-Input", "sig=" + params);
-            exchange.getResponseHeaders().add("Signature", "sig=:" + signature + ":");
-            exchange.getResponseHeaders().add("Date", responseDate);
+            exchange.getResponseHeaders().set("Signature-Input", "sig=" + params);
+            exchange.getResponseHeaders().set("Signature", "sig=:" + signature + ":");
+            exchange.getResponseHeaders().set("Date", responseDate);
             byte[] body = new byte[0];
             exchange.sendResponseHeaders(200, body.length);
             try (OutputStream output = exchange.getResponseBody()) {
@@ -124,7 +128,10 @@ public class HandshakeTest {
     try {
       if (expectPass) {
         // V1 handshake returns false (domain binding is a v2 concept) and must not throw.
-        boolean domainBound = Handshake.performHandshake(uri, pka, recordKid, Duration.ofSeconds(5));
+        boolean domainBound =
+            assertDoesNotThrow(
+                () -> Handshake.performHandshake(uri, pka, recordKid, Duration.ofSeconds(5)),
+                id + ": expected the handshake to pass");
         assertFalse(domainBound, id + ": V1 handshake must never be domain-bound");
       } else {
         AidError err =
