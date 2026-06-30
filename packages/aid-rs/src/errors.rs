@@ -24,7 +24,11 @@ impl AidError {
             "ERR_FALLBACK_FAILED" => ERR_FALLBACK_FAILED,
             _ => ERR_INVALID_TXT,
         };
-        Self { code, error_code, message: message.into() }
+        Self {
+            code,
+            error_code,
+            message: message.into(),
+        }
     }
 
     pub fn invalid_txt(message: impl Into<String>) -> Self {

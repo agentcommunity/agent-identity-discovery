@@ -1,9 +1,9 @@
 use std::time::Duration;
 
+use crate::constants_gen::{SPEC_VERSION_V1, SPEC_VERSION_V2};
 use crate::errors::AidError;
 use crate::parser::parse;
 use crate::record::AidRecord;
-use crate::constants_gen::{SPEC_VERSION_V1, SPEC_VERSION_V2};
 use hickory_resolver::TokioAsyncResolver;
 use idna::domain_to_ascii;
 
@@ -15,7 +15,12 @@ use crate::well_known::fetch_well_known;
 /// Discover an AID record for the given domain using DNS TXT at _agent.<domain>.
 /// Falls back to HTTPS .well-known when DNS has no record or lookup fails.
 pub async fn discover(domain: &str, timeout: Duration) -> Result<AidRecord, AidError> {
-    let opts = DiscoveryOptions { protocol: None, timeout, well_known_fallback: true, well_known_timeout: Duration::from_secs(2) };
+    let opts = DiscoveryOptions {
+        protocol: None,
+        timeout,
+        well_known_fallback: true,
+        well_known_timeout: Duration::from_secs(2),
+    };
     discover_with_options(domain, opts).await
 }
 
@@ -34,7 +39,10 @@ fn looks_like_aid_record(raw: &str) -> bool {
         || lower.contains(";version=aid")
 }
 
-fn select_supported_record(records: Vec<AidRecord>, query_name: &str) -> Result<AidRecord, AidError> {
+fn select_supported_record(
+    records: Vec<AidRecord>,
+    query_name: &str,
+) -> Result<AidRecord, AidError> {
     let selected_version = if records.iter().any(|record| record.v == SPEC_VERSION_V2) {
         SPEC_VERSION_V2
     } else {
@@ -56,7 +64,10 @@ fn select_supported_record(records: Vec<AidRecord>, query_name: &str) -> Result<
     ))
 }
 
-fn select_from_txt_answers(raw_records: Vec<String>, query_name: &str) -> Result<Option<AidRecord>, AidError> {
+fn select_from_txt_answers(
+    raw_records: Vec<String>,
+    query_name: &str,
+) -> Result<Option<AidRecord>, AidError> {
     let mut valid: Vec<AidRecord> = Vec::new();
     let mut parse_err: Option<AidError> = None;
     for raw_record in raw_records {
@@ -89,7 +100,10 @@ fn discovery_query_names(alabel: &str, protocol: Option<&str>) -> Vec<String> {
     names
 }
 
-pub async fn discover_with_options(domain: &str, options: DiscoveryOptions) -> Result<AidRecord, AidError> {
+pub async fn discover_with_options(
+    domain: &str,
+    options: DiscoveryOptions,
+) -> Result<AidRecord, AidError> {
     // IDNA → A-label
     let alabel = domain_to_ascii(domain).unwrap_or_else(|_| domain.to_string());
     let names = discovery_query_names(&alabel, options.protocol.as_deref());
@@ -101,7 +115,8 @@ pub async fn discover_with_options(domain: &str, options: DiscoveryOptions) -> R
     // iterate names
     let mut last_err: Option<AidError> = None;
     for name in names {
-        let txt_lookup = tokio::time::timeout(options.timeout, resolver.txt_lookup(name.clone())).await;
+        let txt_lookup =
+            tokio::time::timeout(options.timeout, resolver.txt_lookup(name.clone())).await;
         match txt_lookup {
             Err(_) => {
                 last_err = Some(AidError::new("ERR_DNS_LOOKUP_FAILED", "DNS query timeout"));
@@ -109,9 +124,19 @@ pub async fn discover_with_options(domain: &str, options: DiscoveryOptions) -> R
             }
             Ok(Err(e)) => {
                 let msg = e.to_string().to_lowercase();
-                let code = if msg.contains("nxdomain") || msg.contains("no record") || msg.contains("no data") { "ERR_NO_RECORD" } else { "ERR_DNS_LOOKUP_FAILED" };
+                let code = if msg.contains("nxdomain")
+                    || msg.contains("no record")
+                    || msg.contains("no data")
+                {
+                    "ERR_NO_RECORD"
+                } else {
+                    "ERR_DNS_LOOKUP_FAILED"
+                };
                 let err = AidError::new(code, e.to_string());
-                if code != "ERR_NO_RECORD" { last_err = Some(err); break; }
+                if code != "ERR_NO_RECORD" {
+                    last_err = Some(err);
+                    break;
+                }
                 last_err = Some(err);
                 continue;
             }
@@ -131,7 +156,14 @@ pub async fn discover_with_options(domain: &str, options: DiscoveryOptions) -> R
                     {
                         if let Some(pka) = rec.pka.clone() {
                             if rec.v == SPEC_VERSION_V1 {
-                                perform_pka_handshake(&rec.uri, &pka, rec.kid.as_deref().unwrap_or(""), options.timeout, None).await?;
+                                perform_pka_handshake(
+                                    &rec.uri,
+                                    &pka,
+                                    rec.kid.as_deref().unwrap_or(""),
+                                    options.timeout,
+                                    None,
+                                )
+                                .await?;
                             } else {
                                 // The `bool` returned by perform_pka_handshake is `domainBound`.
                                 // Verification/rejection is at full parity (including fail-closed),
@@ -139,13 +171,23 @@ pub async fn discover_with_options(domain: &str, options: DiscoveryOptions) -> R
                                 // domainBound value via a DiscoveryResult is an intentional
                                 // fast-follow (see tracking/plans/2026-06-14-sdk-parity-domain-binding-plan.md),
                                 // so the value is deliberately discarded here, not by oversight.
-                                perform_pka_handshake(&rec.uri, &pka, "", options.timeout, Some(&alabel)).await?;
+                                perform_pka_handshake(
+                                    &rec.uri,
+                                    &pka,
+                                    "",
+                                    options.timeout,
+                                    Some(&alabel),
+                                )
+                                .await?;
                             }
                         }
                     }
                     return Ok(rec);
                 }
-                last_err = Some(AidError::new("ERR_NO_RECORD", format!("No valid AID record found for {}", name)));
+                last_err = Some(AidError::new(
+                    "ERR_NO_RECORD",
+                    format!("No valid AID record found for {}", name),
+                ));
                 continue;
             }
         }
@@ -173,7 +215,10 @@ mod tests {
     fn protocol_query_names_use_underscore_then_base() {
         assert_eq!(
             discovery_query_names("example.com", Some("mcp")),
-            vec!["_agent._mcp.example.com".to_string(), "_agent.example.com".to_string()]
+            vec![
+                "_agent._mcp.example.com".to_string(),
+                "_agent.example.com".to_string()
+            ]
         );
     }
 
@@ -197,7 +242,8 @@ mod tests {
             "v=aid2;u=https://example.com/b;p=mcp",
         ]);
 
-        let err = select_supported_record(records, "_agent.example.com").expect_err("multiple aid2 records fail");
+        let err = select_supported_record(records, "_agent.example.com")
+            .expect_err("multiple aid2 records fail");
         assert_eq!(err.error_code, "ERR_INVALID_TXT");
         assert!(err.message.contains("Multiple valid aid2 AID records"));
     }

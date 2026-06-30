@@ -121,7 +121,9 @@ mod tests {
             kid: None,
         };
 
-        let v2 = current.as_v2().expect("aid2 without kid projects as AidRecordV2");
+        let v2 = current
+            .as_v2()
+            .expect("aid2 without kid projects as AidRecordV2");
         assert_eq!(v2.pka.as_deref(), Some(V2_PKA));
 
         let mut invalid_v2 = current.clone();

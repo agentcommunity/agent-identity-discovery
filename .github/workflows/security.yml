@@ -82,18 +82,46 @@ jobs:
 
       - name: License compliance check
         run: |
-          violations=()
-          while IFS= read -r f; do
-            if ! head -5 "$f" | grep -qE "MIT|License|Copyright"; then
-              violations+=("$f")
-            fi
-          done < <(find packages \( -name "*.ts" -o -name "*.js" -o -name "*.rs" -o -name "*.go" -o -name "*.cs" -o -name "*.java" \))
-          if [ ${#violations[@]} -gt 0 ]; then
-            echo "Missing license header in ${#violations[@]} file(s):"
-            printf '  %s\n' "${violations[@]}"
-            exit 1
-          fi
-          echo "License headers OK"
+          test -f LICENSE
+          grep -qi "MIT License" LICENSE
+
+          node <<'NODE'
+          const fs = require('node:fs');
+          const packageManifests = [
+            'package.json',
+            'packages/aid/package.json',
+            'packages/aid-conformance/package.json',
+            'packages/aid-doctor/package.json',
+            'packages/aid-engine/package.json',
+            'packages/aid-go/package.json',
+            'packages/aid-py/package.json',
+            'packages/e2e-tests/package.json',
+            'packages/web/package.json',
+          ];
+
+          const missing = [];
+          for (const manifest of packageManifests) {
+            const pkg = JSON.parse(fs.readFileSync(manifest, 'utf8'));
+            if (pkg.license !== 'MIT') missing.push(`${manifest}: license is ${JSON.stringify(pkg.license)}`);
+          }
+
+          const textChecks = [
+            ['packages/aid-py/pyproject.toml', /license\s*=\s*\{\s*text\s*=\s*"MIT"\s*\}/],
+            ['packages/aid-rs/Cargo.toml', /^license\s*=\s*"MIT"/m],
+          ];
+          for (const [file, pattern] of textChecks) {
+            const body = fs.readFileSync(file, 'utf8');
+            if (!pattern.test(body)) missing.push(`${file}: missing MIT license metadata`);
+          }
+
+          if (missing.length > 0) {
+            console.error('License metadata check failed:');
+            for (const item of missing) console.error(`  ${item}`);
+            process.exit(1);
+          }
+          NODE
+
+          echo "License metadata OK"
 
       - name: Dependency vulnerability scan
         run: |
