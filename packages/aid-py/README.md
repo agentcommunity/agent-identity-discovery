@@ -154,6 +154,8 @@ except AidError as e:
   - Or add `cryptography>=42` or `PyNaCl>=1.5` to your environment (the verifier prefers `PyNaCl` if present and otherwise falls back to `cryptography`)
     If no backend is available, discovery raises `ERR_SECURITY` when PKA is present.
 
+- Domain binding: For `aid2` PKA, discovery sends `AID-Domain` by default. A domain-bound proof still uses the single `aid-pka-v2` tag and is indicated by signed coverage of `"aid-domain";req`; discovery stores the outcome in `record["domain_bound"]`. An unbound proof is accepted unless the caller enforces `domain-binding=require` in tooling.
+
 - `.well-known` fallback: On DNS issues (`ERR_NO_RECORD` or `ERR_DNS_LOOKUP_FAILED`), the client may fetch `https://<domain>/.well-known/agent` (TLS-anchored). Disable with `well_known_fallback=False`.
 
 ## Redirect Security

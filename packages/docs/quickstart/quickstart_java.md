@@ -15,7 +15,7 @@ import org.agentcommunity.aid.Discovery;
 import org.agentcommunity.aid.Discovery.DiscoveryOptions;
 
 var result = Discovery.discover("supabase.agentcommunity.org", new DiscoveryOptions());
-System.out.println(result.record.proto + " at " + result.record.uri + " ttl=" + result.ttl + " qname=" + result.queryName);
+System.out.println(result.record.proto + " at " + result.record.uri + " ttl=" + result.ttl + " qname=" + result.queryName + " domainBound=" + result.domainBound);
 ```
 
 ### Options

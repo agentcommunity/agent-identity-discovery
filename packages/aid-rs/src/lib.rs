@@ -23,7 +23,10 @@ pub use pka::perform_pka_handshake;
 
 pub mod well_known;
 
-pub use well_known::fetch_well_known;
+pub use well_known::{fetch_well_known, fetch_well_known_result, WellKnownResult};
 
 pub mod discover;
-pub use discover::{discover, discover_with_options, DiscoveryOptions};
+pub use discover::{
+    discover, discover_result, discover_with_options, discover_with_options_result,
+    DiscoveryOptions, DiscoveryResult,
+};

@@ -85,6 +85,7 @@ export async function runCheck(domain: string, opts: CheckOptions): Promise<Doct
       ...(opts.securityMode ? { securityMode: opts.securityMode } : {}),
       ...(opts.dnssecPolicy ? { dnssecPolicy: opts.dnssecPolicy } : {}),
       ...(opts.pkaPolicy ? { pkaPolicy: opts.pkaPolicy } : {}),
+      ...(opts.domainBindingPolicy ? { domainBindingPolicy: opts.domainBindingPolicy } : {}),
       ...(opts.downgradePolicy ? { downgradePolicy: opts.downgradePolicy } : {}),
       ...(opts.wellKnownPolicy ? { wellKnownPolicy: opts.wellKnownPolicy } : {}),
       ...(opts.previousSecurity ? { previousSecurity: opts.previousSecurity } : {}),

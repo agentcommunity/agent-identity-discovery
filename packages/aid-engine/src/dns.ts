@@ -23,6 +23,7 @@ export async function runBaseDiscovery(
     securityMode?: import('@agentcommunity/aid').SecurityMode;
     dnssecPolicy?: import('@agentcommunity/aid').DnssecPolicy;
     pkaPolicy?: import('@agentcommunity/aid').PkaPolicy;
+    domainBindingPolicy?: import('@agentcommunity/aid').DomainBindingPolicy;
     downgradePolicy?: import('@agentcommunity/aid').DowngradePolicy;
     wellKnownPolicy?: import('@agentcommunity/aid').WellKnownPolicy;
     previousSecurity?: import('@agentcommunity/aid').PreviousSecurityState;
@@ -45,6 +46,7 @@ export async function runBaseDiscovery(
       ...(options.securityMode ? { securityMode: options.securityMode } : {}),
       ...(options.dnssecPolicy ? { dnssecPolicy: options.dnssecPolicy } : {}),
       ...(options.pkaPolicy ? { pkaPolicy: options.pkaPolicy } : {}),
+      ...(options.domainBindingPolicy ? { domainBindingPolicy: options.domainBindingPolicy } : {}),
       ...(options.downgradePolicy ? { downgradePolicy: options.downgradePolicy } : {}),
       ...(options.wellKnownPolicy ? { wellKnownPolicy: options.wellKnownPolicy } : {}),
       ...(options.previousSecurity ? { previousSecurity: options.previousSecurity } : {}),

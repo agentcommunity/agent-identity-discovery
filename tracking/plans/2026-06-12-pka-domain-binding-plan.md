@@ -1,6 +1,10 @@
 # PKA Domain Binding (Optional Profile) Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **SUPERSEDED:** This plan preserves the first design pass for history only. The active contract is the one-tag model in `2026-06-14-one-tag-simplification-plan.md`: `tag="aid-pka-v2"` is used for both bound and unbound proofs, and domain binding is indicated by signed coverage of `"aid-domain";req`.
+
+> **DO NOT IMPLEMENT THIS PLAN.** The agent instructions and task checkboxes below are historical notes for reconstructing the old two-tag rollout, not current work guidance.
+
+> **Historical agent instructions:** This superseded plan originally required superpowers:subagent-driven-development or superpowers:executing-plans and checkbox tracking. Keep this text only as archive context.
 
 **Goal:** Close the unauthorized-association gap in AID v2 PKA — any domain can today publish another operator's endpoint URI and public key and the endpoint proof still verifies — by adding an optional profile where the client sends the queried domain in an `AID-Domain` request header and the endpoint covers it in the RFC 9421 response signature (`tag="aid-pka-v2-db"`), so endpoints can refuse to attest for domains they don't serve.
 
@@ -12,15 +16,15 @@
 
 **Design decisions (locked):**
 
-| Decision | Value |
-| --- | --- |
-| Request header | `AID-Domain` |
-| Header value | canonicalized queried domain: lowercase, A-label (the discovery layer already produces A-labels via `normalizeDomain`), no trailing dot, no port |
-| Covered component | `"aid-domain";req`, placed between `"@authority";req` and `"@status"` |
-| Tag for bound responses | `aid-pka-v2-db` (`aid-pka-v2` unchanged; not `aid-pka-v3`, to avoid implying a record-format v3) |
-| Refusal | server responds without `Signature-Input` (e.g. 403) → client's existing "Missing signature headers" `ERR_SECURITY` path; no new error code |
-| Client behavior | when a domain is known (always, during discovery), send `AID-Domain` + request the db shape; accept db-tag responses as `domainBound: true` and plain-v2-tag responses as `domainBound: false`; reject db-tag responses that don't cover `aid-domain` or that arrive when no domain was sent |
-| API | `performPKAHandshake(uri, pka, kid?, domain?)` now returns `Promise<PKAHandshakeResult>` (`{ domainBound: boolean }`); `DiscoveryResult` gains optional `pka?: PKAHandshakeResult` |
+| Decision                | Value                                                                                                                                                                                                                                                                                        |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Request header          | `AID-Domain`                                                                                                                                                                                                                                                                                 |
+| Header value            | canonicalized queried domain: lowercase, A-label (the discovery layer already produces A-labels via `normalizeDomain`), no trailing dot, no port                                                                                                                                             |
+| Covered component       | `"aid-domain";req`, placed between `"@authority";req` and `"@status"`                                                                                                                                                                                                                        |
+| Tag for bound responses | `aid-pka-v2-db` (`aid-pka-v2` unchanged; not `aid-pka-v3`, to avoid implying a record-format v3)                                                                                                                                                                                             |
+| Refusal                 | server responds without `Signature-Input` (e.g. 403) → client's existing "Missing signature headers" `ERR_SECURITY` path; no new error code                                                                                                                                                  |
+| Client behavior         | when a domain is known (always, during discovery), send `AID-Domain` + request the db shape; accept db-tag responses as `domainBound: true` and plain-v2-tag responses as `domainBound: false`; reject db-tag responses that don't cover `aid-domain` or that arrive when no domain was sent |
+| API                     | `performPKAHandshake(uri, pka, kid?, domain?)` now returns `Promise<PKAHandshakeResult>` (`{ domainBound: boolean }`); `DiscoveryResult` gains optional `pka?: PKAHandshakeResult`                                                                                                           |
 
 **Precomputed signatures** (Ed25519 seed `AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=`, same deterministic key as the existing v2 vectors — both values verified against the signature bases in Task 2):
 
@@ -32,6 +36,7 @@
 ### Task 1: Spec text — unauthorized-association note + Appendix B.7 profile
 
 **Files:**
+
 - Modify: `packages/docs/specification.md` (sections 3.1, 3.2, B.6; new B.7)
 - Modify: `packages/docs/Reference/versioning.md` (v2.0.0 feature list)
 - Modify (generated): `packages/docs/export-manifest.json`, `packages/docs/export-manifest.sha256`
@@ -77,7 +82,7 @@ with:
 
 - [ ] **Step 4: Add Appendix B.7 (after B.6, before Appendix C)**
 
-```markdown
+````markdown
 ### **B.7. Domain Binding (Optional Profile)**
 
 This optional profile lets an endpoint prove that it consents to serve as the agent for the queried domain, addressing the unauthorized-association gap described in Section 3.1.
@@ -88,6 +93,7 @@ A client requesting domain binding sends the canonicalized queried domain in the
 AID-Domain: example.com
 Accept-Signature: aid-pka=("@method";req "@target-uri";req "@authority";req "aid-domain";req "@status");created;expires;keyid="<jwk-thumbprint>";alg="ed25519";nonce="<client-challenge>";tag="aid-pka-v2-db"
 ```
+````
 
 The `AID-Domain` value is the queried domain in A-label form, lowercase, without a trailing dot or port.
 
@@ -102,13 +108,14 @@ Verifier rules, in addition to Appendix B.6:
 3. Clients **SHOULD** surface whether the accepted proof was domain-bound, and MAY require domain binding by local policy.
 
 Domain binding is a statement by the endpoint that it serves the named domain. It does not prove authorization, delegation, or organizational identity.
-```
+
+````
 
 - [ ] **Step 5: Add a bullet to the v2.0.0 feature list in `packages/docs/Reference/versioning.md`**
 
 ```markdown
 - Optional PKA domain-binding profile (Appendix B.7): `AID-Domain` request header and `aid-pka-v2-db` tag let an endpoint consent to — or refuse — serving as the agent for the queried domain. Clients report `domainBound` on discovery results.
-```
+````
 
 - [ ] **Step 6: Regenerate the docs export manifest and verify**
 
@@ -127,6 +134,7 @@ git commit -m "docs(spec): describe unauthorized association and add PKA domain-
 ### Task 2: Shared test vectors
 
 **Files:**
+
 - Modify: `protocol/pka_vectors.json` (append two entries to the `vectors` array, after `v2-ipv6-authority`)
 
 Safety note: TS `pka.vectors.test.ts` filters `record.v === 'aid1'`, Go `pka_vectors_test.go:171` skips non-`aid1`, .NET `PkaTests.cs:181` skips non-`aid1`, and Python/Rust/Java/.NET-v2 select vectors by exact id — so these additions break no existing suite.
@@ -255,6 +263,7 @@ git commit -m "test(protocol): add domain-binding PKA vectors (aid-pka-v2-db)"
 ### Task 3: TypeScript verifier — the domain-binding profile in pka.ts
 
 **Files:**
+
 - Modify: `packages/aid/src/pka.ts`
 - Create: `packages/aid/src/pka.v2db.test.ts`
 
@@ -451,9 +460,9 @@ interface V2CoveredItem {
 **3c.** In `parseV2CoveredItem` (currently `pka.ts:458-473`), replace the allowed-name check:
 
 ```ts
-  if (!['@method', '@target-uri', '@authority', '@status', 'aid-domain'].includes(name)) {
-    throw new AidError('ERR_SECURITY', `Unsupported covered field: ${name}`);
-  }
+if (!['@method', '@target-uri', '@authority', '@status', 'aid-domain'].includes(name)) {
+  throw new AidError('ERR_SECURITY', `Unsupported covered field: ${name}`);
+}
 ```
 
 **3d.** Replace `validateV2CoveredSet` (currently `pka.ts:475-498`) entirely:
@@ -489,18 +498,18 @@ function validateV2CoveredSet(covered: V2CoveredItem[], domainBound: boolean): v
 **3e.** In `parseV2SignatureHeaders` (currently `pka.ts:500-552`): delete the early `validateV2CoveredSet(covered);` call (line 514) so covered items are parsed but not yet validated, and after the `if (!/^\d+$/.test(createdRaw) ...)` timestamp check, insert:
 
 ```ts
-  validateV2CoveredSet(covered, tag === AID_PKA_TAG_V2_DB);
+validateV2CoveredSet(covered, tag === AID_PKA_TAG_V2_DB);
 ```
 
 **3f.** In `buildV2SignatureBase` (currently `pka.ts:577-591`), change the `ctx` parameter type to `{ method: string; targetUri: string; authority: string; status: number; aidDomain?: string }` and add inside the loop, after the `@authority` line:
 
 ```ts
-    if (item.name === 'aid-domain') {
-      if (ctx.aidDomain === undefined) {
-        throw new AidError('ERR_SECURITY', 'Signature covers aid-domain but no AID-Domain was sent');
-      }
-      lines.push(`"aid-domain";req: ${ctx.aidDomain}`);
-    }
+if (item.name === 'aid-domain') {
+  if (ctx.aidDomain === undefined) {
+    throw new AidError('ERR_SECURITY', 'Signature covers aid-domain but no AID-Domain was sent');
+  }
+  lines.push(`"aid-domain";req: ${ctx.aidDomain}`);
+}
 ```
 
 **3g.** Replace `buildAcceptSignatureV2` (currently `pka.ts:607-609`):
@@ -595,6 +604,7 @@ git commit -m "feat(aid): verify optional PKA domain-binding profile (aid-pka-v2
 ### Task 4: Thread the queried domain through discovery and expose `domainBound`
 
 **Files:**
+
 - Modify: `packages/aid/src/client.ts`
 - Modify: `packages/aid/src/browser.ts`
 - Create: `packages/aid/src/client.pka.domain.integration.test.ts`
@@ -736,44 +746,44 @@ async function performPKAHandshakeForRecord(
 **3d.** In `fetchWellKnown`: change the return type's object to include `pka?: PKAHandshakeResult;`, declare `let pkaResult: PKAHandshakeResult | undefined;` before the `if (record.pka)` block (currently `client.ts:276-286`), assign inside the existing try (`pkaResult = await performPKAHandshakeForRecord(record, normalizeDomain(domain));`), and change the return (currently `client.ts:289`) to:
 
 ```ts
-    return {
-      record,
-      raw: text.trim(),
-      queryName: url,
-      security,
-      ...(pkaResult ? { pka: pkaResult } : {}),
-    };
+return {
+  record,
+  raw: text.trim(),
+  queryName: url,
+  security,
+  ...(pkaResult ? { pka: pkaResult } : {}),
+};
 ```
 
 **3e.** In `queryOnce` (currently `client.ts:412-421`), replace:
 
 ```ts
-        const result = selectedRecords[0];
-        await performPKAHandshakeForRecord(result.record);
+const result = selectedRecords[0];
+await performPKAHandshakeForRecord(result.record);
 ```
 
 with:
 
 ```ts
-        const result = selectedRecords[0];
-        const pkaResult = await performPKAHandshakeForRecord(result.record, normalizeDomain(domain));
+const result = selectedRecords[0];
+const pkaResult = await performPKAHandshakeForRecord(result.record, normalizeDomain(domain));
 ```
 
 and the return at the end of that block with:
 
 ```ts
-        return { ...result, security, ...(pkaResult ? { pka: pkaResult } : {}) };
+return { ...result, security, ...(pkaResult ? { pka: pkaResult } : {}) };
 ```
 
 **3f.** In the `discover` fallback (currently `client.ts:519-524`), destructure and forward `pka`:
 
 ```ts
-        const { record, raw, queryName, security, pka } = await fetchWellKnown(
-          domain,
-          wellKnownTimeoutMs,
-          options,
-        );
-        return { record, raw, ttl: DNS_TTL_MIN, queryName, security, ...(pka ? { pka } : {}) };
+const { record, raw, queryName, security, pka } = await fetchWellKnown(
+  domain,
+  wellKnownTimeoutMs,
+  options,
+);
+return { record, raw, ttl: DNS_TTL_MIN, queryName, security, ...(pka ? { pka } : {}) };
 ```
 
 - [ ] **Step 4: Mirror in `packages/aid/src/browser.ts`**
@@ -796,27 +806,33 @@ import { performPKAHandshake, type PKAHandshakeResult } from './pka.js';
 **4d.** In `fetchWellKnown` (currently `browser.ts:163-249`): add `pka?: PKAHandshakeResult;` to the return type object, declare `let pkaResult: PKAHandshakeResult | undefined;` before the `if (record.pka)` block (lines 223-233), assign `pkaResult = await performPKAHandshakeForRecord(record, normalizeDomain(domain));` inside the try, and change the return (line 236) to:
 
 ```ts
-    return { record, raw: text.trim(), queryName: url, security, ...(pkaResult ? { pka: pkaResult } : {}) };
+return {
+  record,
+  raw: text.trim(),
+  queryName: url,
+  security,
+  ...(pkaResult ? { pka: pkaResult } : {}),
+};
 ```
 
 **4e.** In the DNS path (currently `browser.ts:393-401`), replace:
 
 ```ts
-      const result = selectedRecords[0];
-      await performPKAHandshakeForRecord(result.record);
+const result = selectedRecords[0];
+await performPKAHandshakeForRecord(result.record);
 ```
 
 with:
 
 ```ts
-      const result = selectedRecords[0];
-      const pkaResult = await performPKAHandshakeForRecord(result.record, normalizeDomain(domain));
+const result = selectedRecords[0];
+const pkaResult = await performPKAHandshakeForRecord(result.record, normalizeDomain(domain));
 ```
 
 and the return with:
 
 ```ts
-      return { ...result, security, ...(pkaResult ? { pka: pkaResult } : {}) };
+return { ...result, security, ...(pkaResult ? { pka: pkaResult } : {}) };
 ```
 
 (`domain` is the `discover` parameter and is in scope; `normalizeDomain` exists at `browser.ts:107`.)
@@ -824,13 +840,13 @@ and the return with:
 **4f.** In the `discover` fallback (currently `browser.ts:435-441`), destructure `pka` and forward it:
 
 ```ts
-        const { record, queryName, security, pka } = await fetchWellKnown(
-          domain,
-          wellKnownTimeoutMs,
-          options,
-        );
-        // well-known does not provide a TTL, so we use a sensible default.
-        return { record, domain, queryName, ttl: 300, security, ...(pka ? { pka } : {}) };
+const { record, queryName, security, pka } = await fetchWellKnown(
+  domain,
+  wellKnownTimeoutMs,
+  options,
+);
+// well-known does not provide a TTL, so we use a sensible default.
+return { record, domain, queryName, ttl: 300, security, ...(pka ? { pka } : {}) };
 ```
 
 - [ ] **Step 5: Run the integration test to verify it passes**
@@ -855,6 +871,7 @@ git commit -m "feat(aid): thread queried domain through discovery and expose pka
 ### Task 5: Reference servers — demo endpoint allowlist + e2e coverage
 
 **Files:**
+
 - Modify: `packages/web/src/app/api/pka-demo/route.ts`
 - Modify: `packages/e2e-tests/src/pka_e2e.ts`
 
@@ -890,39 +907,39 @@ function extractTag(acceptSignature: string | null): string | null {
 **1c.** In `GET`, after `const v2Nonce = extractNonce(acceptSignature);` (line 36), add:
 
 ```ts
-  const requestedTag = extractTag(acceptSignature);
-  const aidDomain = request.headers.get('aid-domain')?.trim().toLowerCase() ?? null;
-  const boundDomain = requestedTag === 'aid-pka-v2-db' && aidDomain !== null ? aidDomain : null;
+const requestedTag = extractTag(acceptSignature);
+const aidDomain = request.headers.get('aid-domain')?.trim().toLowerCase() ?? null;
+const boundDomain = requestedTag === 'aid-pka-v2-db' && aidDomain !== null ? aidDomain : null;
 ```
 
 **1d.** Immediately after the closing brace of the `if (!v2Nonce) { ... }` block (line 66), add the refusal path:
 
 ```ts
-  if (requestedTag === 'aid-pka-v2-db' && aidDomain !== null && !SERVED_DOMAINS.has(aidDomain)) {
-    return NextResponse.json(
-      { error: `This endpoint does not serve as the agent for ${aidDomain}.` },
-      {
-        status: 403,
-        headers: { 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' },
-      },
-    );
-  }
+if (requestedTag === 'aid-pka-v2-db' && aidDomain !== null && !SERVED_DOMAINS.has(aidDomain)) {
+  return NextResponse.json(
+    { error: `This endpoint does not serve as the agent for ${aidDomain}.` },
+    {
+      status: 403,
+      headers: { 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' },
+    },
+  );
+}
 ```
 
 **1e.** Replace the signature construction (lines 78-85):
 
 ```ts
-  const covered = boundDomain !== null ? V2_COVERED_DB : V2_COVERED;
-  const tag = boundDomain !== null ? 'aid-pka-v2-db' : 'aid-pka-v2';
-  const sigInputValue = `${covered};created=${nowSec};expires=${expires};keyid="${KEYID}";alg="ed25519";nonce="${v2Nonce}";tag="${tag}"`;
-  const lines = [
-    `"@method";req: ${method}`,
-    `"@target-uri";req: ${targetUri}`,
-    `"@authority";req: ${authority}`,
-    ...(boundDomain !== null ? [`"aid-domain";req: ${boundDomain}`] : []),
-    `"@status": ${status}`,
-    `"@signature-params": ${sigInputValue}`,
-  ];
+const covered = boundDomain !== null ? V2_COVERED_DB : V2_COVERED;
+const tag = boundDomain !== null ? 'aid-pka-v2-db' : 'aid-pka-v2';
+const sigInputValue = `${covered};created=${nowSec};expires=${expires};keyid="${KEYID}";alg="ed25519";nonce="${v2Nonce}";tag="${tag}"`;
+const lines = [
+  `"@method";req: ${method}`,
+  `"@target-uri";req: ${targetUri}`,
+  `"@authority";req: ${authority}`,
+  ...(boundDomain !== null ? [`"aid-domain";req: ${boundDomain}`] : []),
+  `"@status": ${status}`,
+  `"@signature-params": ${sigInputValue}`,
+];
 ```
 
 **1f.** In `OPTIONS`, change the allow-headers line to:
@@ -1048,6 +1065,7 @@ git commit -m "feat(web,e2e): domain-binding allowlist in PKA demo and e2e mock 
 ### Task 6: Changeset and full verification
 
 **Files:**
+
 - Create: `.changeset/pka-domain-binding.md`
 
 - [ ] **Step 1: Add the changeset**

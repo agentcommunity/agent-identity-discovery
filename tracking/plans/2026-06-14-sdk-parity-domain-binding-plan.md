@@ -1,6 +1,10 @@
 # Non-TS SDK Parity — Domain Binding Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **SUPERSEDED:** This plan preserves the pre-simplification SDK rollout for history only. The active contract is the one-tag model in `2026-06-14-one-tag-simplification-plan.md`: `tag="aid-pka-v2"` is used for both bound and unbound proofs, and domain binding is indicated by signed coverage of `"aid-domain";req`. Rust now also surfaces `domain_bound` through discovery result APIs rather than remaining verification-only.
+
+> **DO NOT IMPLEMENT THIS PLAN.** The agent instructions and task checkboxes below are historical notes for reconstructing the old two-tag rollout, not current work guidance.
+
+> **Historical agent instructions:** This superseded plan originally required superpowers:subagent-driven-development or superpowers:executing-plans and checkbox tracking. Keep this text only as archive context.
 
 **Goal:** Bring the five non-TypeScript SDKs (Go, Python, Rust, .NET, Java) to parity with the TS SDK's PKA domain-binding profile — they currently behave as non-supporting clients (never send `AID-Domain`, never verify `aid-pka-v2-db`). After this, all six SDKs send `AID-Domain` by default for v2 PKA, verify the `aid-pka-v2-db` tag + `"aid-domain";req` covered component, and surface a `domainBound` boolean.
 
@@ -17,7 +21,7 @@
 ## The Shared Recipe (every SDK does these 8 things)
 
 1. **Covered whitelist:** allow `"aid-domain"` as a covered-component name (alongside `@method`/`@target-uri`/`@authority`/`@status`).
-2. **Tag-aware covered-set validation — parse the tag BEFORE validating coverage.** All five SDKs currently validate the covered set (expecting exactly 4 items) *before* the tag is known. Reorder so the tag is parsed first, then validate: `aid-pka-v2` → exactly 4 components; `aid-pka-v2-db` → exactly 5 incl `"aid-domain";req`. A db-tagged response missing `aid-domain` MUST be rejected (the fail vector).
+2. **Tag-aware covered-set validation — parse the tag BEFORE validating coverage.** All five SDKs currently validate the covered set (expecting exactly 4 items) _before_ the tag is known. Reorder so the tag is parsed first, then validate: `aid-pka-v2` → exactly 4 components; `aid-pka-v2-db` → exactly 5 incl `"aid-domain";req`. A db-tagged response missing `aid-domain` MUST be rejected (the fail vector).
 3. **Build accept-signature:** when a domain is provided, emit the 5-component covered list (`"aid-domain";req` between `@authority` and `@status`) with tag `aid-pka-v2-db`; else the existing 4-component / `aid-pka-v2` form.
 4. **Signature base:** add an `"aid-domain";req: <domain>` line (between `@authority` and `@status`); thread `domain` through the sig-base context. Fail-closed if a covered item is `aid-domain` but no domain was sent.
 5. **Handshake:** accept a `domain` parameter; when non-empty, **canonicalize** it (ASCII-lowercase, strip one trailing dot, validate charset `[a-z0-9.:[\]_-]`) and set the `AID-Domain` request header; reject a `aid-pka-v2-db` response when no domain was sent ("Unrequested domain-bound signature tag"); accept either tag; return `domainBound` (true only for `aid-pka-v2-db`).
@@ -45,6 +49,7 @@
 - [ ] **Step 2: Run it — expect FAIL** (`aid-domain` not whitelisted / validation not tag-aware): `cd packages/aid-go && go test ./... -run TestPKAV2 -count=1`
 - [ ] **Step 3: Whitelist `aid-domain`** in `parseV2CoveredItem` (pka.go:572-576): add `"aid-domain"` to the `switch name` case.
 - [ ] **Step 4: Make `validateV2CoveredSet` tag-aware** (pka.go:580):
+
 ```go
 func validateV2CoveredSet(covered []v2CoveredItem, isDomainBound bool) error {
     expected := map[string]bool{"@method": true, "@target-uri": true, "@authority": true, "@status": false}
@@ -68,6 +73,7 @@ func validateV2CoveredSet(covered []v2CoveredItem, isDomainBound bool) error {
     return nil
 }
 ```
+
 - [ ] **Step 5: Reorder `parseV2SignatureHeaders`** (pka.go ~360-387): remove the early `validateV2CoveredSet(covered)` call (it's at **line 371**); after the params block extracts `tag`, call `validateV2CoveredSet(covered, parsed.tag == "aid-pka-v2-db")`. (The tag local is the value compared at the existing tag check.)
 - [ ] **Step 6: Run — expect PASS** for the new test; **Step 7: Commit** `feat(aid-go): tag-aware v2 covered-set validation for domain binding`.
 
@@ -76,6 +82,7 @@ func validateV2CoveredSet(covered []v2CoveredItem, isDomainBound bool) error {
 **Files:** Modify `packages/aid-go/pka.go`; Test `packages/aid-go/pka_v2_test.go`
 
 - [ ] **Step 1: Add the pass-vector test** (the real end-to-end): add a `Domain` field to the `pkaV2Vector` struct + `AidDomain` to its `Request`, then:
+
 ```go
 func TestPKAV2DomainBoundPassVector(t *testing.T) {
     vector := loadPKAV2Vector(t, "v2-db-rfc9421-domain-bound")
@@ -97,8 +104,10 @@ func TestPKAV2DomainBoundPassVector(t *testing.T) {
     if !result.DomainBound { t.Fatalf("expected DomainBound=true") }
 }
 ```
+
 - [ ] **Step 2: Run — expect FAIL** (signature `performPKAHandshake` doesn't take a domain / no result struct).
 - [ ] **Step 3: Add the result struct + canonicalizer** in pka.go:
+
 ```go
 type PKAHandshakeResult struct{ DomainBound bool }
 
@@ -114,12 +123,15 @@ func canonicalizeAidDomain(domain string) (string, error) {
     return value, nil
 }
 ```
+
 - [ ] **Step 4: `v2SignatureContext` gains `domain string`** (pka.go:329); **`buildV2SignatureBase`** adds, between `@authority` and `@status`:
+
 ```go
 case "aid-domain":
     if ctx.domain == "" { return nil, newAidError("ERR_SECURITY", "Signature covers aid-domain but no AID-Domain was sent") }
     lines = append(lines, `"aid-domain";req: `+ctx.domain)
 ```
+
 - [ ] **Step 5: `buildAcceptSignatureV2(keyID, nonce, domain string)`** (pka.go:287) — when `domain != ""`, 5 components + tag `aid-pka-v2-db`; else the existing string.
 - [ ] **Step 6: `performV2PKAHandshake(uri, pka, domain string, timeout) (PKAHandshakeResult, error)`** (pka.go:144): canonicalize domain (if non-empty); pass to `buildAcceptSignatureV2`; set `AID-Domain` header when non-empty; replace the tag check with `isDomainBound := timingSafeEqualString(parsed.tag, "aid-pka-v2-db")` / reject neither-tag / reject `isDomainBound && canonicalDomain == ""`; thread `domain: canonicalDomain` into the sig-base context; return `PKAHandshakeResult{DomainBound: isDomainBound}`. All error returns become `(PKAHandshakeResult{}, err)`.
 - [ ] **Step 7: `performPKAHandshake(uri, pka, kid, domain string, timeout) (PKAHandshakeResult, error)`** (pka.go:39): v2 path delegates; v1 path returns `PKAHandshakeResult{DomainBound:false}` after success.
@@ -208,7 +220,7 @@ case "aid-domain":
 - [ ] **Step 8: ALL handshake call sites** — the public `perform_pka_handshake` signature change breaks every caller under `--features handshake`. There are FOUR call sites, not two:
   - `src/discover.rs` (lines 131-141): pass `Some(&alabel)` for v2, `None` for v1; discard the bool via `?`.
   - `src/well_known.rs` (line 84 v1 → add `None`; line 86 v2 → add `Some(domain)` — `domain: &str` is in scope at `fetch_well_known` ~line 33); discard via `?`.
-  Without the `well_known.rs` fixups the crate won't compile under the `handshake` feature (which the tests require).
+    Without the `well_known.rs` fixups the crate won't compile under the `handshake` feature (which the tests require).
 - [ ] **Step 9: Fix `tests/pka_test.rs` call sites** (lines 58, 95, 128): add `None` 5th arg; `assert!(res.is_err())` checks remain valid.
 - [ ] **Step 10: Run full — expect PASS**: `cargo test --features handshake --manifest-path packages/aid-rs/Cargo.toml`; **Step 11: Commit** `feat(aid-rs): send AID-Domain and verify domain-bound PKA responses`.
 
@@ -302,6 +314,7 @@ case "aid-domain":
 **Files:** Create `.changeset/sdk-parity-domain-binding.md`
 
 - [ ] **Step 1:** create the changeset (the non-TS SDKs aren't separate npm packages — they're tested via parity but versioned differently; the user-facing change is that all SDKs now do domain binding). Use:
+
 ```markdown
 ---
 '@agentcommunity/aid': patch
@@ -309,7 +322,9 @@ case "aid-domain":
 
 All official SDKs (Go, Python, Rust, .NET, Java) now reach parity with the TypeScript SDK's PKA domain-binding profile: they send `AID-Domain` by default for v2 PKA, verify the `aid-pka-v2-db` tag and `"aid-domain";req` covered component, and surface a `domainBound` result (Rust verifies and rejects identically; surfacing `domainBound` through Rust discovery is a fast-follow). Unbound `aid-pka-v2` proofs remain valid.
 ```
+
 (If the Go/Py/Rust/.NET/Java packages have their own version files — `aid-go` go.mod, `aid-py` pyproject, etc. — bump those per each ecosystem's release convention instead of/in addition to the changeset; check `.changeset/config.json` ignore list and each package's release tooling.)
+
 - [ ] **Step 2: Full verification:**
   - `pnpm build && pnpm test && pnpm lint` — green.
   - `pnpm test:parity` — TS+Go+Python parity now EXERCISES the v2-db vectors in Go and Python (previously inert). Must be green.

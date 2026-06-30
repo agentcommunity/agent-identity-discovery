@@ -2,15 +2,19 @@
 
 > Official Go implementation of the [Agent Identity & Discovery (AID)](https://github.com/agentcommunity/agent-identity-discovery) specification.
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/agentcommunity/aid-go.svg)](https://pkg.go.dev/github.com/agentcommunity/aid-go)
 [![Go 1.23+](https://img.shields.io/badge/go-1.23+-blue.svg)](https://golang.org/dl/)
 
 AID enables you to discover AI agents by domain name using DNS TXT records. Type a domain, get the agent's endpoint and protocol - that's it.
 
 ## Installation
 
+> **Not yet published as a standalone Go module.** Consume the SDK from source (`packages/aid-go`) until the `github.com/agentcommunity/aid-go` module repository and tags are published.
+
+For local source use, add a temporary replace in your consuming module:
+
 ```bash
-go get -u github.com/agentcommunity/aid-go
+go mod edit -require=github.com/agentcommunity/aid-go@v0.0.0
+go mod edit -replace=github.com/agentcommunity/aid-go=../agent-identity-discovery/packages/aid-go
 ```
 
 ## Quick Start

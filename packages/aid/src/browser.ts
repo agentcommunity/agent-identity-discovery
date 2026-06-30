@@ -463,8 +463,11 @@ export async function discover(
         );
         // well-known does not provide a TTL, so we use a sensible default.
         return { record, domain, queryName, ttl: 300, security, ...(pka ? { pka } : {}) };
-      } catch {
-        // Throw original error if fallback fails to provide better context
+      } catch (fallbackError) {
+        if (fallbackError instanceof AidError) {
+          throw fallbackError;
+        }
+        // Throw original error if fallback fails without AID-specific context.
         throw error;
       }
     }

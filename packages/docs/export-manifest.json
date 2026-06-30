@@ -109,18 +109,18 @@
     },
     {
       "path": "quickstart/quickstart_dotnet.md",
-      "bytes": 2164,
-      "sha256": "fc23ca1c89a68da53ebf28c81483b8474fe1de97ea1871051ddf9f15e4d5681b"
+      "bytes": 2197,
+      "sha256": "d53c450086a9f6645f750b126de1e87c2e93d63b2334961b014a0ec3fc75a00d"
     },
     {
       "path": "quickstart/quickstart_go.md",
-      "bytes": 2149,
-      "sha256": "0a3745c789d8b295d53efa4483e8f2ae018563ebfaec75d06c7f1db7f324f13d"
+      "bytes": 2452,
+      "sha256": "7439cc19aa96c4ccb3c87a94a8de87a01276f78ea3427d6101ffdbb7881516dc"
     },
     {
       "path": "quickstart/quickstart_java.md",
-      "bytes": 2264,
-      "sha256": "5a2d58de80abfb1aae348646f42d7fc5e30ce4c59c60c65bf7373ccba18badea"
+      "bytes": 2303,
+      "sha256": "104d29da53ba0bcf9a67be2150d9a6a36b2e4cc84567f4435ce379e48153b657"
     },
     {
       "path": "quickstart/quickstart_mcp.md",
@@ -139,8 +139,8 @@
     },
     {
       "path": "quickstart/quickstart_rust.md",
-      "bytes": 2509,
-      "sha256": "21aea481a1b12376646b4d27a98fd55725da5c4295cdfcc29bcf36b5bd02ce21"
+      "bytes": 2536,
+      "sha256": "ae29d576496c6ebdc5ea83f84ec0a3bf2ee2ae86a7b4efcbd65cbd1b501d493f"
     },
     {
       "path": "quickstart/quickstart_ts.md",
@@ -158,5 +158,5 @@
       "sha256": "7c5140cc846885a4eba17ff71600576845b98e21f48a23e199f24aab2fbf5e97"
     }
   ],
-  "aggregateSha256": "aeac042ce44b9a06453db2b4d3b2d06ba816d0409d22c60854dc7d22f52cd321"
+  "aggregateSha256": "fba4e360a48cbe3e7c9ab685a66386a349ded6d36b0eb23c2337d3634282cf76"
 }

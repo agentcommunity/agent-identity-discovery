@@ -7,6 +7,15 @@ use reqwest::redirect::Policy;
 use reqwest::Client;
 use std::time::Duration;
 
+/// Result returned by `.well-known` discovery when callers need metadata produced
+/// during verification.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WellKnownResult {
+    pub record: AidRecord,
+    /// True only when a v2 PKA handshake returned a verified domain-bound proof.
+    pub domain_bound: bool,
+}
+
 fn canonicalize_to_txt(obj: &serde_json::Map<String, serde_json::Value>) -> String {
     let get_str = |k: &str| -> Option<String> {
         obj.get(k)
@@ -48,6 +57,15 @@ fn canonicalize_to_txt(obj: &serde_json::Map<String, serde_json::Value>) -> Stri
 
 /// Fetch https://<domain>/.well-known/agent with strict guards and return a parsed record.
 pub async fn fetch_well_known(domain: &str, timeout: Duration) -> Result<AidRecord, AidError> {
+    Ok(fetch_well_known_result(domain, timeout).await?.record)
+}
+
+/// Fetch https://<domain>/.well-known/agent and return the parsed record plus
+/// verification metadata such as v2 PKA domain binding.
+pub async fn fetch_well_known_result(
+    domain: &str,
+    timeout: Duration,
+) -> Result<WellKnownResult, AidError> {
     let url = format!("https://{}/.well-known/agent", domain);
     let client = Client::builder()
         .redirect(Policy::none())
@@ -95,8 +113,18 @@ pub async fn fetch_well_known(domain: &str, timeout: Duration) -> Result<AidReco
         .ok_or_else(|| AidError::new("ERR_FALLBACK_FAILED", "Well-known JSON must be an object"))?;
     let txt = canonicalize_to_txt(obj);
     let rec = parse(&txt)?;
-    // Perform PKA handshake when present (only when the handshake feature is enabled;
-    // the well-known fetch itself works under default features, matching Go/Python).
+    let domain_bound = verify_domain_bound_for_record(&rec, domain, timeout).await?;
+    Ok(WellKnownResult {
+        record: rec,
+        domain_bound,
+    })
+}
+
+pub(crate) async fn verify_domain_bound_for_record(
+    rec: &AidRecord,
+    domain: &str,
+    timeout: Duration,
+) -> Result<bool, AidError> {
     #[cfg(feature = "handshake")]
     if let Some(pka) = rec.pka.clone() {
         if rec.v == SPEC_VERSION_V1 {
@@ -108,12 +136,15 @@ pub async fn fetch_well_known(domain: &str, timeout: Duration) -> Result<AidReco
                 None,
             )
             .await?;
+            return Ok(false);
         } else {
-            // The `bool` returned here is `domainBound`. As in discover.rs, Rust ships
-            // verification-only parity: the value is intentionally discarded (surfacing it via
-            // a DiscoveryResult is a documented fast-follow), not dropped by oversight.
-            crate::pka::perform_pka_handshake(&rec.uri, &pka, "", timeout, Some(domain)).await?;
+            return crate::pka::perform_pka_handshake(&rec.uri, &pka, "", timeout, Some(domain))
+                .await;
         }
     }
-    Ok(rec)
+
+    #[cfg(not(feature = "handshake"))]
+    let _ = (rec, domain, timeout);
+
+    Ok(false)
 }

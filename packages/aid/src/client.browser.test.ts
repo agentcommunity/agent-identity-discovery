@@ -115,6 +115,45 @@ describe('Browser client', () => {
         expect.any(Object),
       );
     });
+
+    it('surfaces well-known PKA/domain-binding failures instead of the original DNS miss', async () => {
+      vi.spyOn(pkaModule, 'performPKAHandshake').mockResolvedValue({ domainBound: false });
+      g.fetch = vi.fn(async (url: string) => {
+        const target = url.toString();
+        if (target.startsWith('https://cloudflare-dns.com')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ Status: 2 }),
+          };
+        }
+        if (target.includes('/.well-known/agent')) {
+          return {
+            ok: true,
+            status: 200,
+            headers: {
+              get: (name: string) =>
+                name.toLowerCase() === 'content-type' ? 'application/json' : null,
+            },
+            text: async () =>
+              JSON.stringify({
+                v: 'aid2',
+                u: 'https://api.example.com/mcp',
+                p: 'mcp',
+                k: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+              }),
+          };
+        }
+        return { ok: false, status: 404, text: async () => 'Not Found' };
+      });
+
+      await expect(
+        browser.discover('example.com', {
+          wellKnownFallback: true,
+          domainBindingPolicy: 'require',
+        }),
+      ).rejects.toMatchObject({ errorCode: 'ERR_SECURITY' });
+    });
   });
 
   describe('protocol resolution', () => {

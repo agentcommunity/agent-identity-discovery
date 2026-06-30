@@ -8,8 +8,11 @@ icon: material/language-go
 
 ## Install
 
+> **Not yet published as a standalone Go module.** Consume the SDK from source (`packages/aid-go`) until the `github.com/agentcommunity/aid-go` module repository and tags are published.
+
 ```bash
-go get -u github.com/agentcommunity/aid-go
+go mod edit -require=github.com/agentcommunity/aid-go@v0.0.0
+go mod edit -replace=github.com/agentcommunity/aid-go=../agent-identity-discovery/packages/aid-go
 ```
 
 ## Discover by Domain

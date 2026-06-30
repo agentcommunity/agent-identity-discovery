@@ -57,7 +57,7 @@ public final class WellKnown {
   }
 
   public static AidRecord fetch(String domain, Duration timeout, boolean allowInsecure) {
-    return fetchBound(domain, timeout, allowInsecure, null).record;
+    return fetchBound(domain, timeout, allowInsecure, domain).record;
   }
 
   public static Result fetchBound(String domain, Duration timeout, boolean allowInsecure, String queriedDomain) {
@@ -104,9 +104,13 @@ public final class WellKnown {
     }
     boolean domainBound = false;
     if (rec.pka != null) {
-      domainBound = Handshake.performHandshake(rec.uri, rec.pka, rec.kid == null ? "" : rec.kid, timeout, queriedDomain);
+      domainBound = Handshake.performHandshake(
+          rec.uri,
+          rec.pka,
+          rec.kid == null ? "" : rec.kid,
+          timeout,
+          queriedDomain == null ? domain : queriedDomain);
     }
     return new Result(rec, domainBound);
   }
 }
-

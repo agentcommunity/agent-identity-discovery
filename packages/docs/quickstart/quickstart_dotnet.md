@@ -22,7 +22,7 @@ var result = await Discovery.DiscoverAsync(
   }
 );
 
-Console.WriteLine($"{result.Record.Proto} at {result.Record.Uri} ttl={result.Ttl} qname={result.QueryName}");
+Console.WriteLine($"{result.Record.Proto} at {result.Record.Uri} ttl={result.Ttl} qname={result.QueryName} domainBound={result.DomainBound}");
 ```
 
 ### Options

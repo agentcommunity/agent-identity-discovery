@@ -49,6 +49,7 @@ vi.mock('./protoProbe', () => ({
 }));
 
 import { runCheck } from './checker';
+import { runBaseDiscovery } from './dns';
 import type { CacheEntry } from './types';
 
 const ZERO_JWK_X = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
@@ -333,6 +334,22 @@ describe('runCheck domain-binding policy', () => {
       expect.anything(),
       undefined,
       undefined,
+    );
+  });
+
+  it('threads domain-binding policy into the base discovery wrapper', async () => {
+    nextDiscovery = aid2Discovery();
+
+    await runCheck('example.com', {
+      timeoutMs: 1,
+      allowFallback: true,
+      wellKnownTimeoutMs: 1,
+      domainBindingPolicy: 'off',
+    });
+
+    expect(vi.mocked(runBaseDiscovery)).toHaveBeenCalledWith(
+      'example.com',
+      expect.objectContaining({ domainBindingPolicy: 'off' }),
     );
   });
 

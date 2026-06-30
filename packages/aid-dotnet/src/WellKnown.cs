@@ -84,7 +84,7 @@ public static class WellKnown
         bool domainBound = false;
         if (record.Pka is not null)
         {
-            domainBound = await Pka.PerformHandshakeAsync(record.Uri, record.Pka, record.Kid ?? string.Empty, timeout, domain: queriedDomain, cancellationToken: cancellationToken).ConfigureAwait(false);
+            domainBound = await Pka.PerformHandshakeAsync(record.Uri, record.Pka, record.Kid ?? string.Empty, timeout, domain: queriedDomain ?? domain, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
         return (record, domainBound);
     }

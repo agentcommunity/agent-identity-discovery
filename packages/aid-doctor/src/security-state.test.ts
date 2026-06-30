@@ -156,6 +156,23 @@ describe('security state application', () => {
     expect(result.shouldPersist).toBe(true);
   });
 
+  it('does not persist a record from a failed PKA/domain-binding check', () => {
+    const report = reportFor({
+      v: 'aid2',
+      uri: 'https://agent.example.com',
+      proto: 'mcp',
+      pka: OLD_KEY,
+    });
+    report.exitCode = 1003;
+    report.pka.verified = false;
+
+    const result = applySecurityState(report, previous(), 'warn');
+
+    expect(result.shouldPersist).toBe(false);
+    expect(report.cacheEntry).toBeNull();
+    expect(report.downgrade.checked).toBe(false);
+  });
+
   it('preserves the prior cache entry when a fail-policy downgrade is rejected', () => {
     const previousEntry = previous();
     const cache = {

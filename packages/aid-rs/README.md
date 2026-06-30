@@ -50,7 +50,7 @@ async fn main() -> Result<(), aid_rs::AidError> {
 ### Options form
 
 ```rust,no_run
-use aid_rs::{discover_with_options, DiscoveryOptions};
+use aid_rs::{discover_with_options_result, DiscoveryOptions};
 use std::time::Duration;
 
 #[tokio::main]
@@ -61,8 +61,11 @@ async fn main() -> Result<(), aid_rs::AidError> {
         well_known_fallback: true,
         well_known_timeout: Duration::from_secs(2),
     };
-    let rec = discover_with_options("example.com", opts).await?;
-    println!("{} {}", rec.proto, rec.uri);
+    let result = discover_with_options_result("example.com", opts).await?;
+    println!(
+        "{} {} domain_bound={}",
+        result.record.proto, result.record.uri, result.domain_bound
+    );
     Ok(())
 }
 ```
@@ -100,7 +103,14 @@ async fn main() -> Result<(), aid_rs::AidError> {
     let rec = aid_rs::parse("v=aid2;uri=https://api.example.com/mcp;p=mcp;k=ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ")?;
     // The final argument is the AID-Domain for v2 domain binding; pass `Some("example.com")`
     // to bind the proof to the queried domain, or `None` to skip domain binding.
-    perform_pka_handshake(&rec.uri, rec.pka.as_deref().unwrap(), "", std::time::Duration::from_secs(2), None).await?;
+    let domain_bound = perform_pka_handshake(
+        &rec.uri,
+        rec.pka.as_deref().unwrap(),
+        "",
+        std::time::Duration::from_secs(2),
+        Some("example.com"),
+    ).await?;
+    println!("domain_bound={domain_bound}");
     Ok(())
 }
 ```
@@ -117,9 +127,9 @@ async fn main() -> Result<(), aid_rs::AidError> {
 
 #### Domain binding
 
-When you pass an `AID-Domain` (the final argument to `perform_pka_handshake`, sent by `discover`/`discover_with_options` for `aid2` records), the client requests a domain-bound proof using the same single `aid-pka-v2` tag; the bound proof additionally covers `"aid-domain";req`. A response that covers `aid-domain` when no `AID-Domain` was sent is rejected (fail-closed).
+When you pass an `AID-Domain` (the final argument to `perform_pka_handshake`, sent by discovery result APIs for `aid2` records), the client requests a domain-bound proof using the same single `aid-pka-v2` tag; the bound proof additionally covers `"aid-domain";req`. A response that covers `aid-domain` when no `AID-Domain` was sent is rejected (fail-closed).
 
-Note: the handshake verifies and enforces domain binding (`perform_pka_handshake` returns the `domainBound` boolean), but `discover`/`discover_with_options` do not yet surface it on the returned record — Rust currently ships verification-only parity, with `domainBound` surfacing as a fast-follow.
+Use `discover_result`, `discover_with_options_result`, or `fetch_well_known_result` when you need the authenticated `domain_bound` outcome. The legacy `discover`, `discover_with_options`, and `fetch_well_known` helpers still return only `AidRecord` for source compatibility.
 
 ### v1 compatibility
 

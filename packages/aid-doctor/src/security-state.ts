@@ -19,6 +19,10 @@ export function applySecurityState(
   downgradePolicy?: DowngradePolicy,
 ): ApplySecurityStateResult {
   if (!report.record.parsed) return { shouldPersist: false };
+  if (report.exitCode !== 0 || report.pka.verified === false) {
+    report.cacheEntry = null;
+    return { shouldPersist: false };
+  }
 
   const currentEntry = buildCacheEntryFromReport(report);
   const status = classifySecurityChange(previousCacheEntry, currentEntry);
