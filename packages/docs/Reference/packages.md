@@ -12,17 +12,17 @@ AID keeps the public package names stable across the v2 transition. New records 
 
 ## Packages
 
-| Package                                                                                                  | Purpose                                                                                              | Language   |
-| -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ---------- |
-| [`@agentcommunity/aid`](https://www.npmjs.com/package/@agentcommunity/aid)                               | Main discovery SDK for Node.js and browser clients                                                   | TypeScript |
-| [`@agentcommunity/aid-engine`](https://www.npmjs.com/package/@agentcommunity/aid-engine)                 | Pure discovery, validation, and PKA logic with no network side effects                               | TypeScript |
-| [`@agentcommunity/aid-doctor`](https://www.npmjs.com/package/@agentcommunity/aid-doctor)                 | CLI for record generation, validation, diagnostics, and PKA helpers                                  | Node.js    |
-| [`aid-discovery`](https://pypi.org/project/aid-discovery/)                                               | Python discovery library                                                                             | Python     |
-| [`aid-go`](https://github.com/agentcommunity/agent-identity-discovery/tree/main/packages/aid-go)         | Go discovery library; source-only until module repo/tags are published                               | Go         |
-| [`aid-rs`](https://github.com/agentcommunity/agent-identity-discovery/tree/main/packages/aid-rs)         | Rust parser and discovery library; source-only until crate publication is resolved                   | Rust       |
-| [`aid-dotnet`](https://github.com/agentcommunity/agent-identity-discovery/tree/main/packages/aid-dotnet) | .NET parser, discovery, PKA, and `.well-known` support; source-only until NuGet publication is ready | .NET       |
-| [`aid-java`](https://github.com/agentcommunity/agent-identity-discovery/tree/main/packages/aid-java)     | Java parser, discovery, PKA, and `.well-known` support; source-only until Maven publication is ready | Java       |
-| [Web Workbench](https://aid.agentcommunity.org/workbench)                                                | Browser generator and resolver for AID records                                                       | Web        |
+| Package                                                                                                  | Purpose                                                                                                      | Language   |
+| -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ---------- |
+| [`@agentcommunity/aid`](https://www.npmjs.com/package/@agentcommunity/aid)                               | Main discovery SDK for Node.js and browser clients                                                           | TypeScript |
+| [`@agentcommunity/aid-engine`](https://www.npmjs.com/package/@agentcommunity/aid-engine)                 | Core diagnostics, validation, record generation, and PKA logic; `runCheck` performs explicit DNS/HTTP checks | TypeScript |
+| [`@agentcommunity/aid-doctor`](https://www.npmjs.com/package/@agentcommunity/aid-doctor)                 | CLI for record generation, validation, diagnostics, and PKA helpers                                          | Node.js    |
+| [`aid-discovery`](https://pypi.org/project/aid-discovery/)                                               | Python discovery library                                                                                     | Python     |
+| [`aid-go`](https://github.com/agentcommunity/agent-identity-discovery/tree/main/packages/aid-go)         | Go discovery library; source-only until module repo/tags are published                                       | Go         |
+| [`aid-rs`](https://github.com/agentcommunity/agent-identity-discovery/tree/main/packages/aid-rs)         | Rust parser and discovery library; source-only until crate publication is resolved                           | Rust       |
+| [`aid-dotnet`](https://github.com/agentcommunity/agent-identity-discovery/tree/main/packages/aid-dotnet) | .NET parser, discovery, PKA, and `.well-known` support; source-only until NuGet publication is ready         | .NET       |
+| [`aid-java`](https://github.com/agentcommunity/agent-identity-discovery/tree/main/packages/aid-java)     | Java parser, discovery, PKA, and `.well-known` support; source-only until Maven publication is ready         | Java       |
+| [Web Workbench](https://aid.agentcommunity.org/workbench)                                                | Browser generator and resolver for AID records                                                               | Web        |
 
 ## Shared Contract
 
