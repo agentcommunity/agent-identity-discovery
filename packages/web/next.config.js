@@ -92,6 +92,27 @@ const nextConfig = {
     ];
   },
   headers: async () => {
+    // Baseline Content-Security-Policy. The workbench is a Next.js app, so it
+    // needs inline + eval'd bootstrap scripts and inline styles; 'unsafe-inline'
+    // / 'unsafe-eval' are therefore required here (a nonce-based policy would
+    // need middleware wiring we don't have). This is still meaningful
+    // defense-in-depth: it pins object-src/base-uri, blocks framing
+    // (frame-ancestors 'none', mirroring X-Frame-Options), and constrains
+    // default-src to same-origin. img/font/connect are widened only as far as
+    // the app actually needs (data: URIs, same-origin API calls, https images).
+    const contentSecurityPolicy = [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob: https:",
+      "font-src 'self' data:",
+      "connect-src 'self' https:",
+      "frame-ancestors 'none'",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ].join('; ');
+
     return [
       {
         source: '/(.*)',
@@ -111,6 +132,17 @@ const nextConfig = {
           {
             key: 'Permissions-Policy',
             value: 'interest-cohort=(), camera=(), microphone=(), geolocation=()',
+          },
+          {
+            // HSTS: force HTTPS for two years incl. subdomains, with preload.
+            // The site is HTTPS-only (Cloudflare edge); this in-repo header makes
+            // the policy explicit rather than relying solely on dashboard config.
+            key: 'Strict-Transport-Security',
+            value: 'max-age=63072000; includeSubDomains; preload',
+          },
+          {
+            key: 'Content-Security-Policy',
+            value: contentSecurityPolicy,
           },
         ],
       },

@@ -1,4 +1,5 @@
 import type { ProtocolHandler, ProtocolHandlerOptions, ProtocolResult, AgentCard } from '../types';
+import { safeDiscoveryFetch } from '@/lib/api/ssrf';
 
 /**
  * A2A protocol handler - fetches and displays Agent Card
@@ -24,8 +25,10 @@ export class A2AHandler implements ProtocolHandler {
           : uri + '/.well-known/agent.json';
       }
 
-      // Fetch the agent card
-      const response = await fetch(cardUrl, {
+      // Fetch the agent card. Use the SSRF-safe fetch so that 30x redirects
+      // cannot bounce a public host into a private/link-local target (which
+      // would bypass the route's front-door isPrivateHost check).
+      const response = await safeDiscoveryFetch(cardUrl, {
         method: 'GET',
         headers: {
           Accept: 'application/json',

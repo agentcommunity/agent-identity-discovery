@@ -14,7 +14,7 @@ Built by the team at [agentcommunity.org](https://agentcommunity.org).
 
 - **Website**: [aid.agentcommunity.org](https://aid.agentcommunity.org)
 - **Docs**: [docs.agentcommunity.org/aid](https://docs.agentcommunity.org/aid)
-- **GitHub**: [github.com/agent-community/agent-identity-discovery](https://github.com/agent-community/agent-identity-discovery)
+- **GitHub**: [github.com/agentcommunity/agent-identity-discovery](https://github.com/agentcommunity/agent-identity-discovery)
 
 ## Install
 
@@ -87,11 +87,12 @@ console.log(result.security.warnings);
 - DNS `kid` (`i`) is invalid for `aid2`; clients derive the RFC 7638 JWK thumbprint and use it as the HTTP signature `keyid`.
 - The client sends `Accept-Signature` with an RFC 9421 nonce. The server returns `Signature-Input` and `Signature`.
 - `created` and `expires` are mandatory. The response must include `Cache-Control: no-store`.
+- Domain binding: the client sends the queried host in the `AID-Domain` header by default and reports a `domainBound` indicator (`true` only for a verified domain-bound proof — one whose `aid-pka-v2` covered set includes `"aid-domain";req` — and `false` for an unbound proof). Requesting binding does not by itself mitigate unauthorized association — only `domain-binding=require` rejects unbound proofs. See specification Appendix B.7.
 - v2 PKA does not sign HTTP `Date` and does not use `AID-Challenge`.
 
 ### v2 PKA handshake expectations (summary)
 
-- Covered fields set: `"@method";req`, `"@target-uri";req`, `"@authority";req`, and `"@status"`.
+- Covered fields set: `"@method";req`, `"@target-uri";req`, `"@authority";req`, and `"@status"` (`tag="aid-pka-v2"`). A domain-bound proof keeps the same `aid-pka-v2` tag and additionally covers `"aid-domain";req` after `"@authority";req`.
 - `alg="ed25519"`, compared case-insensitively while preserving the received signature parameters.
 - `keyid` equals the RFC 7638 thumbprint derived from `k`.
 - `nonce` exactly matches the value sent in `Accept-Signature`.

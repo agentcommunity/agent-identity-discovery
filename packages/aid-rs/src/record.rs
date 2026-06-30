@@ -11,6 +11,14 @@ pub struct AidRecord {
     pub kid: Option<String>,
 }
 
+/// Versioned projection of an [`AidRecord`] in the `aid1` shape.
+///
+/// This deliberately mirrors [`AidRecord`] field-for-field (including `kid`): an `aid1`
+/// record is identical in shape to the unversioned record. The value of this type is the
+/// *named contract* — it documents at the type level that the record was validated as `aid1`
+/// (see [`AidRecord::as_v1`]) and pairs with [`AidRecordV2`], which legitimately differs by
+/// dropping `kid` (forbidden in `aid2`). Kept as a separate type for symmetry with the v2
+/// projection rather than collapsed into [`AidRecord`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AidRecordV1 {
     pub v: String,
@@ -113,7 +121,9 @@ mod tests {
             kid: None,
         };
 
-        let v2 = current.as_v2().expect("aid2 without kid projects as AidRecordV2");
+        let v2 = current
+            .as_v2()
+            .expect("aid2 without kid projects as AidRecordV2");
         assert_eq!(v2.pka.as_deref(), Some(V2_PKA));
 
         let mut invalid_v2 = current.clone();

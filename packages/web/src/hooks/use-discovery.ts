@@ -2,7 +2,12 @@
 
 import { useState } from 'react';
 // Import the browser-specific discovery function and types
-import { discover, AidError, type AidRecord } from '@agentcommunity/aid/browser';
+import {
+  discover,
+  AidError,
+  type AidRecord,
+  type DiscoveryResult as LibDiscoveryResult,
+} from '@agentcommunity/aid/browser';
 import type { Result } from '@/lib/types/result';
 
 /** Shape of the successful TXT payload parsed and formatted by the hook for the UI. */
@@ -27,7 +32,7 @@ export interface DiscoveryMetadata {
   source: 'DNS-over-HTTPS' | 'DNS';
   txtRecord?: string;
   dnssecPresent?: boolean;
-  pka?: { present: boolean; verified: boolean | null; keyid: string | null };
+  pka?: { present: boolean; verified: boolean | null; keyid: string | null; domainBound?: boolean };
   tls?: { valid: boolean | null; daysRemaining: number | null };
 }
 
@@ -59,6 +64,34 @@ const deriveAid2Keyid = async (pka: string): Promise<string | null> => {
     return null;
   }
 };
+
+/**
+ * Pure function: builds the `pka` metadata object from the parsed AID record and
+ * the SDK's handshake result. Exported for unit testing.
+ *
+ * Coherence rules:
+ * - If the DNS record has no `pka` key → `{ present: false, verified: null, keyid: null }`.
+ * - If the DNS record has a `pka` key AND `libResult.pka` is set (the SDK only resolves
+ *   successfully when the handshake passes, so presence == verified) → `verified: true`.
+ * - `domainBound` is forwarded directly from the SDK handshake result.
+ * NOTE: keyid is async (requires crypto.subtle) — callers that need the real keyid
+ * should compute it separately; here we accept an optional pre-computed value.
+ */
+export function buildPkaMetadata(
+  parsed: AidRecord & { uri?: string },
+  libResult: Pick<LibDiscoveryResult, 'pka'>,
+  keyid: string | null = null,
+): { present: boolean; verified: boolean | null; keyid: string | null; domainBound?: boolean } {
+  if (!parsed.pka) {
+    return { present: false, verified: null, keyid: null };
+  }
+  return {
+    present: true,
+    verified: libResult.pka ? true : null,
+    keyid,
+    ...(libResult.pka ? { domainBound: libResult.pka.domainBound } : {}),
+  };
+}
 
 /**
  * React hook for performing client-side AID DNS discovery.
@@ -102,13 +135,7 @@ export function useDiscovery() {
             recordType: 'TXT',
             source: 'DNS-over-HTTPS',
             txtRecord: reconstructedTxt,
-            pka: parsed.pka
-              ? {
-                  present: true,
-                  verified: null,
-                  keyid: pkaKeyid,
-                }
-              : undefined,
+            pka: parsed.pka ? buildPkaMetadata(parsed, libResult, pkaKeyid) : undefined,
           },
         },
       };

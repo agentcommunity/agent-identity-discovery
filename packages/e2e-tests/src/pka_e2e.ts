@@ -226,9 +226,80 @@ async function runAid2PkaCheck() {
   if (code !== 0) process.exit(code || 1);
 }
 
+async function runAid2DomainBoundPkaCheck() {
+  const vector = loadVectors().find((v) => v.id === 'v2-db-rfc9421-domain-bound');
+  if (!vector) throw new Error('Missing v2 db vector');
+
+  const key = vector.key as { seed_b64: string; public_x: string; jwk_thumbprint: string };
+  const seed = Buffer.from(key.seed_b64, 'base64');
+  const priv = crypto.createPrivateKey({
+    key: seedToPkcs8Ed25519(seed),
+    format: 'der',
+    type: 'pkcs8',
+  });
+
+  const port = 19083;
+  const domain = `127.0.0.1:${port}`;
+  const targetUri = `http://${domain}/mcp?check=1`;
+  const record = { v: 'aid2', u: targetUri, p: 'mcp', k: key.public_x };
+
+  const server = http.createServer((req, res) => {
+    if (!req.url) return res.writeHead(404).end();
+    if (req.url === '/.well-known/agent') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(record));
+      return;
+    }
+    if (req.url === '/mcp?check=1') {
+      const acceptSignature = req.headers['accept-signature'];
+      const aidDomain = req.headers['aid-domain'];
+      if (typeof acceptSignature !== 'string' || typeof aidDomain !== 'string') {
+        res.writeHead(400).end('missing Accept-Signature or AID-Domain');
+        return;
+      }
+      if (aidDomain !== '127.0.0.1') {
+        res.writeHead(403, { 'Cache-Control': 'no-store' }).end('domain not served');
+        return;
+      }
+      const nonce = quotedParam(acceptSignature, 'nonce');
+      const created = Math.floor(Date.now() / 1000);
+      const expires = created + 60;
+      const status = 401;
+      const signatureInput = `aid-pka=("@method";req "@target-uri";req "@authority";req "aid-domain";req "@status");created=${created};expires=${expires};keyid="${key.jwk_thumbprint}";alg="ed25519";nonce="${nonce}";tag="aid-pka-v2"`;
+      const signatureParams = signatureInput.replace(/^aid-pka=/, '');
+      const signatureBase = [
+        `"@method";req: GET`,
+        `"@target-uri";req: ${targetUri}`,
+        `"@authority";req: ${domain}`,
+        `"aid-domain";req: ${aidDomain}`,
+        `"@status": ${status}`,
+        `"@signature-params": ${signatureParams}`,
+      ].join('\n');
+
+      res.writeHead(status, {
+        'Signature-Input': signatureInput,
+        Signature: signatureHeaderValue(priv, signatureBase),
+        'Cache-Control': 'no-store',
+      });
+      res.end('');
+      return;
+    }
+    res.writeHead(404).end();
+  });
+
+  await new Promise<void>((resolve) => server.listen(port, '127.0.0.1', resolve));
+  console.log(`AID v2 domain-bound mock server listening on ${domain}`);
+  await new Promise((r) => setTimeout(r, 100));
+
+  const code = await runDoctorCheck(domain);
+  server.close();
+  if (code !== 0) process.exit(code || 1);
+}
+
 async function main() {
   await runLegacyPkaCheck();
   await runAid2PkaCheck();
+  await runAid2DomainBoundPkaCheck();
 }
 
 main().catch((e) => {

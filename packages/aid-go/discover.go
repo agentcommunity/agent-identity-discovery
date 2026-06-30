@@ -26,11 +26,20 @@ type DiscoveryOptions struct {
 	WellKnownTimeout time.Duration
 }
 
+// DiscoveryResult carries the resolved record, its TTL, and whether the PKA
+// handshake produced a domain-bound proof for the queried domain.
+type DiscoveryResult struct {
+	Record      AidRecord
+	TTL         uint32
+	DomainBound bool
+}
+
 // Discover retains the original signature for backward compatibility.
 // It performs DNS-first discovery and falls back to HTTPS .well-known.
 func Discover(domain string, timeout time.Duration) (AidRecord, uint32, error) {
 	opts := DiscoveryOptions{WellKnownFallback: true, WellKnownTimeout: 2 * time.Second}
-	return DiscoverWithOptions(domain, timeout, opts)
+	res, err := DiscoverWithOptions(domain, timeout, opts)
+	return res.Record, res.TTL, err
 }
 
 func classifyLookupError(err error) *AidError {
@@ -42,18 +51,18 @@ func classifyLookupError(err error) *AidError {
 }
 
 // DiscoverWithOptions performs discovery with protocol-specific DNS flow and well-known controls.
-func DiscoverWithOptions(domain string, timeout time.Duration, opts DiscoveryOptions) (AidRecord, uint32, error) {
+func DiscoverWithOptions(domain string, timeout time.Duration, opts DiscoveryOptions) (DiscoveryResult, error) {
 	// IDN → A-label
 	alabel, _ := idna.ToASCII(domain)
 
 	// Helper to resolve a specific FQDN
-	resolve := func(fqdn string) (AidRecord, uint32, error) {
+	resolve := func(fqdn string) (DiscoveryResult, error) {
 		fqdn = strings.TrimSuffix(fqdn, ".")
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 		txts, err := lookupTXT(ctx, fqdn)
 		if err != nil {
-			return AidRecord{}, 0, classifyLookupError(err)
+			return DiscoveryResult{}, classifyLookupError(err)
 		}
 		var lastErr error
 		validByVersion := map[string][]AidRecord{
@@ -78,23 +87,26 @@ func DiscoverWithOptions(domain string, timeout time.Duration, opts DiscoveryOpt
 		if selectedVersion != "" {
 			selected := validByVersion[selectedVersion]
 			if len(selected) > 1 {
-				return AidRecord{}, 0, newAidError(
+				return DiscoveryResult{}, newAidError(
 					"ERR_INVALID_TXT",
 					fmt.Sprintf("Multiple valid %s AID records found for %s; publish exactly one valid record per queried DNS name", selectedVersion, fqdn),
 				)
 			}
 			valid := selected[0]
+			domainBound := false
 			if valid.Pka != "" {
-				if err := performPKAHandshake(valid.URI, valid.Pka, valid.Kid, timeout); err != nil {
-					return AidRecord{}, 0, err
+				pkaResult, err := performPKAHandshake(valid.URI, valid.Pka, valid.Kid, alabel, timeout)
+				if err != nil {
+					return DiscoveryResult{}, err
 				}
+				domainBound = pkaResult.DomainBound
 			}
-			return valid, 0, nil
+			return DiscoveryResult{Record: valid, TTL: 0, DomainBound: domainBound}, nil
 		}
 		if lastErr != nil {
-			return AidRecord{}, 0, lastErr
+			return DiscoveryResult{}, lastErr
 		}
-		return AidRecord{}, 0, newAidError("ERR_NO_RECORD", "No valid AID record in TXT answers")
+		return DiscoveryResult{}, newAidError("ERR_NO_RECORD", "No valid AID record in TXT answers")
 	}
 
 	// Query order
@@ -106,9 +118,9 @@ func DiscoverWithOptions(domain string, timeout time.Duration, opts DiscoveryOpt
 
 	var lastErr *AidError
 	for _, name := range names {
-		rec, ttl, err := resolve(name)
+		res, err := resolve(name)
 		if err == nil {
-			return rec, ttl, nil
+			return res, nil
 		}
 		if ae, ok := err.(*AidError); ok {
 			lastErr = ae
@@ -127,19 +139,22 @@ func DiscoverWithOptions(domain string, timeout time.Duration, opts DiscoveryOpt
 	if opts.WellKnownFallback && lastErr != nil && (lastErr.Symbol == "ERR_NO_RECORD" || lastErr.Symbol == "ERR_DNS_LOOKUP_FAILED") {
 		rec, werr := fetchWellKnown(alabel, firstNonZero(opts.WellKnownTimeout, 2*time.Second))
 		if werr != nil {
-			return AidRecord{}, 0, werr
+			return DiscoveryResult{}, werr
 		}
+		domainBound := false
 		if rec.Pka != "" {
-			if err := performPKAHandshake(rec.URI, rec.Pka, rec.Kid, timeout); err != nil {
-				return AidRecord{}, 0, err
+			pkaResult, err := performPKAHandshake(rec.URI, rec.Pka, rec.Kid, alabel, timeout)
+			if err != nil {
+				return DiscoveryResult{}, err
 			}
+			domainBound = pkaResult.DomainBound
 		}
-		return rec, uint32(DnsTtlMin), nil
+		return DiscoveryResult{Record: rec, TTL: uint32(DnsTtlMin), DomainBound: domainBound}, nil
 	}
 	if lastErr != nil {
-		return AidRecord{}, 0, lastErr
+		return DiscoveryResult{}, lastErr
 	}
-	return AidRecord{}, 0, newAidError("ERR_DNS_LOOKUP_FAILED", "DNS query failed")
+	return DiscoveryResult{}, newAidError("ERR_DNS_LOOKUP_FAILED", "DNS query failed")
 }
 
 func firstNonZero(d time.Duration, def time.Duration) time.Duration {

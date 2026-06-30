@@ -54,6 +54,7 @@
     "lint": "eslint src/**/*.ts",
     "test": "vitest run",
     "test:coverage": "vitest --coverage",
+    "conformance:run": "node dist/runner.js",
     "clean": "rimraf dist",
     "prepack": "turbo run build --filter=."
   },

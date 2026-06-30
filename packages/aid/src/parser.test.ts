@@ -48,6 +48,30 @@ describe('AID Parser', () => {
       expect(() => parse(txtRecord)).toThrow('Unsupported protocol: unknown');
     });
 
+    it.each(['constructor', 'toString', 'hasOwnProperty', '__proto__', 'valueOf', 'isPrototypeOf'])(
+      'should reject Object.prototype member %s as a protocol token',
+      (protoValue) => {
+        const txtRecord = `v=aid2;uri=https://api.example.com/mcp;proto=${protoValue}`;
+
+        expect(() => parse(txtRecord)).toThrow(AidError);
+        try {
+          parse(txtRecord);
+        } catch (error) {
+          expect((error as AidError).errorCode).toBe('ERR_UNSUPPORTED_PROTO');
+        }
+      },
+    );
+
+    it.each(['constructor', 'toString', 'hasOwnProperty', '__proto__', 'valueOf', 'isPrototypeOf'])(
+      'should reject Object.prototype member %s as an auth token',
+      (authValue) => {
+        const txtRecord = `v=aid2;uri=https://api.example.com/mcp;proto=mcp;auth=${authValue}`;
+
+        expect(() => parse(txtRecord)).toThrow(AidError);
+        expect(() => parse(txtRecord)).toThrow(`Invalid auth token: ${authValue}`);
+      },
+    );
+
     it('should throw error for both proto and p fields', () => {
       const txtRecord = 'v=aid1;uri=https://api.example.com/mcp;proto=mcp;p=mcp';
 
@@ -214,6 +238,13 @@ describe('AID Parser', () => {
       expect(isValidProto('')).toBe(false);
       expect(isValidProto('MCP')).toBe(false); // case sensitive
     });
+
+    it.each(['constructor', 'toString', 'hasOwnProperty', '__proto__', 'valueOf', 'isPrototypeOf'])(
+      'should return false for Object.prototype member %s',
+      (member) => {
+        expect(isValidProto(member)).toBe(false);
+      },
+    );
   });
 
   describe('AidRecordValidator', () => {

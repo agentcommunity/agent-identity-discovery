@@ -41,7 +41,7 @@ async fn main() -> Result<(), aid_rs::AidError> {
 Protocol-specific DNS flow and guarded `.well-known` fallback:
 
 ```rust
-use aid_rs::{discover_with_options, DiscoveryOptions};
+use aid_rs::{discover_with_options_result, DiscoveryOptions};
 use std::time::Duration;
 
 #[tokio::main]
@@ -52,8 +52,11 @@ async fn main() -> Result<(), aid_rs::AidError> {
         well_known_fallback: true,     // only on ERR_NO_RECORD / ERR_DNS_LOOKUP_FAILED
         well_known_timeout: Duration::from_secs(2),
     };
-    let rec = discover_with_options("example.com", opts).await?;
-    println!("{} {}", rec.proto, rec.uri);
+    let result = discover_with_options_result("example.com", opts).await?;
+    println!(
+        "{} {} domain_bound={}",
+        result.record.proto, result.record.uri, result.domain_bound
+    );
     Ok(())
 }
 ```
@@ -74,6 +77,7 @@ Notes
 
 - TTL from DNS is respected; successful `.well-known` fallback uses TTL=300.
 - PKA handshake (when v2 `pka`/`k` is present) requires enabling the `handshake` feature. Legacy `aid1` records still use `pka`/`kid`.
+- With the `handshake` feature enabled, `aid2` PKA sends the queried host in the `AID-Domain` header by default and surfaces `DiscoveryResult.domain_bound` (`true` only for a verified domain-bound proof — one whose `aid-pka-v2` covered set includes `"aid-domain";req`). Without the feature, discovery parses records but does not perform PKA. The legacy record-only helpers still return `AidRecord` for compatibility. Requesting binding is not itself a mitigation — only `domain-binding=require` enforces it. See [Specification Appendix B.7](../specification.md#b7-domain-binding).
 
 ---
 

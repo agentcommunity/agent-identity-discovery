@@ -6,6 +6,15 @@ namespace AidDiscovery;
 
 public static class WellKnown
 {
+    // Single shared client reused across all well-known fetches. Creating/disposing an
+    // HttpClient per call can exhaust ephemeral ports under load; per-request timeouts are
+    // applied via a linked CancellationTokenSource rather than HttpClient.Timeout.
+    private static readonly HttpClient SharedClient = new(new SocketsHttpHandler
+    {
+        AllowAutoRedirect = false,
+        PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+    });
+
     private static string CanonicalizeToTxt(JsonElement obj)
     {
         static string? GetStr(JsonElement root, string k)
@@ -32,16 +41,17 @@ public static class WellKnown
         return sb.ToString().TrimEnd(';');
     }
 
-    public static async Task<AidRecord> FetchAsync(string domain, TimeSpan timeout, bool allowInsecure = false)
+    public static async Task<(AidRecord Record, bool DomainBound)> FetchAsync(string domain, TimeSpan timeout, bool allowInsecure = false, string? queriedDomain = null, CancellationToken cancellationToken = default)
     {
         var scheme = allowInsecure ? "http" : "https";
         var url = $"{scheme}://{domain}/.well-known/agent";
-        using var http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = timeout };
-        using var res = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
+        using var timeoutCts = new CancellationTokenSource(timeout);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+        using var res = await SharedClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, linked.Token).ConfigureAwait(false);
         if (!res.IsSuccessStatusCode) throw new AidError(nameof(Constants.ERR_FALLBACK_FAILED), $"Well-known HTTP {(int)res.StatusCode}");
         var ct = res.Content.Headers.ContentType?.MediaType?.ToLowerInvariant() ?? string.Empty;
         if (!ct.StartsWith("application/json")) throw new AidError(nameof(Constants.ERR_FALLBACK_FAILED), "Invalid content-type for well-known (expected application/json)");
-        var data = await res.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
+        var data = await res.Content.ReadAsByteArrayAsync(linked.Token).ConfigureAwait(false);
         if (data.Length > 64 * 1024) throw new AidError(nameof(Constants.ERR_FALLBACK_FAILED), "Well-known response too large (>64KB)");
         JsonDocument doc;
         try { doc = JsonDocument.Parse(data); }
@@ -69,10 +79,13 @@ public static class WellKnown
             // Restore http URI in the resulting record
             record = new AidRecord(validated.V, uri!, validated.Proto, validated.Auth, validated.Desc, validated.Docs, validated.Dep, validated.Pka, validated.Kid);
         }
+        // Reject records whose deprecation date has already passed (parity with the TS client).
+        Discovery.EnforceDepExpiry(record, $"{Constants.DnsSubdomain}.{domain}");
+        bool domainBound = false;
         if (record.Pka is not null)
         {
-            await Pka.PerformHandshakeAsync(record.Uri, record.Pka, record.Kid ?? string.Empty, timeout).ConfigureAwait(false);
+            domainBound = await Pka.PerformHandshakeAsync(record.Uri, record.Pka, record.Kid ?? string.Empty, timeout, domain: queriedDomain ?? domain, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
-        return record;
+        return (record, domainBound);
     }
 }

@@ -61,6 +61,20 @@ _agent.example.com. 300 IN TXT "v=aid2;p=mcp;u=https://api.example.com/mcp;k=JrQ
 - Downgrade warnings: If `k`/`pka` disappears after being present, clients should warn.
 - Together with TLS (required) and DNSSEC (recommended), PKA creates defense in depth.
 
+## Domain Binding
+
+PKA alone proves that the reached endpoint controls the private key in the DNS record. It does not prove the endpoint consents to serve as the agent for the queried domain — any domain can publish another operator's endpoint URI and key, creating an _unauthorized association_ that passes endpoint proof (see [§3.1 of the spec](../specification.md#31-what-pka-proves)).
+
+The domain-binding profile addresses this. When `k` is present in an `aid2` record, v2 clients **SHOULD** send the `AID-Domain` request header containing the queried domain, and request the extended response signature that covers `"aid-domain";req` (the tag stays `aid-pka-v2`). This is the default for v2 clients unless `domain-binding=off` is set locally (see [§3.3](../specification.md#33-enterprise-policy-modes)).
+
+When the endpoint returns a response covering `"aid-domain";req` that passes verification, the discovery result carries `domainBound: true`. When the endpoint returns the base unbound proof (covered set without `aid-domain`), the result carries `domainBound: false`.
+
+> **Important:** requesting domain binding is not itself a mitigation. An attacker-controlled endpoint can ignore `AID-Domain` and return a valid unbound proof. Only `domain-binding=require` — which rejects unbound proofs — enforces the protection. See [§3.3](../specification.md#33-enterprise-policy-modes).
+
+To enforce hard domain-binding, set `domain-binding=require` in enterprise policy. This causes discovery to fail with `ERR_SECURITY` when the proof is unbound or when the endpoint refuses with `403`.
+
+Full protocol detail is in [Specification Appendix B.7](../specification.md#b7-domain-binding).
+
 ## v1 compatibility
 
 Legacy `aid1` records remain valid during the compatibility window:

@@ -10,6 +10,19 @@ const PUBLIC_KEY_X = 'Eesj9h7MD0cRERrc_ICXu5Lb1WkokpkbWAkRcDsxUvA';
 const KEYID = 'sYkYRKJfa8y8rCgWHb-qxqR4LY93c_hbbL10YbvT88o';
 
 const V2_COVERED = '("@method";req "@target-uri";req "@authority";req "@status")';
+// Domain-bound covered set: keeps "aid-domain";req strictly between @authority and @status.
+// Signalled by coverage (not a distinct tag); both shapes sign under tag="aid-pka-v2".
+const V2_COVERED_BOUND =
+  '("@method";req "@target-uri";req "@authority";req "aid-domain";req "@status")';
+
+// Domains this endpoint agrees to serve as an agent for (AID domain binding).
+const SERVED_DOMAINS = new Set([
+  'agentcommunity.org',
+  'aid.agentcommunity.org',
+  'pka-basic.agentcommunity.org',
+  'localhost',
+  '127.0.0.1',
+]);
 
 let cachedKey: CryptoKey | null = null;
 
@@ -31,9 +44,22 @@ function extractNonce(acceptSignature: string | null): string | null {
   return /(?:^|;)\s*nonce="([^"]+)"/.exec(acceptSignature)?.[1] ?? null;
 }
 
+// Domain binding is requested by covering "aid-domain";req in the signed covered set,
+// not by a distinct tag. Mirrors the aid SDK (packages/aid/src/pka.ts), which signs and
+// verifies only tag="aid-pka-v2" and derives domainBound from coverage.
+function requestsDomainBinding(acceptSignature: string | null): boolean {
+  if (!acceptSignature) return false;
+  return /"aid-domain";req/.test(acceptSignature);
+}
+
 export async function GET(request: Request) {
   const acceptSignature = request.headers.get('accept-signature');
   const v2Nonce = extractNonce(acceptSignature);
+  const domainBindingRequested = requestsDomainBinding(acceptSignature);
+  // The AID SDK pre-canonicalizes AID-Domain (A-label, lowercased, no trailing dot/port).
+  // This trim+lowercase is belt-and-suspenders for the ASCII-only showcase domains in SERVED_DOMAINS.
+  const aidDomain = request.headers.get('aid-domain')?.trim().toLowerCase() ?? null;
+  const boundDomain = domainBindingRequested && aidDomain !== null ? aidDomain : null;
 
   if (!v2Nonce) {
     if (acceptSignature || request.headers.has('aid-challenge')) {
@@ -61,8 +87,34 @@ export async function GET(request: Request) {
         'Send a GET request with Accept-Signature to perform the AID v2 handshake.',
       publicKey: PUBLIC_KEY_X,
       keyid: KEYID,
-      spec: 'https://docs.agentcommunity.org/docs/reference/pka',
+      spec: 'https://aid.agentcommunity.org/docs/reference/pka',
     });
+  }
+
+  // Fail-closed: if the client covers "aid-domain";req in its signed set but
+  // sends no AID-Domain header, there is no domain to bind. Rather than silently
+  // sign an UNBOUND proof (which would let a covered-but-unbound mismatch slip
+  // through), reject — mirroring the SDK verifier's fail-closed enforcement.
+  if (domainBindingRequested && aidDomain === null) {
+    return NextResponse.json(
+      { error: 'Accept-Signature covers aid-domain but no AID-Domain header was sent.' },
+      {
+        status: 400,
+        headers: { 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' },
+      },
+    );
+  }
+
+  // Security boundary: only an allowlisted (fixed, safe) domain reaches the signing
+  // path below, so the value placed in the signed "aid-domain" line is never attacker-controlled.
+  if (domainBindingRequested && aidDomain !== null && !SERVED_DOMAINS.has(aidDomain)) {
+    return NextResponse.json(
+      { error: `This endpoint does not serve as the agent for ${aidDomain}.` },
+      {
+        status: 403,
+        headers: { 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' },
+      },
+    );
   }
 
   const url = new URL(request.url);
@@ -75,11 +127,15 @@ export async function GET(request: Request) {
   const authority = url.port
     ? `${url.hostname.toLowerCase()}:${url.port}`
     : url.hostname.toLowerCase();
-  const sigInputValue = `${V2_COVERED};created=${nowSec};expires=${expires};keyid="${KEYID}";alg="ed25519";nonce="${v2Nonce}";tag="aid-pka-v2"`;
+  const covered = boundDomain === null ? V2_COVERED : V2_COVERED_BOUND;
+  // Both unbound and domain-bound proofs sign under the single tag aid-pka-v2; domain binding
+  // is authenticated via the covered set (the "aid-domain";req line above), not the tag.
+  const sigInputValue = `${covered};created=${nowSec};expires=${expires};keyid="${KEYID}";alg="ed25519";nonce="${v2Nonce}";tag="aid-pka-v2"`;
   const lines = [
     `"@method";req: ${method}`,
     `"@target-uri";req: ${targetUri}`,
     `"@authority";req: ${authority}`,
+    ...(boundDomain === null ? [] : [`"aid-domain";req: ${boundDomain}`]),
     `"@status": ${status}`,
     `"@signature-params": ${sigInputValue}`,
   ];
@@ -112,7 +168,7 @@ export function OPTIONS() {
     headers: {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Accept-Signature, Cache-Control',
+      'Access-Control-Allow-Headers': 'Accept-Signature, Cache-Control, AID-Domain',
       'Access-Control-Expose-Headers': 'Signature, Signature-Input, Cache-Control',
       'Access-Control-Max-Age': '86400',
     },

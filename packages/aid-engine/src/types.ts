@@ -16,6 +16,7 @@ export interface CacheEntry {
   kid: string | null;
   keyid?: string | null;
   jwkX?: string | null;
+  domainBound?: boolean | null;
   hash?: string | null;
 }
 
@@ -82,11 +83,10 @@ export interface PkaBlock {
   present: boolean;
   attempted: boolean;
   verified: boolean | null;
+  domainBound?: boolean | null;
   kid: string | null;
   keyid: string | null;
   alg: string | null;
-  createdSkewSec: number | null;
-  covered: string[] | null;
 }
 
 export interface DowngradeBlock {
@@ -109,6 +109,7 @@ export interface DowngradeBlock {
     | 'pka_removed'
     | 'key_replaced'
     | 'version_downgrade'
+    | 'binding_loss'
     | 'fallback_well_known_tls'
     | null;
 }
@@ -137,6 +138,7 @@ export interface CheckOptions {
   pkaPolicy?: PkaPolicy;
   downgradePolicy?: DowngradePolicy;
   wellKnownPolicy?: WellKnownPolicy;
+  domainBindingPolicy?: 'off' | 'prefer' | 'require';
   previousSecurity?: PreviousSecurityState;
   showDetails?: boolean;
   dumpWellKnownPath?: string | null;

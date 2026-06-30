@@ -1,6 +1,9 @@
 package aid
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 const validAid2Pka = "ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ"
 
@@ -31,6 +34,75 @@ func TestInvalidProto(t *testing.T) {
 	_, err := Parse(txt)
 	if err == nil {
 		t.Fatalf("expected error")
+	}
+}
+
+func TestParseMalformedPairReturnsError(t *testing.T) {
+	// A bare token (no '=') in the TXT record must surface a typed
+	// ERR_INVALID_TXT error, not panic the calling goroutine.
+	txt := "v=aid2;garbage;u=https://x.example.com/mcp;p=mcp"
+	_, err := Parse(txt)
+	if err == nil {
+		t.Fatalf("expected error for malformed pair")
+	}
+	aidErr, ok := err.(*AidError)
+	if !ok {
+		t.Fatalf("expected *AidError, got %T: %v", err, err)
+	}
+	if aidErr.Symbol != "ERR_INVALID_TXT" {
+		t.Fatalf("expected ERR_INVALID_TXT, got %s", aidErr.Symbol)
+	}
+}
+
+func TestParseRejectsDuplicateKey(t *testing.T) {
+	// A repeated key (here the canonical version field) must be rejected
+	// rather than silently last-write-wins, matching the other 5 SDKs.
+	txt := "v=aid1;v=aid2;u=https://x.example.com/mcp;p=mcp"
+	_, err := Parse(txt)
+	if err == nil {
+		t.Fatalf("expected error for duplicate key")
+	}
+	aidErr, ok := err.(*AidError)
+	if !ok {
+		t.Fatalf("expected *AidError, got %T: %v", err, err)
+	}
+	if aidErr.Symbol != "ERR_INVALID_TXT" {
+		t.Fatalf("expected ERR_INVALID_TXT, got %s", aidErr.Symbol)
+	}
+	if !strings.Contains(aidErr.Msg, "Duplicate key: v") {
+		t.Fatalf("expected duplicate-key message, got %q", aidErr.Msg)
+	}
+}
+
+func TestParseRejectsEmptyKey(t *testing.T) {
+	// A pair with an empty key (e.g. "=foo") must be rejected.
+	txt := "=foo;v=aid2;u=https://x.example.com/mcp;p=mcp"
+	_, err := Parse(txt)
+	if err == nil {
+		t.Fatalf("expected error for empty key")
+	}
+	aidErr, ok := err.(*AidError)
+	if !ok {
+		t.Fatalf("expected *AidError, got %T: %v", err, err)
+	}
+	if aidErr.Symbol != "ERR_INVALID_TXT" {
+		t.Fatalf("expected ERR_INVALID_TXT, got %s", aidErr.Symbol)
+	}
+}
+
+func TestParseRejectsEmptyValue(t *testing.T) {
+	// A pair with an empty value (e.g. "v=") must be rejected.
+	txt := "v=;u=https://x.example.com/mcp;p=mcp"
+	_, err := Parse(txt)
+	if err == nil {
+		t.Fatalf("expected error for empty value")
+	}
+	aidErr, ok := err.(*AidError)
+	if !ok {
+		t.Fatalf("expected *AidError, got %T: %v", err, err)
+	}
+	if aidErr.Symbol != "ERR_INVALID_TXT" {
+		t.Fatalf("expected ERR_INVALID_TXT, got %s", aidErr.Symbol)
 	}
 }
 

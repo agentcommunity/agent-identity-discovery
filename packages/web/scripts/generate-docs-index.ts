@@ -16,12 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import matter from 'gray-matter';
 import { preprocessMarkdown } from '../src/lib/docs/markdown';
-
-interface Heading {
-  depth: number;
-  text: string;
-  id: string;
-}
+import { extractHeadings, type Heading } from '../src/lib/docs/headings';
 
 interface DocPage {
   slug: string;
@@ -73,32 +68,6 @@ function toRouteSlug(slug: string): string {
   if (slug === 'index') return 'index'; // sentinel for root page
   if (slug.endsWith('/index')) return slug.slice(0, -'/index'.length);
   return slug;
-}
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replaceAll(/[^\w\s-]/g, '')
-    .replaceAll(/\s+/g, '-')
-    .replaceAll(/-+/g, '-')
-    .trim();
-}
-
-function extractHeadings(content: string): Array<Heading> {
-  const headings: Array<Heading> = [];
-  for (const line of content.split('\n')) {
-    const match = line.match(/^(#{2,6})\s+(.+)/);
-    if (match) {
-      const depth = match[1].length;
-      const text = match[2]
-        .replaceAll(/`([^`]*)`/g, '$1')
-        .replaceAll(/\*\*([^*]*)\*\*/g, '$1')
-        .replaceAll(/\*([^*]*)\*/g, '$1')
-        .trim();
-      headings.push({ depth, text, id: slugify(text) });
-    }
-  }
-  return headings;
 }
 
 function pathToSlug(filePath: string): string {

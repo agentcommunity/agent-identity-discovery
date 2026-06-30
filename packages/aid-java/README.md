@@ -15,12 +15,12 @@ This library supports `aid2` records and the v2 PKA handshake (Ed25519 HTTP Mess
 
 ```java
 import org.agentcommunity.aid.WellKnown;
-import org.agentcommunity.aid.AidRecord;
 import java.time.Duration;
 
-AidRecord rec = WellKnown.fetch("example.com", Duration.ofSeconds(2), false /* allowInsecure */);
-System.out.println(rec.proto + " at " + rec.uri);
-// If rec.pka != null, handshake was executed by WellKnown.fetch
+WellKnown.Result result =
+    WellKnown.fetchBound("example.com", Duration.ofSeconds(2), false /* allowInsecure */, "example.com");
+System.out.println(result.record.proto + " at " + result.record.uri + " domainBound=" + result.domainBound);
+// If result.record.pka != null, handshake was executed by WellKnown.fetchBound
 ```
 
 ### Example: Handshake only
@@ -31,7 +31,8 @@ import org.agentcommunity.aid.Parser;
 import java.time.Duration;
 
 var rec = Parser.parse("v=aid2;uri=https://api.example.com/mcp;p=mcp;k=ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ");
-Handshake.performHandshake(rec.uri, rec.pka, null, Duration.ofSeconds(2));
+boolean domainBound =
+    Handshake.performHandshake(rec.uri, rec.pka, null, Duration.ofSeconds(2), "example.com");
 ```
 
 ### Example: DNS-first discovery with options
@@ -47,7 +48,7 @@ opts.wellKnownFallback = true;        // Only on ERR_NO_RECORD / ERR_DNS_LOOKUP_
 opts.wellKnownTimeout = java.time.Duration.ofSeconds(2);
 
 var result = Discovery.discover("example.com", opts);
-System.out.println(result.record.proto + " at " + result.record.uri + ", ttl=" + result.ttl + ", name=" + result.queryName);
+System.out.println(result.record.proto + " at " + result.record.uri + ", ttl=" + result.ttl + ", name=" + result.queryName + ", domainBound=" + result.domainBound);
 ```
 
 Discovery is exact-host only. Passing `app.team.example.com` does not cause implicit fallback to `_agent.team.example.com` or `_agent.example.com`. Use DNS delegation on `_agent.app.team.example.com` if you want inheritance.

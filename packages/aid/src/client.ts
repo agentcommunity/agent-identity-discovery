@@ -6,10 +6,11 @@ import {
   SPEC_VERSION_V2,
 } from './constants';
 import { AidError, parse, AidRecordValidator, canonicalizeRaw } from './parser';
-import { performPKAHandshake } from './pka.js';
+import { performPKAHandshake, type PKAHandshakeResult } from './pka.js';
 import {
   type DiscoverySecurity,
   type DnssecPolicy,
+  type DomainBindingPolicy,
   type DowngradePolicy,
   type PkaPolicy,
   type PreviousSecurityState,
@@ -17,6 +18,7 @@ import {
   type WellKnownPolicy,
   createDiscoverySecurity,
   enforceDnssecPolicy,
+  enforceDomainBindingPolicy,
   enforceDowngradePolicy,
   enforcePkaPolicy,
   enforceWellKnownPolicy,
@@ -44,6 +46,8 @@ export interface DiscoveryOptions {
   pkaPolicy?: PkaPolicy;
   /** Downgrade handling when previous security state is supplied. */
   downgradePolicy?: DowngradePolicy;
+  /** Domain-binding enforcement for v2 PKA proofs. */
+  domainBindingPolicy?: DomainBindingPolicy;
   /** `.well-known` fallback policy. */
   wellKnownPolicy?: WellKnownPolicy;
   /** Previously observed PKA/KID state for downgrade detection. */
@@ -68,43 +72,14 @@ function constructQueryName(domain: string, protocol?: string, useUnderscore = f
 }
 
 function looksLikeAidRecord(raw: string): boolean {
-  const pattern = new RegExp(
-    String.raw`(?:^|;)\s*(?:v|version)\s*=\s*aid[0-9]+(?:\s*(?:;|$))`,
-    'i',
-  );
+  // Match only the canonical `v` key. `version` is not a spec field and the
+  // parser does not consume it (parseRawRecord handles `v` only), so gating on
+  // `version=aidN` would classify a record as AID-like that the parser then
+  // rejects with a confusing "Missing required field: v" and suppresses the
+  // well-known fallback.
+  const pattern = new RegExp(String.raw`(?:^|;)\s*v\s*=\s*aid[0-9]+(?:\s*(?:;|$))`, 'i');
   return pattern.test(raw);
 }
-
-/**
- * Build a canonical RawAidRecord from JSON that may include alias keys
- */
-/*
-function canonicalizeRaw(json: Record<string, unknown>): RawAidRecord {
-  const out: RawAidRecord = {};
-  const getStr = (k: string) =>
-    typeof json[k] === 'string' ? (json[k] as string).trim() : undefined;
-  // Only set fields when defined to comply with exactOptionalPropertyTypes
-  const v = getStr('v');
-  if (v !== undefined) out.v = v;
-  const uri = getStr('uri') ?? getStr('u');
-  if (uri !== undefined) out.uri = uri;
-  const proto = getStr('proto') ?? getStr('p');
-  if (proto !== undefined) out.proto = proto;
-  const auth = getStr('auth') ?? getStr('a');
-  if (auth !== undefined) out.auth = auth;
-  const desc = getStr('desc') ?? getStr('s');
-  if (desc !== undefined) out.desc = desc;
-  const docs = getStr('docs') ?? getStr('d');
-  if (docs !== undefined) out.docs = docs;
-  const dep = getStr('dep') ?? getStr('e');
-  if (dep !== undefined) out.dep = dep;
-  const pka = getStr('pka') ?? getStr('k');
-  if (pka !== undefined) out.pka = pka;
-  const kid = getStr('kid') ?? getStr('i');
-  if (kid !== undefined) out.kid = kid;
-  return out;
-}
-*/
 
 // Minimal fetch/response types to avoid DOM lib dependency
 type HeadersLike = { get(name: string): string | null };
@@ -113,13 +88,15 @@ type FetchInit = { signal?: unknown; redirect?: 'error' | 'follow' | 'manual' };
 type FetchLike = (input: string, init?: FetchInit) => Promise<ResponseLike>;
 type DnssecResponse = { Status: number; AD?: boolean };
 
-async function performPKAHandshakeForRecord(record: AidRecord): Promise<void> {
-  if (!record.pka) return;
+async function performPKAHandshakeForRecord(
+  record: AidRecord,
+  domain?: string,
+): Promise<PKAHandshakeResult | undefined> {
+  if (!record.pka) return undefined;
   if (record.v === SPEC_VERSION_V1) {
-    await performPKAHandshake(record.uri, record.pka, record.kid ?? '');
-    return;
+    return await performPKAHandshake(record.uri, record.pka, record.kid ?? '');
   }
-  await performPKAHandshake(record.uri, record.pka);
+  return await performPKAHandshake(record.uri, record.pka, undefined, domain);
 }
 
 async function queryDnssecStatus(queryName: string, timeoutMs: number): Promise<boolean | null> {
@@ -162,6 +139,7 @@ async function fetchWellKnown(
   raw: string;
   queryName: string;
   security: DiscoverySecurity;
+  pka?: PKAHandshakeResult;
 }> {
   const policy = resolveSecurityPolicy(options);
   const security = createDiscoverySecurity(policy, true);
@@ -273,9 +251,12 @@ async function fetchWellKnown(
         );
       }
     }
+    let pkaResult: PKAHandshakeResult | undefined;
     if (record.pka) {
       try {
-        await performPKAHandshakeForRecord(record);
+        const bindingDomain =
+          policy.domainBindingPolicy === 'off' ? undefined : normalizeDomain(domain);
+        pkaResult = await performPKAHandshakeForRecord(record, bindingDomain);
       } catch (pkaError) {
         // Preserve ERR_SECURITY errors from PKA verification
         if (pkaError instanceof AidError && pkaError.errorCode === 'ERR_SECURITY') {
@@ -286,7 +267,14 @@ async function fetchWellKnown(
     }
     enforcePkaPolicy(record, url, security);
     await enforceDowngradePolicy(record, url, policy, security);
-    return { record, raw: text.trim(), queryName: url, security };
+    enforceDomainBindingPolicy(security, url, pkaResult);
+    return {
+      record,
+      raw: text.trim(),
+      queryName: url,
+      security,
+      ...(pkaResult ? { pka: pkaResult } : {}),
+    };
   } catch (e) {
     if (e instanceof AidError) {
       // Preserve ERR_SECURITY errors from PKA verification, don't convert to ERR_FALLBACK_FAILED
@@ -319,6 +307,8 @@ export interface DiscoveryResult {
   queryName: string;
   /** Security policy evaluation for the chosen result. */
   security: DiscoverySecurity;
+  /** PKA handshake outcome when the record carried a key. */
+  pka?: PKAHandshakeResult;
 }
 
 /**
@@ -410,15 +400,18 @@ export async function discover(
         }
 
         const result = selectedRecords[0];
-        await performPKAHandshakeForRecord(result.record);
+        const bindingDomain =
+          policy.domainBindingPolicy === 'off' ? undefined : normalizeDomain(domain);
+        const pkaResult = await performPKAHandshakeForRecord(result.record, bindingDomain);
         const security = createDiscoverySecurity(policy, false);
         enforcePkaPolicy(result.record, queryName, security);
         await enforceDowngradePolicy(result.record, queryName, policy, security);
+        enforceDomainBindingPolicy(security, queryName, pkaResult);
         if (policy.dnssecPolicy !== 'off') {
           const validated = await queryDnssecStatus(queryName, timeout);
           enforceDnssecPolicy(security, queryName, validated);
         }
-        return { ...result, security };
+        return { ...result, security, ...(pkaResult ? { pka: pkaResult } : {}) };
       }
 
       if (lastAidError) throw lastAidError;
@@ -516,12 +509,12 @@ export async function discover(
       (error.errorCode === 'ERR_NO_RECORD' || error.errorCode === 'ERR_DNS_LOOKUP_FAILED')
     ) {
       try {
-        const { record, raw, queryName, security } = await fetchWellKnown(
+        const { record, raw, queryName, security, pka } = await fetchWellKnown(
           domain,
           wellKnownTimeoutMs,
           options,
         );
-        return { record, raw, ttl: DNS_TTL_MIN, queryName, security };
+        return { record, raw, ttl: DNS_TTL_MIN, queryName, security, ...(pka ? { pka } : {}) };
       } catch (fallbackError) {
         if (fallbackError instanceof AidError) {
           // Propagate rich details from the fallback

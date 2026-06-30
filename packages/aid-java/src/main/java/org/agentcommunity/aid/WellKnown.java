@@ -46,7 +46,21 @@ public final class WellKnown {
     return sb.toString();
   }
 
+  /** Result of a .well-known fetch: the parsed record and whether a domain-bound PKA proof was obtained. */
+  public static final class Result {
+    public final AidRecord record;
+    public final boolean domainBound;
+    public Result(AidRecord record, boolean domainBound) {
+      this.record = record;
+      this.domainBound = domainBound;
+    }
+  }
+
   public static AidRecord fetch(String domain, Duration timeout, boolean allowInsecure) {
+    return fetchBound(domain, timeout, allowInsecure, domain).record;
+  }
+
+  public static Result fetchBound(String domain, Duration timeout, boolean allowInsecure, String queriedDomain) {
     String scheme = allowInsecure ? "http" : "https";
     String url = scheme + "://" + domain + "/.well-known/agent";
     HttpClient http = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).connectTimeout(timeout).build();
@@ -88,10 +102,15 @@ public final class WellKnown {
       // Restore http URI in the resulting record
       rec = new AidRecord(validated.v, uri, validated.proto, validated.auth, validated.desc, validated.docs, validated.dep, validated.pka, validated.kid);
     }
+    boolean domainBound = false;
     if (rec.pka != null) {
-      Handshake.performHandshake(rec.uri, rec.pka, rec.kid == null ? "" : rec.kid, timeout);
+      domainBound = Handshake.performHandshake(
+          rec.uri,
+          rec.pka,
+          rec.kid == null ? "" : rec.kid,
+          timeout,
+          queriedDomain == null ? domain : queriedDomain);
     }
-    return rec;
+    return new Result(rec, domainBound);
   }
 }
-

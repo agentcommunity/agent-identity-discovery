@@ -1,5 +1,0 @@
-[
-  { "id": "happy-path", "expect": "pass" },
-  { "id": "alg-mismatch", "overrideAlg": "rsa", "expect": "fail" },
-  { "id": "kid-mismatch", "overrideKeyId": "b2", "expect": "fail" }
-]

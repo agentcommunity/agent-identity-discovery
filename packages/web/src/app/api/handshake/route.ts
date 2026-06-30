@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { runCheck } from '@agentcommunity/aid-engine';
 import { handleProtocol } from '@/lib/protocols';
 import type { ProtocolToken } from '@/lib/protocols';
 import {
@@ -7,6 +6,8 @@ import {
   parseHandshakeRequestBody,
   type AuthCredentials,
 } from '@/lib/api/handshake-validation';
+import { getSecurityInfo } from '@/lib/api/handshake-security';
+import { isPrivateHost } from '@/lib/api/ssrf';
 
 export const runtime = 'nodejs';
 
@@ -22,39 +23,6 @@ const safeHostFromUri = (uri: string): string => {
     return new URL(uri).host;
   } catch {
     return uri.split('/')[0] || uri;
-  }
-};
-
-const getSecurityInfo = async (hostname: string): Promise<Record<string, unknown> | undefined> => {
-  try {
-    if (isPrivateHost(hostname)) {
-      return undefined;
-    }
-
-    const report = await runCheck(hostname, {
-      timeoutMs: 4000,
-      allowFallback: true,
-      wellKnownTimeoutMs: 1500,
-      showDetails: true,
-    });
-
-    return {
-      dnssec: report.dnssec.present,
-      pka: {
-        present: report.pka.present,
-        attempted: report.pka.attempted,
-        verified: report.pka.verified,
-        keyid: report.pka.keyid,
-        alg: report.pka.alg,
-        createdSkewSec: report.pka.createdSkewSec,
-        covered: report.pka.covered,
-      },
-      tls: report.tls,
-      warnings: report.record.warnings,
-      errors: report.record.errors,
-    };
-  } catch {
-    return undefined;
   }
 };
 
@@ -124,7 +92,11 @@ export async function POST(request: Request) {
     try {
       const url = new URL(uri);
       if (url.protocol.startsWith('http')) {
-        const probe = await fetch(url.toString(), { method: 'HEAD', redirect: 'manual' });
+        const probe = await fetch(url.toString(), {
+          method: 'HEAD',
+          redirect: 'manual',
+          signal: AbortSignal.timeout(3000),
+        });
         if (probe.status === 401) {
           const headerValue = probe.headers.get('www-authenticate') ?? undefined;
           const metadataMatch = headerValue?.match(/as_uri="([^"]+)"/i);
@@ -214,13 +186,6 @@ export async function POST(request: Request) {
 
 const isSupportedScheme = (protocol: SupportedScheme): boolean =>
   ['http:', 'https:', 'ws:', 'wss:'].includes(protocol);
-
-const isPrivateHost = (host: string): boolean =>
-  host === 'localhost' ||
-  host === '127.0.0.1' ||
-  /^10\./.test(host) ||
-  /^192\.168\./.test(host) ||
-  /^172\.(1[6-9]|2\d|3[0-1])\./.test(host);
 
 const safeParseBody = async (
   request: Request,

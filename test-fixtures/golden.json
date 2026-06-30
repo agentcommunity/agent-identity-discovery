@@ -141,6 +141,26 @@
       "name": "unknown-future-version",
       "raw": "v=aid3;uri=https://api.example.com/mcp;proto=mcp",
       "errorCode": "ERR_INVALID_TXT"
+    },
+    {
+      "name": "malformed-pair-missing-equals",
+      "raw": "v=aid2;garbage;u=https://x/mcp;p=mcp",
+      "errorCode": "ERR_INVALID_TXT"
+    },
+    {
+      "name": "empty-key-in-pair",
+      "raw": "=foo;v=aid2;u=https://x/mcp;p=mcp",
+      "errorCode": "ERR_INVALID_TXT"
+    },
+    {
+      "name": "empty-value-in-pair",
+      "raw": "v=;u=https://x/mcp;p=mcp",
+      "errorCode": "ERR_INVALID_TXT"
+    },
+    {
+      "name": "duplicate-canonical-key",
+      "raw": "v=aid1;v=aid2;u=https://x/mcp;p=mcp",
+      "errorCode": "ERR_INVALID_TXT"
     }
   ],
   "recordSets": [

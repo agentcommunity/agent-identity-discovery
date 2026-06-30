@@ -2,12 +2,19 @@ name: Showcase DNS
 
 on:
   pull_request:
-    branches: [main, feat/aid1.1-spec, feat/next16-react19-modernization, cloudflare-migration]
+    branches: [main]
     paths: ['showcase/terraform/**']
   push:
-    branches: [main, feat/aid1.1-spec, feat/next16-react19-modernization, cloudflare-migration]
+    branches: [main]
     paths: ['showcase/terraform/**']
   workflow_dispatch: {}
+
+# Serialize showcase-dns runs: never cancel a partially-applied terraform run
+# because that can leave the Cloudflare zone in a partial state. Two concurrent
+# pushes to main therefore queue rather than race.
+concurrency:
+  group: showcase-dns-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   terraform:
@@ -17,7 +24,7 @@ jobs:
         working-directory: showcase/terraform
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v4
@@ -25,7 +32,7 @@ jobs:
           terraform_version: 1.6.6
 
       - name: Cache Terraform dir
-        uses: actions/cache@v5
+        uses: actions/cache@v4
         with:
           path: showcase/terraform/.terraform
           key: terraform-${{ hashFiles('showcase/terraform/**/*.tf') }}
@@ -50,22 +57,30 @@ jobs:
           CF_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
         run: |
           set -euo pipefail
-          deleted=0
+          # Collect ALL matching _agent.* TXT record ids across ALL pages FIRST,
+          # then delete them. Interleaving deletes with pagination is broken for
+          # >100 records: deleting records on page N shifts the result set, so
+          # page N+1 skips what just moved into the freed slots.
+          all_ids=()
           page=1
           while :; do
             resp=$(curl -fsS \
               -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
               "https://api.cloudflare.com/client/v4/zones/$CF_ZONE_ID/dns_records?type=TXT&per_page=100&page=$page")
-            ids=$(echo "$resp" | jq -r '.result[] | select(.name | startswith("_agent.")) | .id')
-            for id in $ids; do
-              curl -fsS -X DELETE \
-                -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-                "https://api.cloudflare.com/client/v4/zones/$CF_ZONE_ID/dns_records/$id" > /dev/null
-              deleted=$((deleted+1))
+            page_ids=$(echo "$resp" | jq -r '.result[] | select(.name | startswith("_agent.")) | .id')
+            for id in $page_ids; do
+              all_ids+=("$id")
             done
             total=$(echo "$resp" | jq -r '.result_info.total_pages // 1')
             [ "$page" -ge "$total" ] && break
             page=$((page+1))
+          done
+          deleted=0
+          for id in "${all_ids[@]}"; do
+            curl -fsS -X DELETE \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              "https://api.cloudflare.com/client/v4/zones/$CF_ZONE_ID/dns_records/$id" > /dev/null
+            deleted=$((deleted+1))
           done
           echo "purged $deleted _agent.* TXT record(s)"
 

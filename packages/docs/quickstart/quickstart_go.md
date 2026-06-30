@@ -8,8 +8,11 @@ icon: material/language-go
 
 ## Install
 
+> **Not yet published as a standalone Go module.** Consume the SDK from source (`packages/aid-go`) until the `github.com/agentcommunity/aid-go` module repository and tags are published.
+
 ```bash
-go get -u github.com/agentcommunity/agent-identity-discovery/aid-go
+go mod edit -require=github.com/agentcommunity/aid-go@v0.0.0
+go mod edit -replace=github.com/agentcommunity/aid-go=../agent-identity-discovery/packages/aid-go
 ```
 
 ## Discover by Domain
@@ -22,7 +25,7 @@ import (
     "log"
     "time"
 
-    aid "github.com/agentcommunity/agent-identity-discovery/aid-go"
+    aid "github.com/agentcommunity/aid-go"
 )
 
 func main() {
@@ -37,7 +40,7 @@ func main() {
 Base-first DNS flow and guarded `.well-known` fallback:
 
 ```go
-rec, ttl, err := aid.DiscoverWithOptions(
+res, err := aid.DiscoverWithOptions(
     "example.com",
     5*time.Second,
     aid.DiscoveryOptions{
@@ -46,12 +49,16 @@ rec, ttl, err := aid.DiscoverWithOptions(
         WellKnownTimeout:  2 * time.Second,
     },
 )
+// res.Record, res.TTL, res.DomainBound
 ```
+
+`DiscoverWithOptions` returns a `DiscoveryResult` carrying `Record`, `TTL`, and `DomainBound`. The original `aid.Discover(domain, timeout)` form still returns `(AidRecord, uint32, error)` for backward compatibility.
 
 Notes
 
 - TTL uses DNS value when available; for `.well-known` fallback, TTL is treated as 300.
 - PKA handshake runs automatically when v2 `pka`/`k` is present. Legacy `aid1` records still use `pka`/`kid`.
+- For `aid2` PKA, the SDK sends the queried host in the `AID-Domain` header by default and surfaces `DiscoveryResult.DomainBound` (`true` only for a verified domain-bound proof — one whose `aid-pka-v2` covered set includes `"aid-domain";req`). Requesting binding is not itself a mitigation — only `domain-binding=require` enforces it. See [Specification Appendix B.7](../specification.md#b7-domain-binding).
 
 ## Parse Raw TXT
 

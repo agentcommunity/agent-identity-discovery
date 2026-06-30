@@ -39,19 +39,20 @@ def _select_preferred_record(valid_records: list[dict], query_name: str) -> dict
         return selected_records[0]
     raise AidError(
         "ERR_INVALID_TXT",
-        f"Multiple valid AID records found for {query_name}; publish exactly one valid record per queried DNS name",
+        f"Multiple valid {selected_version} AID records found for {query_name}; publish exactly one valid record per queried DNS name",
     )
 
 
-def _perform_pka_for_record(record: dict, timeout: float) -> None:
+def _perform_pka_for_record(record: dict, timeout: float, *, queried_domain: str | None = None) -> bool:
+    """Perform the PKA handshake for a record (if PKA is present). Returns True if domain-bound."""
     if not record.get("pka"):
-        return
+        return False
     if perform_pka_handshake is None:
         raise AidError("ERR_SECURITY", "PKA handshake not supported in this environment")
     if record.get("v") == SPEC_VERSION_V1:
         perform_pka_handshake(record["uri"], record["pka"], record.get("kid") or "", timeout=timeout)
-        return
-    perform_pka_handshake(record["uri"], record["pka"], timeout=timeout)
+        return False
+    return perform_pka_handshake(record["uri"], record["pka"], domain=queried_domain, timeout=timeout)
 
 
 def _query_txt_record(fqdn: str, timeout: float) -> Tuple[list[str], int]:
@@ -65,15 +66,12 @@ def _query_txt_record(fqdn: str, timeout: float) -> Tuple[list[str], int]:
         raise AidError("ERR_DNS_LOOKUP_FAILED", str(exc)) from None
 
     # dnspython joins multi-string automatically? Actually each answer.rdata.strings
-    ttl = answers.rrset.ttl if answers.rrset else DNS_TTL_DEFAULT
+    ttl = answers.rrset.ttl if answers.rrset else DNS_TTL_MIN
     txt_strings: list[str] = []
     for rdata in answers:
         # each rdata.strings is a tuple of bytes segments
         txt_strings.append("".join(seg.decode() for seg in rdata.strings))
     return txt_strings, ttl
-
-
-DNS_TTL_DEFAULT = 300  # fallback
 
 
 def discover(
@@ -103,7 +101,7 @@ def discover(
             DeprecationWarning,
             stacklevel=2,
         )
-        well_known_fallback = bool(kwargs["wellKnownFallback"])  # type: ignore[assignment]
+        well_known_fallback = bool(kwargs.pop("wellKnownFallback"))  # type: ignore[assignment]
     if "wellKnownTimeoutMs" in kwargs:
         import warnings
 
@@ -113,11 +111,19 @@ def discover(
             stacklevel=2,
         )
         try:
-            ms = float(kwargs["wellKnownTimeoutMs"])  # type: ignore[arg-type]
+            ms = float(kwargs.pop("wellKnownTimeoutMs"))  # type: ignore[arg-type]
         except Exception:
             ms = 0.0
         if ms > 0:
             well_known_timeout = ms / 1000.0  # type: ignore[assignment]
+
+    # Fail closed on unknown keyword arguments so typos of security-relevant
+    # options (e.g. a misspelled well_known_fallback) surface as errors instead
+    # of silently degrading to the default (network fallback enabled).
+    if kwargs:
+        raise TypeError(
+            f"discover() got unexpected keyword arguments: {sorted(kwargs)}"
+        )
 
     # IDN → A-label conversion per RFC5890
     try:
@@ -148,7 +154,8 @@ def discover(
 
         if valid_records:
             record = _select_preferred_record(valid_records, query_name)
-            _perform_pka_for_record(record, timeout)
+            domain_bound = _perform_pka_for_record(record, timeout, queried_domain=domain_alabel)
+            record["domain_bound"] = domain_bound
             return record, ttl
 
         # If we got here, either no records or all invalid
@@ -242,6 +249,7 @@ def discover(
         doc = _fetch_well_known_json(domain_alabel, well_known_timeout)
         record = _canonicalize_well_known(doc)
         # Perform PKA handshake if present
-        _perform_pka_for_record(record, well_known_timeout)
+        domain_bound = _perform_pka_for_record(record, well_known_timeout, queried_domain=domain_alabel)
+        record["domain_bound"] = domain_bound
         return record, DNS_TTL_MIN
     raise last_error or AidError("ERR_NO_RECORD", f"No valid _agent TXT record found for {base_fqdn}")

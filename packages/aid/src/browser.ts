@@ -15,10 +15,11 @@
 
 import { type AidRecord, DNS_SUBDOMAIN, SPEC_VERSION_V1, SPEC_VERSION_V2 } from './constants.js';
 import { AidError, parse, canonicalizeRaw, AidRecordValidator } from './parser.js';
-import { performPKAHandshake } from './pka.js';
+import { performPKAHandshake, type PKAHandshakeResult } from './pka.js';
 import {
   type DiscoverySecurity,
   type DnssecPolicy,
+  type DomainBindingPolicy,
   type DowngradePolicy,
   type PkaPolicy,
   type PreviousSecurityState,
@@ -26,6 +27,7 @@ import {
   type WellKnownPolicy,
   createDiscoverySecurity,
   enforceDnssecPolicy,
+  enforceDomainBindingPolicy,
   enforceDowngradePolicy,
   enforcePkaPolicy,
   enforceWellKnownPolicy,
@@ -68,6 +70,8 @@ export interface DiscoveryResult {
   ttl?: number;
   /** Security policy evaluation for the chosen result. */
   security: DiscoverySecurity;
+  /** PKA handshake outcome when the record carried a key. */
+  pka?: PKAHandshakeResult;
 }
 
 /**
@@ -92,6 +96,8 @@ export interface DiscoveryOptions {
   pkaPolicy?: PkaPolicy;
   /** Downgrade handling when previous security state is supplied. */
   downgradePolicy?: DowngradePolicy;
+  /** Domain-binding enforcement for v2 PKA proofs. */
+  domainBindingPolicy?: DomainBindingPolicy;
   /** `.well-known` fallback policy. */
   wellKnownPolicy?: WellKnownPolicy;
   /** Previously observed PKA/KID state for downgrade detection. */
@@ -135,18 +141,22 @@ function constructQueryName(domain: string, protocol?: string, useUnderscore = f
 }
 
 function looksLikeAidRecord(raw: string): boolean {
-  return new RegExp(String.raw`(?:^|;)\s*(?:v|version)\s*=\s*aid[0-9]+(?:\s*(?:;|$))`, 'i').test(
-    raw,
-  );
+  // Match only the canonical `v` key. `version` is not a spec field and the
+  // parser does not consume it, so gating on `version=aidN` would classify a
+  // record as AID-like that the parser then rejects, suppressing the
+  // well-known fallback for an effectively non-AID record.
+  return new RegExp(String.raw`(?:^|;)\s*v\s*=\s*aid[0-9]+(?:\s*(?:;|$))`, 'i').test(raw);
 }
 
-async function performPKAHandshakeForRecord(record: AidRecord): Promise<void> {
-  if (!record.pka) return;
+async function performPKAHandshakeForRecord(
+  record: AidRecord,
+  domain?: string,
+): Promise<PKAHandshakeResult | undefined> {
+  if (!record.pka) return undefined;
   if (record.v === SPEC_VERSION_V1) {
-    await performPKAHandshake(record.uri, record.pka, record.kid ?? '');
-    return;
+    return await performPKAHandshake(record.uri, record.pka, record.kid ?? '');
   }
-  await performPKAHandshake(record.uri, record.pka);
+  return await performPKAHandshake(record.uri, record.pka, undefined, domain);
 }
 
 function dnsLookupSecurityError(message: string): AidError {
@@ -169,6 +179,7 @@ async function fetchWellKnown(
   raw: string;
   queryName: string;
   security: DiscoverySecurity;
+  pka?: PKAHandshakeResult;
 }> {
   const policy = resolveSecurityPolicy(options);
   const security = createDiscoverySecurity(policy, true);
@@ -220,9 +231,12 @@ async function fetchWellKnown(
         );
       }
     }
+    let pkaResult: PKAHandshakeResult | undefined;
     if (record.pka) {
       try {
-        await performPKAHandshakeForRecord(record);
+        const bindingDomain =
+          policy.domainBindingPolicy === 'off' ? undefined : normalizeDomain(domain);
+        pkaResult = await performPKAHandshakeForRecord(record, bindingDomain);
       } catch (pkaError) {
         // Preserve ERR_SECURITY errors from PKA verification
         if (pkaError instanceof AidError && pkaError.errorCode === 'ERR_SECURITY') {
@@ -233,7 +247,14 @@ async function fetchWellKnown(
     }
     enforcePkaPolicy(record, url, security);
     await enforceDowngradePolicy(record, url, policy, security);
-    return { record, raw: text.trim(), queryName: url, security };
+    enforceDomainBindingPolicy(security, url, pkaResult);
+    return {
+      record,
+      raw: text.trim(),
+      queryName: url,
+      security,
+      ...(pkaResult ? { pka: pkaResult } : {}),
+    };
   } catch (e) {
     if (e instanceof AidError) {
       // Preserve ERR_SECURITY errors from PKA verification, don't convert to ERR_FALLBACK_FAILED
@@ -391,14 +412,17 @@ export async function discover(
       }
 
       const result = selectedRecords[0];
-      await performPKAHandshakeForRecord(result.record);
+      const bindingDomain =
+        policy.domainBindingPolicy === 'off' ? undefined : normalizeDomain(domain);
+      const pkaResult = await performPKAHandshakeForRecord(result.record, bindingDomain);
       const security = createDiscoverySecurity(policy, false);
       enforcePkaPolicy(result.record, name, security);
       await enforceDowngradePolicy(result.record, name, policy, security);
+      enforceDomainBindingPolicy(security, name, pkaResult);
       if (policy.dnssecPolicy !== 'off') {
         enforceDnssecPolicy(security, name, ad);
       }
-      return { ...result, security };
+      return { ...result, security, ...(pkaResult ? { pka: pkaResult } : {}) };
     }
 
     if (lastAidError) throw lastAidError;
@@ -432,15 +456,18 @@ export async function discover(
       canUseWellKnownFallback(error)
     ) {
       try {
-        const { record, queryName, security } = await fetchWellKnown(
+        const { record, queryName, security, pka } = await fetchWellKnown(
           domain,
           wellKnownTimeoutMs,
           options,
         );
         // well-known does not provide a TTL, so we use a sensible default.
-        return { record, domain, queryName, ttl: 300, security };
-      } catch {
-        // Throw original error if fallback fails to provide better context
+        return { record, domain, queryName, ttl: 300, security, ...(pka ? { pka } : {}) };
+      } catch (fallbackError) {
+        if (fallbackError instanceof AidError) {
+          throw fallbackError;
+        }
+        // Throw original error if fallback fails without AID-specific context.
         throw error;
       }
     }

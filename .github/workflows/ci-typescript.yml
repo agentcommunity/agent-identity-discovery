@@ -2,9 +2,13 @@ name: CI (TypeScript)
 on:
   workflow_dispatch:
   push:
-    branches: [main, feat/aid1.1-spec, feat/next16-react19-modernization]
+    branches: [main]
   pull_request:
-    branches: [main, feat/aid1.1-spec, feat/next16-react19-modernization]
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -76,4 +80,10 @@ jobs:
       - name: Build aid and aid-doctor
         run: |
           pnpm install --frozen-lockfile
-          pnpm exec turbo run build --filter="@agentcommunity/aid" --filter="@agentcommunity/aid-doctor"
+          pnpm exec turbo run build --filter="@agentcommunity/aid" --filter="@agentcommunity/aid-doctor" --filter="@agentcommunity/e2e-tests"
+
+      - name: Verify doctor CLI (PKA mock e2e)
+        # Runs the full pka_e2e.ts suite (legacy aid1 + aid2 + aid2 domain-bound)
+        # against a local mock server — no external DNS required. This is the
+        # only macOS leg in CI, so it also validates cross-platform path handling.
+        run: pnpm -C packages/e2e-tests run e2e:pka

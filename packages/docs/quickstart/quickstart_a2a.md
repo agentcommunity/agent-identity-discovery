@@ -47,7 +47,7 @@ interface AgentCard {
   url: string; // The actual interaction endpoint
   preferredTransport?: string;
   skills: { id: string; name: string; description: string }[];
-  securitySchemes?: { [scheme: string]: any };
+  securitySchemes?: Record<string, unknown>;
 }
 
 async function connectToA2aAgent(domain: string) {

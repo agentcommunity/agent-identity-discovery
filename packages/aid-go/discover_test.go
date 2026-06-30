@@ -46,15 +46,15 @@ func TestDiscoverWithProtocolStaysOnExactHost(t *testing.T) {
 		}
 	}
 
-	rec, _, err := DiscoverWithOptions("app.team.example.com", 2*time.Second, DiscoveryOptions{
+	res, err := DiscoverWithOptions("app.team.example.com", 2*time.Second, DiscoveryOptions{
 		Protocol:          "mcp",
 		WellKnownFallback: false,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if rec.URI != "https://app.team.example.com/mcp" {
-		t.Fatalf("expected exact-host record, got %s", rec.URI)
+	if res.Record.URI != "https://app.team.example.com/mcp" {
+		t.Fatalf("expected exact-host record, got %s", res.Record.URI)
 	}
 	if len(queries) != 2 ||
 		queries[0] != "_agent._mcp.app.team.example.com" ||
@@ -82,15 +82,15 @@ func TestDiscoverWithProtocolNxDomainContinuesToBase(t *testing.T) {
 		}
 	}
 
-	rec, _, err := DiscoverWithOptions("example.com", 2*time.Second, DiscoveryOptions{
+	res, err := DiscoverWithOptions("example.com", 2*time.Second, DiscoveryOptions{
 		Protocol:          "mcp",
 		WellKnownFallback: false,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if rec.URI != "https://base.example.com/mcp" {
-		t.Fatalf("expected base record after protocol NXDOMAIN, got %s", rec.URI)
+	if res.Record.URI != "https://base.example.com/mcp" {
+		t.Fatalf("expected base record after protocol NXDOMAIN, got %s", res.Record.URI)
 	}
 	if len(queries) != 2 ||
 		queries[0] != "_agent._mcp.example.com" ||
@@ -152,14 +152,14 @@ func TestDiscoverPrefersValidAid2OverAid1(t *testing.T) {
 		}, nil
 	}
 
-	rec, _, err := DiscoverWithOptions("example.com", 2*time.Second, DiscoveryOptions{
+	res, err := DiscoverWithOptions("example.com", 2*time.Second, DiscoveryOptions{
 		WellKnownFallback: false,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if rec.V != "aid2" || rec.URI != "https://v2.example.com/mcp" {
-		t.Fatalf("expected aid2 record, got %+v", rec)
+	if res.Record.V != "aid2" || res.Record.URI != "https://v2.example.com/mcp" {
+		t.Fatalf("expected aid2 record, got %+v", res.Record)
 	}
 }
 
@@ -174,7 +174,7 @@ func TestDiscoverFailsOnMultipleValidAid2Records(t *testing.T) {
 		}, nil
 	}
 
-	_, _, err := DiscoverWithOptions("example.com", 2*time.Second, DiscoveryOptions{
+	_, err := DiscoverWithOptions("example.com", 2*time.Second, DiscoveryOptions{
 		WellKnownFallback: false,
 	})
 	if err == nil {
@@ -199,14 +199,14 @@ func TestDiscoverSelectsValidAid2WhenAnotherAid2IsMalformed(t *testing.T) {
 		}, nil
 	}
 
-	rec, _, err := DiscoverWithOptions("example.com", 2*time.Second, DiscoveryOptions{
+	res, err := DiscoverWithOptions("example.com", 2*time.Second, DiscoveryOptions{
 		WellKnownFallback: false,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if rec.V != "aid2" || rec.URI != "https://good.example.com/mcp" {
-		t.Fatalf("expected valid aid2 record, got %+v", rec)
+	if res.Record.V != "aid2" || res.Record.URI != "https://good.example.com/mcp" {
+		t.Fatalf("expected valid aid2 record, got %+v", res.Record)
 	}
 }
 
@@ -217,7 +217,7 @@ func TestDiscoverRejectsOnlyMalformedAidLikeTxt(t *testing.T) {
 		return []string{"v=aid3;u=https://future.example.com/mcp;p=mcp"}, nil
 	}
 
-	_, _, err := DiscoverWithOptions("example.com", 2*time.Second, DiscoveryOptions{
+	_, err := DiscoverWithOptions("example.com", 2*time.Second, DiscoveryOptions{
 		WellKnownFallback: true,
 	})
 	if err == nil {

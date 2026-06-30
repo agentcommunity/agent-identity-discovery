@@ -117,7 +117,7 @@ For full details on each protocol, see [Protocols & Auth](../Reference/protocols
 
 ## When to Add PKA
 
-PKA (Public Key Attestation) adds cryptographic proof that the server you're connecting to is the one the domain owner intended. It's optional but recommended for production.
+PKA (Public Key for Agent) adds cryptographic proof that the server you're connecting to is the one the domain owner intended. It's optional but recommended for production.
 
 **Add PKA when:**
 

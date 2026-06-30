@@ -40,6 +40,7 @@ export type {
   PkaPolicy,
   DowngradePolicy,
   WellKnownPolicy,
+  DomainBindingPolicy,
   PreviousSecurityState,
   DiscoverySecurity,
   DiscoverySecurityWarning,

@@ -1,11 +1,24 @@
 Metadata-Version: 2.4
 Name: aid-discovery
-Version: 2.0.0
-Summary: Python library for Agent Identity & Discovery (AID) - v2.0.0 release
+Version: 2.1.0
+Summary: Python library for Agent Identity & Discovery (AID) - v2.1.0 release
 Author-email: Agent Community <maintainers@agentcommunity.org>
 License: MIT
 Project-URL: Homepage, https://github.com/agentcommunity/agent-identity-discovery
 Project-URL: Repository, https://github.com/agentcommunity/agent-identity-discovery
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Topic :: Internet :: Name Service (DNS)
+Classifier: Topic :: Security
+Classifier: Typing :: Typed
 Requires-Python: >=3.8
 Description-Content-Type: text/markdown
 Requires-Dist: dnspython>=2.6.0
@@ -36,13 +49,19 @@ pip install aid-discovery
 from aid_py import discover, AidError
 
 try:
-    # Discover an agent by domain
-    result = discover("supabase.agentcommunity.org")
+    # discover() returns a (record, ttl) tuple.
+    # record is a dict (TypedDict); access fields by key.
+    record, ttl = discover("supabase.agentcommunity.org")
 
-    print(f"Protocol: {result.record.proto}")  # "mcp"
-    print(f"URI: {result.record.uri}")         # "https://api.supabase.com/mcp"
-    print(f"Description: {result.record.desc}") # "Supabase MCP"
-    print(f"TTL: {result.ttl} seconds")
+    print(f"Protocol: {record['proto']}")          # "mcp"
+    print(f"URI: {record['uri']}")                 # "https://api.supabase.com/mcp"
+    print(f"Description: {record.get('desc')}")    # "Supabase MCP" (optional)
+    print(f"TTL: {ttl} seconds")
+
+    # PKA domain-binding result (True only when an Ed25519 handshake
+    # cryptographically bound endpoint control to the queried domain):
+    if record.get("domain_bound"):
+        print("Endpoint control is bound to this domain")
 
 except AidError as e:
     print(f"Discovery failed: {e}")
@@ -64,7 +83,11 @@ Discovers an agent by looking up the `_agent` TXT record for the exact host you 
 
 **Returns:**
 
-- `DiscoveryResult`: Object containing the parsed record and TTL
+- `(record, ttl)` tuple, where:
+  - `record` (`dict`): the parsed and validated AID record. Access fields by key (e.g. `record["proto"]`, `record["uri"]`). See [Data Types → `AidRecord`](#aidrecord) for the available keys.
+  - `ttl` (`int`): DNS TTL in seconds.
+
+  Unpack it directly: `record, ttl = discover(domain)`.
 
 **Raises:**
 
@@ -80,7 +103,7 @@ Parses and validates a raw TXT record string.
 
 **Returns:**
 
-- `AidRecord`: Parsed and validated record
+- `AidRecord`: Parsed and validated record (a `dict` / `TypedDict`; access fields by key)
 
 **Raises:**
 
@@ -90,20 +113,18 @@ Parses and validates a raw TXT record string.
 
 ### `AidRecord`
 
-Represents a parsed AID record with the following attributes:
+A parsed AID record. At runtime this is a plain `dict` (a `TypedDict`), so access fields by key (`record["proto"]`), not by attribute. Optional fields may be absent — use `record.get("desc")`. Keys:
 
-- `v` (str): Protocol version (defaults to "aid2"; "aid1" is supported for legacy compatibility)
+- `v` (str): Protocol version (`"aid2"`; `"aid1"` is supported for legacy compatibility)
 - `uri` (str): Agent endpoint URI
-- `proto` (str): Protocol identifier (e.g., "mcp", "openapi")
+- `proto` (str): Protocol identifier (e.g., `"mcp"`, `"openapi"`)
 - `auth` (str, optional): Authentication method
 - `desc` (str, optional): Human-readable description
-
-### `DiscoveryResult`
-
-Contains discovery results:
-
-- `record` (AidRecord): The parsed AID record
-- `ttl` (int): DNS TTL in seconds
+- `docs` (str, optional): Absolute `https://` documentation URL
+- `dep` (str, optional): ISO 8601 UTC deprecation timestamp
+- `pka` (str, optional): Public key for attestation (base64url)
+- `kid` (str, optional): Key id (`aid1` only)
+- `domain_bound` (bool, optional): Set by `discover()` after a PKA handshake. `True` when endpoint control was cryptographically bound to the queried domain. Not a TXT-record field — records returned by `parse()` do not include it.
 
 ### `AidError`
 
@@ -131,8 +152,8 @@ Exception raised when discovery or parsing fails:
 from aid_py import discover, AidError
 
 try:
-    result = discover("example.com")
-    # Use result.record...
+    record, ttl = discover("example.com")
+    # Use record["proto"], record["uri"], ...
 except AidError as e:
     if e.code == 1000:  # ERR_NO_RECORD
         print("No agent found for this domain")
@@ -151,7 +172,7 @@ txt_record = "v=aid2;u=https://api.example.com/agent;p=mcp;s=Example Agent"
 
 try:
     record = parse(txt_record)
-    print(f"Parsed: {record.proto} agent at {record.uri}")
+    print(f"Parsed: {record['proto']} agent at {record['uri']}")
 except AidError as e:
     print(f"Invalid record: {e}")
 ```
@@ -159,9 +180,11 @@ except AidError as e:
 ### aid2 Notes (PKA + Fallback)
 
 - PKA handshake: For `aid2`, when a record includes `k` (`pka`), the client performs an Ed25519 HTTP Message Signatures handshake to verify endpoint control. The HTTP signature `keyid` is derived from the `aid2` key. `kid` (`i`) is legacy `aid1` compatibility only, not a v2 requirement. This requires an Ed25519 verification backend. Install one of:
-  - `pip install aid-discovery[pka]` (installs `PyNaCl` and `cryptography`)
-  - Or add `PyNaCl>=1.5` or `cryptography>=42` to your environment
+  - `pip install aid-discovery[pka]` (installs `cryptography`)
+  - Or add `cryptography>=42` or `PyNaCl>=1.5` to your environment (the verifier prefers `PyNaCl` if present and otherwise falls back to `cryptography`)
     If no backend is available, discovery raises `ERR_SECURITY` when PKA is present.
+
+- Domain binding: For `aid2` PKA, discovery sends `AID-Domain` by default. A domain-bound proof still uses the single `aid-pka-v2` tag and is indicated by signed coverage of `"aid-domain";req`; discovery stores the outcome in `record["domain_bound"]`. An unbound proof is accepted unless the caller enforces `domain-binding=require` in tooling.
 
 - `.well-known` fallback: On DNS issues (`ERR_NO_RECORD` or `ERR_DNS_LOOKUP_FAILED`), the client may fetch `https://<domain>/.well-known/agent` (TLS-anchored). Disable with `well_known_fallback=False`.
 

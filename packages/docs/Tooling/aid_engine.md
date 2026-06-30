@@ -72,7 +72,7 @@ import { validateTxtRecord } from '@agentcommunity/aid-engine';
 
 const validation = validateTxtRecord('v=aid2;u=https://api.example.com/agent;p=mcp');
 console.log(validation.isValid); // true
-console.log(validation.errors); // []
+console.log(validation.error); // undefined when valid, message string when invalid
 ```
 
 ### PKA Verification
@@ -92,14 +92,14 @@ console.log(result.reason); // error message if invalid
 ```typescript
 interface DoctorReport {
   domain: string;
-  record: RecordBlock;
   queried: QueriedBlock;
+  record: RecordBlock;
   dnssec: DnssecBlock;
   tls: TlsBlock;
   pka: PkaBlock;
   downgrade: DowngradeBlock;
   exitCode: number;
-  cacheEntry?: CacheEntry;
+  cacheEntry: CacheEntry | null;
 }
 ```
 
@@ -161,7 +161,11 @@ The CLI wrapper `aid-doctor` handles:
 import { AidError } from '@agentcommunity/aid';
 
 try {
-  const result = await runCheck('example.com');
+  const result = await runCheck('example.com', {
+    timeoutMs: 5000,
+    allowFallback: true,
+    wellKnownTimeoutMs: 2000,
+  });
 } catch (error) {
   if (error instanceof AidError) {
     console.log('AID Error:', error.code, error.errorCode);

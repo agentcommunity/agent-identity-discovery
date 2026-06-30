@@ -36,7 +36,7 @@ aid-rs = { path = "../aid-rs" }
 
 ### One-liner discovery
 
-```rust
+```rust,no_run
 use aid_rs::discover;
 
 #[tokio::main]
@@ -49,8 +49,8 @@ async fn main() -> Result<(), aid_rs::AidError> {
 
 ### Options form
 
-```rust
-use aid_rs::{discover_with_options, DiscoveryOptions};
+```rust,no_run
+use aid_rs::{discover_with_options_result, DiscoveryOptions};
 use std::time::Duration;
 
 #[tokio::main]
@@ -61,8 +61,11 @@ async fn main() -> Result<(), aid_rs::AidError> {
         well_known_fallback: true,
         well_known_timeout: Duration::from_secs(2),
     };
-    let rec = discover_with_options("example.com", opts).await?;
-    println!("{} {}", rec.proto, rec.uri);
+    let result = discover_with_options_result("example.com", opts).await?;
+    println!(
+        "{} {} domain_bound={}",
+        result.record.proto, result.record.uri, result.domain_bound
+    );
     Ok(())
 }
 ```
@@ -90,7 +93,7 @@ Enable the `handshake` feature to verify endpoint control when an `aid2` record 
 aid-rs = { path = "../aid-rs", features = ["handshake"] }
 ```
 
-```rust
+```rust,no_run
 #[cfg(feature = "handshake")]
 use aid_rs::perform_pka_handshake;
 
@@ -98,20 +101,35 @@ use aid_rs::perform_pka_handshake;
 #[tokio::main]
 async fn main() -> Result<(), aid_rs::AidError> {
     let rec = aid_rs::parse("v=aid2;uri=https://api.example.com/mcp;p=mcp;k=ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ")?;
-    perform_pka_handshake(&rec.uri, rec.pka.as_deref().unwrap(), "", std::time::Duration::from_secs(2)).await?;
+    // The final argument is the AID-Domain for v2 domain binding; pass `Some("example.com")`
+    // to bind the proof to the queried domain, or `None` to skip domain binding.
+    let domain_bound = perform_pka_handshake(
+        &rec.uri,
+        rec.pka.as_deref().unwrap(),
+        "",
+        std::time::Duration::from_secs(2),
+        Some("example.com"),
+    ).await?;
+    println!("domain_bound={domain_bound}");
     Ok(())
 }
 ```
 
 #### v2 handshake expectations (summary)
 
-- Covered fields set: `"@method";req`, `"@target-uri";req`, `"@authority";req`, and `"@status"`
+- Covered fields set: `"@method";req`, `"@target-uri";req`, `"@authority";req`, and `"@status"`. For a domain-bound proof, the set additionally covers `"aid-domain";req` inserted between `"@authority";req` and `"@status"`.
 - `alg="ed25519"`
 - `keyid` equals the RFC 7638 thumbprint derived from `k`
 - `created` and `expires` define a short validity window
 - `nonce` exactly matches the value sent in `Accept-Signature`
 - Response includes `Cache-Control: no-store`
 - `pka` is unpadded base64url for a 32-byte Ed25519 public key
+
+#### Domain binding
+
+When you pass an `AID-Domain` (the final argument to `perform_pka_handshake`, sent by discovery result APIs for `aid2` records), the client requests a domain-bound proof using the same single `aid-pka-v2` tag; the bound proof additionally covers `"aid-domain";req`. A response that covers `aid-domain` when no `AID-Domain` was sent is rejected (fail-closed).
+
+Use `discover_result`, `discover_with_options_result`, or `fetch_well_known_result` when you need the authenticated `domain_bound` outcome. The legacy `discover`, `discover_with_options`, and `fetch_well_known` helpers still return only `AidRecord` for source compatibility.
 
 ### v1 compatibility
 

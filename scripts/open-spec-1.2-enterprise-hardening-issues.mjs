@@ -99,13 +99,18 @@ function labelColor(name) {
 
 function ensureLabels(specs) {
   const required = new Set(specs.flatMap((spec) => spec.labels));
+
+  if (!apply) {
+    // Dry-run: skip the live gh call; treat all required labels as available.
+    return new Set(required);
+  }
+
   const existing = new Set(
     runGhJson(['label', 'list', '--repo', repo, '--limit', '500', '--json', 'name']).map((label) => label.name),
   );
 
   for (const label of required) {
     if (existing.has(label)) continue;
-    if (!apply) continue;
     runGh([
       'label',
       'create',
@@ -201,18 +206,23 @@ function main() {
   }
 
   const availableLabels = ensureLabels(specs);
-  const existingIssues = runGhJson([
-    'issue',
-    'list',
-    '--repo',
-    repo,
-    '--state',
-    'all',
-    '--limit',
-    '500',
-    '--json',
-    'number,title,url',
-  ]);
+
+  // In dry-run mode, skip the live issue-list fetch; use empty maps so all issues
+  // are treated as new (would-create) without requiring network access.
+  const existingIssues = apply
+    ? runGhJson([
+        'issue',
+        'list',
+        '--repo',
+        repo,
+        '--state',
+        'all',
+        '--limit',
+        '500',
+        '--json',
+        'number,title,url',
+      ])
+    : [];
   const existingByTitle = new Map(existingIssues.map((issue) => [issue.title, issue]));
   const existingByNumber = new Map(existingIssues.map((issue) => [issue.number, issue]));
 
@@ -320,4 +330,10 @@ function main() {
   }
 }
 
-main();
+try {
+  main();
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(`Error: ${message}`);
+  process.exit(1);
+}

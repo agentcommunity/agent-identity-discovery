@@ -3,7 +3,7 @@
 Minimal .NET library for Agent Identity & Discovery (AID) parsing, discovery, and constants.
 
 - Target framework: `net9.0`
-- No external runtime dependencies
+- Runtime dependency: `NSec.Cryptography` (Ed25519 signature verification)
 - DNS-first discovery included via DNS-over-HTTPS (DoH)
 
 ## v2 PKA Default
@@ -20,14 +20,15 @@ This library supports `aid2` records and the v2 PKA handshake (Ed25519 HTTP Mess
 ```csharp
 using AidDiscovery;
 
-// Fetch from https://<domain>/.well-known/agent and validate
-var record = await WellKnown.FetchAsync(
+// Fetch from https://<domain>/.well-known/agent and validate.
+// If PKA is present, DomainBound reports whether the proof covered AID-Domain.
+var (record, domainBound) = await WellKnown.FetchAsync(
     domain: "example.com",
     timeout: TimeSpan.FromSeconds(2),
     allowInsecure: false // set true for local http testing only
 );
 
-Console.WriteLine($"{record.Proto} at {record.Uri}");
+Console.WriteLine($"{record.Proto} at {record.Uri}, domainBound={domainBound}");
 // If record.Pka != null, handshake already ran inside FetchAsync
 ```
 
@@ -58,7 +59,13 @@ using AidDiscovery;
 
 // After parsing a TXT or loading from elsewhere
 var rec = Aid.Parse("v=aid2;uri=https://api.example.com/mcp;p=mcp;k=ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ");
-await Pka.PerformHandshakeAsync(rec.Uri, rec.Pka!, "", TimeSpan.FromSeconds(2));
+var domainBound = await Pka.PerformHandshakeAsync(
+    rec.Uri,
+    rec.Pka!,
+    "",
+    TimeSpan.FromSeconds(2),
+    domain: "example.com"
+);
 ```
 
 ## Usage

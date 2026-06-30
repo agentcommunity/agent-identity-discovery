@@ -1,7 +1,11 @@
 import { buildTxtRecordVariant } from '@agentcommunity/aid-engine';
 import type { AuthToken } from '@agentcommunity/aid';
 
-const ISO_8601_UTC_Z = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
+// Mirror the SDK parser (parser.ts:308-316): must end with Z and parse to a
+// real instant. This accepts fractional seconds and rejects impossible dates
+// (e.g. month 13), so the Generator UI never disagrees with the canonical SDK.
+const isValidDepTimestamp = (dep: string): boolean =>
+  dep.endsWith('Z') && !Number.isNaN(Date.parse(dep));
 
 const PROTOCOL_SCHEMES = {
   mcp: ['https://'],
@@ -144,7 +148,7 @@ export const validateGeneratorPayload = (payload: unknown): GeneratorValidationR
   if (data.docs && !data.docs.startsWith('https://')) {
     errors.push({ code: 'ERR_DOCS_HTTPS', message: 'Docs must use https://' });
   }
-  if (data.dep && !ISO_8601_UTC_Z.test(data.dep)) {
+  if (data.dep && !isValidDepTimestamp(data.dep)) {
     errors.push({ code: 'ERR_DEP_ISO', message: 'Dep must be ISO 8601 UTC Z' });
   }
   if (data.kid) {

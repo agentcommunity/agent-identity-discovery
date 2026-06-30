@@ -4,14 +4,20 @@ on:
   schedule:
     - cron: '0 2 * * *'
   push:
-    branches: [main, feat/aid1.1-spec, feat/next16-react19-modernization]
+    branches: [main]
   pull_request:
-    branches: [main, feat/aid1.1-spec, feat/next16-react19-modernization]
+    branches: [main]
 
 permissions:
   contents: read
   security-events: write
   actions: read
+
+# Cancel superseded runs on the same branch; do not cancel in-progress on main
+# (schedule runs on main should always complete).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   security:
@@ -21,7 +27,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: ['javascript-typescript', 'go', 'python', 'java', 'csharp', 'rust']
+        # 'rust' is NOT included here: CodeQL Rust support is in public preview
+        # and the query suites used in codeql-config.yml (security-and-quality,
+        # security-experimental) do not yet have GA coverage. Rust security is
+        # handled by cargo clippy + cargo test in ci-rust.yml instead.
+        language: ['javascript-typescript', 'go', 'python', 'java', 'csharp']
     steps:
       - uses: actions/checkout@v4
         with:
@@ -53,7 +63,10 @@ jobs:
 
       - name: Secret scanning (diff)
         if: github.event_name == 'pull_request' || github.event_name == 'push'
-        uses: trufflesecurity/trufflehog@main
+        # Pinned to a specific release tag — do NOT use @main (floating branch =
+        # supply-chain risk: any commit to trufflehog's main runs with read access
+        # to this repo's checkout). Update the pin periodically or via Dependabot.
+        uses: trufflesecurity/trufflehog@v3.90.0
         with:
           path: ./
           base: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
@@ -62,14 +75,53 @@ jobs:
 
       - name: Secret scanning (full)
         if: github.event_name != 'pull_request' && github.event_name != 'push'
-        uses: trufflesecurity/trufflehog@main
+        uses: trufflesecurity/trufflehog@v3.90.0
         with:
           path: ./
           extra_args: --debug --only-verified
 
       - name: License compliance check
         run: |
-          find packages -name "*.ts" -o -name "*.js" -o -name "*.rs" -o -name "*.go" -o -name "*.cs" -o -name "*.java" | head -10 | xargs -I {} sh -c 'head -5 "{}" | grep -q "MIT\|License\|Copyright" || echo "Missing license header: {}"'
+          test -f LICENSE
+          grep -qi "MIT License" LICENSE
+
+          node <<'NODE'
+          const fs = require('node:fs');
+          const packageManifests = [
+            'package.json',
+            'packages/aid/package.json',
+            'packages/aid-conformance/package.json',
+            'packages/aid-doctor/package.json',
+            'packages/aid-engine/package.json',
+            'packages/aid-go/package.json',
+            'packages/aid-py/package.json',
+            'packages/e2e-tests/package.json',
+            'packages/web/package.json',
+          ];
+
+          const missing = [];
+          for (const manifest of packageManifests) {
+            const pkg = JSON.parse(fs.readFileSync(manifest, 'utf8'));
+            if (pkg.license !== 'MIT') missing.push(`${manifest}: license is ${JSON.stringify(pkg.license)}`);
+          }
+
+          const textChecks = [
+            ['packages/aid-py/pyproject.toml', /license\s*=\s*\{\s*text\s*=\s*"MIT"\s*\}/],
+            ['packages/aid-rs/Cargo.toml', /^license\s*=\s*"MIT"/m],
+          ];
+          for (const [file, pattern] of textChecks) {
+            const body = fs.readFileSync(file, 'utf8');
+            if (!pattern.test(body)) missing.push(`${file}: missing MIT license metadata`);
+          }
+
+          if (missing.length > 0) {
+            console.error('License metadata check failed:');
+            for (const item of missing) console.error(`  ${item}`);
+            process.exit(1);
+          }
+          NODE
+
+          echo "License metadata OK"
 
       - name: Dependency vulnerability scan
         run: |
@@ -101,13 +153,21 @@ jobs:
           category: '/language:${{ matrix.language }}'
           upload: true
 
-      - name: Generate SBOM (CycloneDX)
+      # SBOM: generate the npm dependency tree only for the JS/TS leg.
+      # The gh-node-module-generatebom tool is Node-specific; running it in the
+      # Go/Python/Rust/.NET/Java legs would produce identical npm SBOMs mislabeled
+      # with an ecosystem name they do not represent. Ecosystem-appropriate SBOM
+      # tools (cyclonedx-gomod, cargo-cyclonedx, cyclonedx-py, etc.) can be added
+      # per-language when required.
+      - name: Generate SBOM (CycloneDX, npm)
+        if: matrix.language == 'javascript-typescript'
         uses: CycloneDX/gh-node-module-generatebom@v1
         with:
-          output: ./sbom-${{ matrix.language }}.xml
+          output: ./sbom-npm.xml
 
       - name: Upload SBOM
+        if: matrix.language == 'javascript-typescript'
         uses: actions/upload-artifact@v4
         with:
-          name: sbom-${{ matrix.language }}
-          path: ./sbom-${{ matrix.language }}.xml
+          name: sbom-npm
+          path: ./sbom-npm.xml

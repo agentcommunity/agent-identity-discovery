@@ -2,15 +2,19 @@
 
 > Official Go implementation of the [Agent Identity & Discovery (AID)](https://github.com/agentcommunity/agent-identity-discovery) specification.
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/agentcommunity/agent-identity-discovery/aid-go.svg)](https://pkg.go.dev/github.com/agentcommunity/agent-identity-discovery/aid-go)
 [![Go 1.23+](https://img.shields.io/badge/go-1.23+-blue.svg)](https://golang.org/dl/)
 
 AID enables you to discover AI agents by domain name using DNS TXT records. Type a domain, get the agent's endpoint and protocol - that's it.
 
 ## Installation
 
+> **Not yet published as a standalone Go module.** Consume the SDK from source (`packages/aid-go`) until the `github.com/agentcommunity/aid-go` module repository and tags are published.
+
+For local source use, add a temporary replace in your consuming module:
+
 ```bash
-go get -u github.com/agentcommunity/agent-identity-discovery/aid-go
+go mod edit -require=github.com/agentcommunity/aid-go@v0.0.0
+go mod edit -replace=github.com/agentcommunity/aid-go=../agent-identity-discovery/packages/aid-go
 ```
 
 ## Quick Start
@@ -23,7 +27,7 @@ import (
     "log"
     "time"
 
-    "github.com/agentcommunity/agent-identity-discovery/aid-go"
+    "github.com/agentcommunity/aid-go"
 )
 
 func main() {
@@ -57,20 +61,44 @@ Discovers an agent by looking up the `_agent` TXT record for the exact host you 
 - `uint32`: DNS TTL in seconds (0 if unavailable)
 - `error`: Error if discovery fails
 
-### `func DiscoverWithOptions(domain string, timeout time.Duration, opts DiscoveryOptions) (AidRecord, uint32, error)`
+### `func DiscoverWithOptions(domain string, timeout time.Duration, opts DiscoveryOptions) (DiscoveryResult, error)`
 
-Enhanced discovery with protocol-specific DNS lookup and `.well-known` controls, still scoped to the exact host you passed in.
+Enhanced discovery with protocol-specific DNS lookup and `.well-known` controls, still scoped to the exact host you passed in. Returns a single `DiscoveryResult` struct plus an error.
 
 ```go
-rec, ttl, err := aid.DiscoverWithOptions(
+res, err := aid.DiscoverWithOptions(
     "example.com",
     5*time.Second,
     aid.DiscoveryOptions{
         Protocol:          "mcp",      // queries exact-host base first; protocol-specific probing is diagnostic/base-failure-only where configured
         WellKnownFallback: true,        // only on ERR_NO_RECORD / ERR_DNS_LOOKUP_FAILED
-        WellKnownTimeout:  2*time.Second,
+        WellKnownTimeout:  2 * time.Second,
     },
 )
+if err != nil {
+    log.Fatalf("Discovery failed: %v", err)
+}
+
+fmt.Printf("Protocol: %s\n", res.Record.Proto)
+fmt.Printf("TTL: %d seconds\n", res.TTL)
+fmt.Printf("Domain-bound PKA proof: %t\n", res.DomainBound)
+```
+
+**Returns:**
+
+- `DiscoveryResult`: Struct with the resolved record and metadata (see below)
+- `error`: Error if discovery fails
+
+### `type DiscoveryResult`
+
+Carries the resolved record, its TTL, and whether the PKA handshake produced a domain-bound proof for the queried domain:
+
+```go
+type DiscoveryResult struct {
+    Record      AidRecord // Parsed and validated record
+    TTL         uint32    // DNS TTL in seconds (0 if unavailable)
+    DomainBound bool      // true when the PKA handshake proved control of the queried domain
+}
 ```
 
 ### `func Parse(txt string) (AidRecord, error)`
@@ -112,6 +140,10 @@ type AidRecord struct {
     Proto string `json:"proto"`           // Protocol identifier
     Auth  string `json:"auth,omitempty"`  // Authentication method (optional)
     Desc  string `json:"desc,omitempty"`  // Human-readable description (optional)
+    Docs  string `json:"docs,omitempty"`  // Absolute https:// documentation URL (optional)
+    Dep   string `json:"dep,omitempty"`   // ISO 8601 UTC deprecation timestamp (optional)
+    Pka   string `json:"pka,omitempty"`   // Public Key for Attestation (optional)
+    Kid   string `json:"kid,omitempty"`   // Key ID for legacy aid1 PKA; not used by aid2 (optional)
 }
 ```
 
@@ -137,13 +169,14 @@ type AidError struct {
 
 ## Error Codes
 
-| Code | Symbol                  | Description                  |
-| ---- | ----------------------- | ---------------------------- |
-| 1000 | `ERR_NO_RECORD`         | No `_agent` TXT record found |
-| 1001 | `ERR_INVALID_TXT`       | Record found but malformed   |
-| 1002 | `ERR_UNSUPPORTED_PROTO` | Protocol not supported       |
-| 1003 | `ERR_SECURITY`          | Security policy violation    |
-| 1004 | `ERR_DNS_LOOKUP_FAILED` | DNS query failed             |
+| Code | Symbol                  | Description                                                |
+| ---- | ----------------------- | ---------------------------------------------------------- |
+| 1000 | `ERR_NO_RECORD`         | No `_agent` TXT record found                               |
+| 1001 | `ERR_INVALID_TXT`       | Record found but malformed                                 |
+| 1002 | `ERR_UNSUPPORTED_PROTO` | Protocol not supported                                     |
+| 1003 | `ERR_SECURITY`          | Security policy violation                                  |
+| 1004 | `ERR_DNS_LOOKUP_FAILED` | DNS query failed                                           |
+| 1005 | `ERR_FALLBACK_FAILED`   | The `.well-known` fallback failed or returned invalid data |
 
 ## Advanced Usage
 
@@ -157,7 +190,7 @@ import (
     "fmt"
     "time"
 
-    "github.com/agentcommunity/agent-identity-discovery/aid-go"
+    "github.com/agentcommunity/aid-go"
 )
 
 func main() {
@@ -192,7 +225,7 @@ import (
     "fmt"
     "log"
 
-    "github.com/agentcommunity/agent-identity-discovery/aid-go"
+    "github.com/agentcommunity/aid-go"
 )
 
 func main() {
@@ -216,7 +249,7 @@ package main
 import (
     "fmt"
 
-    "github.com/agentcommunity/agent-identity-discovery/aid-go"
+    "github.com/agentcommunity/aid-go"
 )
 
 func main() {
@@ -248,7 +281,7 @@ import (
     "fmt"
     "time"
 
-    "github.com/agentcommunity/agent-identity-discovery/aid-go"
+    "github.com/agentcommunity/aid-go"
 )
 
 func main() {
@@ -297,11 +330,23 @@ MIT - see [LICENSE](https://github.com/agentcommunity/agent-identity-discovery/b
 
 ### v2 handshake expectations (summary)
 
-- Covered fields set: `"@method";req`, `"@target-uri";req`, `"@authority";req`, and `"@status"`
+- Base covered fields set: `"@method";req`, `"@target-uri";req`, `"@authority";req`, and `"@status"`
 - `alg` must be `ed25519`
 - `created` and `expires` define a short validity window
 - `keyid` equals the RFC 7638 thumbprint derived from `k`
 - `pka` is unpadded base64url for a 32-byte Ed25519 public key
+
+### Domain binding
+
+By default the client sends an `AID-Domain` request header carrying the queried
+domain. If the endpoint chooses to bind the proof to that domain, it returns a
+signature whose covered set additionally includes `"aid-domain";req` inserted
+between `"@authority";req` and `"@status"` (so the covered set is the four base
+components plus that one). Both the endpoint-only and domain-bound proofs use
+the same `aid-pka-v2` tag — domain binding is signalled purely by `aid-domain`
+coverage, not a distinct tag. When the proof is domain-bound, discovery returns
+`DiscoveryResult.DomainBound = true`. A response that covers `aid-domain`
+without the client having sent `AID-Domain` is rejected (fail closed).
 
 ### v1 compatibility
 

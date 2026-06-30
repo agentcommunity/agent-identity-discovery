@@ -211,7 +211,9 @@ export function ConnectionToolBlock({
               }
             >
               {result.value.security.pka.verified === true
-                ? 'PKA verified'
+                ? (result.value.security.pka.domainBound === true
+                  ? 'Endpoint-bound'
+                  : 'PKA verified')
                 : (result.value.security.pka.present
                   ? 'PKA present'
                   : 'PKA not present')}

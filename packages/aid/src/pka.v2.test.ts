@@ -168,7 +168,9 @@ describe('AID v2 PKA handshake', () => {
       },
     );
 
-    await expect(performPKAHandshake(vector.record.u, vector.record.k)).resolves.toBeUndefined();
+    await expect(performPKAHandshake(vector.record.u, vector.record.k)).resolves.toEqual({
+      domainBound: false,
+    });
   });
 
   it('canonicalizes uppercase hosts, default ports, query, and fragments for @target-uri', async () => {
@@ -207,7 +209,9 @@ describe('AID v2 PKA handshake', () => {
       },
     );
 
-    await expect(performPKAHandshake(vector.record.u, vector.record.k)).resolves.toBeUndefined();
+    await expect(performPKAHandshake(vector.record.u, vector.record.k)).resolves.toEqual({
+      domainBound: false,
+    });
   });
 
   it('rejects aid2 PKA responses without Cache-Control: no-store', async () => {
@@ -482,6 +486,44 @@ describe('AID v2 PKA handshake', () => {
 
     await expect(performPKAHandshake(vector.record.u, vector.record.k)).rejects.toThrow(
       'Unsupported Signature-Input parameter: foo',
+    );
+  });
+
+  it('rejects a malformed (non-base64) Signature value with ERR_SECURITY (not a raw DOMException)', async () => {
+    const vector = loadCanonicalV2Vector();
+    const nonceBytes = Uint8Array.from(Array.from({ length: 32 }, (_, index) => 160 + index));
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(vector.created * 1000));
+    getRandomValuesSpy = vi.spyOn(g.crypto!, 'getRandomValues').mockImplementation((array) => {
+      (array as Uint8Array).set(nonceBytes);
+      return array;
+    });
+
+    // Valid Signature-Input, but the Signature dictionary member carries
+    // non-base64 bytes between the colons. atob would throw a DOMException;
+    // the handshake must surface a structured ERR_SECURITY AidError so the
+    // client fails closed instead of treating it as a DNS lookup failure.
+    g.fetch = vi.fn(async () => ({
+      ok: false,
+      status: vector.response.status,
+      headers: {
+        get: (name: string) => {
+          const normalized = name.toLowerCase();
+          if (normalized === 'signature-input') return vector.response.signature_input;
+          if (normalized === 'signature') return 'aid-pka=:@@@not-base64@@@:';
+          if (normalized === 'cache-control') return vector.response.cache_control;
+          return null;
+        },
+      },
+      text: async () => '',
+    }));
+
+    await expect(performPKAHandshake(vector.record.u, vector.record.k)).rejects.toMatchObject({
+      name: 'AidError',
+      errorCode: 'ERR_SECURITY',
+    });
+    await expect(performPKAHandshake(vector.record.u, vector.record.k)).rejects.toThrow(
+      'Invalid PKA signature encoding',
     );
   });
 });

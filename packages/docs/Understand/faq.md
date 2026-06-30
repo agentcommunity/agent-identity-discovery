@@ -43,7 +43,7 @@ See [.well-known JSON](../Reference/well_known_json.md) for the full specificati
 
 ## Is PKA required?
 
-**No.** PKA (Public Key Attestation) is optional. AID works without it — DNS + TLS provides a solid baseline.
+**No.** PKA (Public Key for Agent) is optional. AID works without it — DNS + TLS provides a solid baseline.
 
 PKA adds cryptographic proof that the server at the discovered URI actually controls the private key published in DNS. It's recommended for production deployments where trust matters, but you can start without it and add it later.
 

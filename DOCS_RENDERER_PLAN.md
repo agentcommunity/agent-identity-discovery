@@ -1,6 +1,8 @@
 # Docs Renderer Implementation Plan — Continuation
 
-## Status: Phases 1, 2, 6 COMPLETE. Phases 3, 4, 5, 7 REMAINING.
+> **Historical plan — implementation complete.** The docs renderer shipped and the `/docs` route is live at `aid.agentcommunity.org/docs`. This file is retained for context. Embedded paths, branch names, worktree locations, route listings (e.g. `/docs/rationale`, `/docs/security`), and the `v1.1` spec label are stale and do not reflect the current repo structure (see `packages/docs/` for the live doc tree and `packages/web/WORKBENCH_COMPONENTS_2.md` for the current workbench architecture).
+
+## Status: ALL PHASES COMPLETE (shipped).
 
 ## Worktree Location
 ```

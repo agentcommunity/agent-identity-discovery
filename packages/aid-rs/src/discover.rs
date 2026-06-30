@@ -1,23 +1,24 @@
 use std::time::Duration;
 
+use crate::constants_gen::{SPEC_VERSION_V1, SPEC_VERSION_V2};
 use crate::errors::AidError;
 use crate::parser::parse;
 use crate::record::AidRecord;
-use crate::constants_gen::{SPEC_VERSION_V1, SPEC_VERSION_V2};
 use hickory_resolver::TokioAsyncResolver;
 use idna::domain_to_ascii;
 
-#[cfg(feature = "handshake")]
-use crate::pka::perform_pka_handshake;
-
-#[cfg(feature = "handshake")]
-use crate::well_known::fetch_well_known;
+use crate::well_known::{fetch_well_known_result, verify_domain_bound_for_record};
 
 /// Discover an AID record for the given domain using DNS TXT at _agent.<domain>.
 /// Falls back to HTTPS .well-known when DNS has no record or lookup fails.
 pub async fn discover(domain: &str, timeout: Duration) -> Result<AidRecord, AidError> {
-    let opts = DiscoveryOptions { protocol: None, timeout, well_known_fallback: true, well_known_timeout: Duration::from_secs(2) };
-    discover_with_options(domain, opts).await
+    let opts = DiscoveryOptions {
+        protocol: None,
+        timeout,
+        well_known_fallback: true,
+        well_known_timeout: Duration::from_secs(2),
+    };
+    Ok(discover_with_options_result(domain, opts).await?.record)
 }
 
 pub struct DiscoveryOptions {
@@ -25,6 +26,15 @@ pub struct DiscoveryOptions {
     pub timeout: Duration,
     pub well_known_fallback: bool,
     pub well_known_timeout: Duration,
+}
+
+/// Result returned by discovery when callers need verification metadata.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiscoveryResult {
+    pub record: AidRecord,
+    pub query_name: String,
+    /// True only when a v2 PKA handshake returned a verified domain-bound proof.
+    pub domain_bound: bool,
 }
 
 fn looks_like_aid_record(raw: &str) -> bool {
@@ -35,7 +45,10 @@ fn looks_like_aid_record(raw: &str) -> bool {
         || lower.contains(";version=aid")
 }
 
-fn select_supported_record(records: Vec<AidRecord>, query_name: &str) -> Result<AidRecord, AidError> {
+fn select_supported_record(
+    records: Vec<AidRecord>,
+    query_name: &str,
+) -> Result<AidRecord, AidError> {
     let selected_version = if records.iter().any(|record| record.v == SPEC_VERSION_V2) {
         SPEC_VERSION_V2
     } else {
@@ -57,7 +70,10 @@ fn select_supported_record(records: Vec<AidRecord>, query_name: &str) -> Result<
     ))
 }
 
-fn select_from_txt_answers(raw_records: Vec<String>, query_name: &str) -> Result<Option<AidRecord>, AidError> {
+fn select_from_txt_answers(
+    raw_records: Vec<String>,
+    query_name: &str,
+) -> Result<Option<AidRecord>, AidError> {
     let mut valid: Vec<AidRecord> = Vec::new();
     let mut parse_err: Option<AidError> = None;
     for raw_record in raw_records {
@@ -90,7 +106,29 @@ fn discovery_query_names(alabel: &str, protocol: Option<&str>) -> Vec<String> {
     names
 }
 
-pub async fn discover_with_options(domain: &str, options: DiscoveryOptions) -> Result<AidRecord, AidError> {
+pub async fn discover_with_options(
+    domain: &str,
+    options: DiscoveryOptions,
+) -> Result<AidRecord, AidError> {
+    Ok(discover_with_options_result(domain, options).await?.record)
+}
+
+/// Discover an AID record and return verification metadata such as v2 PKA domain binding.
+pub async fn discover_result(domain: &str, timeout: Duration) -> Result<DiscoveryResult, AidError> {
+    let opts = DiscoveryOptions {
+        protocol: None,
+        timeout,
+        well_known_fallback: true,
+        well_known_timeout: Duration::from_secs(2),
+    };
+    discover_with_options_result(domain, opts).await
+}
+
+/// Discover with explicit options and return verification metadata.
+pub async fn discover_with_options_result(
+    domain: &str,
+    options: DiscoveryOptions,
+) -> Result<DiscoveryResult, AidError> {
     // IDNA → A-label
     let alabel = domain_to_ascii(domain).unwrap_or_else(|_| domain.to_string());
     let names = discovery_query_names(&alabel, options.protocol.as_deref());
@@ -102,7 +140,8 @@ pub async fn discover_with_options(domain: &str, options: DiscoveryOptions) -> R
     // iterate names
     let mut last_err: Option<AidError> = None;
     for name in names {
-        let txt_lookup = tokio::time::timeout(options.timeout, resolver.txt_lookup(name.clone())).await;
+        let txt_lookup =
+            tokio::time::timeout(options.timeout, resolver.txt_lookup(name.clone())).await;
         match txt_lookup {
             Err(_) => {
                 last_err = Some(AidError::new("ERR_DNS_LOOKUP_FAILED", "DNS query timeout"));
@@ -110,9 +149,19 @@ pub async fn discover_with_options(domain: &str, options: DiscoveryOptions) -> R
             }
             Ok(Err(e)) => {
                 let msg = e.to_string().to_lowercase();
-                let code = if msg.contains("nxdomain") || msg.contains("no record") || msg.contains("no data") { "ERR_NO_RECORD" } else { "ERR_DNS_LOOKUP_FAILED" };
+                let code = if msg.contains("nxdomain")
+                    || msg.contains("no record")
+                    || msg.contains("no data")
+                {
+                    "ERR_NO_RECORD"
+                } else {
+                    "ERR_DNS_LOOKUP_FAILED"
+                };
                 let err = AidError::new(code, e.to_string());
-                if code != "ERR_NO_RECORD" { last_err = Some(err); break; }
+                if code != "ERR_NO_RECORD" {
+                    last_err = Some(err);
+                    break;
+                }
                 last_err = Some(err);
                 continue;
             }
@@ -128,32 +177,44 @@ pub async fn discover_with_options(domain: &str, options: DiscoveryOptions) -> R
                     })
                     .collect::<Vec<_>>();
                 if let Some(rec) = select_from_txt_answers(raw_records, &name)? {
-                    #[cfg(feature = "handshake")]
-                    {
-                        if let Some(pka) = rec.pka.clone() {
-                            if rec.v == SPEC_VERSION_V1 {
-                                perform_pka_handshake(&rec.uri, &pka, rec.kid.as_deref().unwrap_or(""), options.timeout).await?;
-                            } else {
-                                perform_pka_handshake(&rec.uri, &pka, "", options.timeout).await?;
-                            }
-                        }
-                    }
-                    return Ok(rec);
+                    return finish_discovered_record(rec, &name, &alabel, options.timeout).await;
                 }
-                last_err = Some(AidError::new("ERR_NO_RECORD", format!("No valid AID record found for {}", name)));
+                last_err = Some(AidError::new(
+                    "ERR_NO_RECORD",
+                    format!("No valid AID record found for {}", name),
+                ));
                 continue;
             }
         }
     }
 
-    // Fallback
+    // Fallback to HTTPS .well-known. The fetch works under default features; the PKA
+    // handshake it performs (if the record carries a key) is only enforced when the
+    // `handshake` feature is enabled. This matches Go/Python, where fallback is
+    // unconditional and not behind a build feature.
     if options.well_known_fallback {
-        #[cfg(feature = "handshake")]
-        {
-            return fetch_well_known(&alabel, options.well_known_timeout).await;
-        }
+        let result = fetch_well_known_result(&alabel, options.well_known_timeout).await?;
+        return Ok(DiscoveryResult {
+            record: result.record,
+            query_name: format!("https://{}/.well-known/agent", alabel),
+            domain_bound: result.domain_bound,
+        });
     }
     Err(last_err.unwrap_or_else(|| AidError::new("ERR_DNS_LOOKUP_FAILED", "DNS query failed")))
+}
+
+async fn finish_discovered_record(
+    record: AidRecord,
+    query_name: &str,
+    binding_domain: &str,
+    timeout: Duration,
+) -> Result<DiscoveryResult, AidError> {
+    let domain_bound = verify_domain_bound_for_record(&record, binding_domain, timeout).await?;
+    Ok(DiscoveryResult {
+        record,
+        query_name: query_name.to_string(),
+        domain_bound,
+    })
 }
 
 #[cfg(test)]
@@ -168,7 +229,10 @@ mod tests {
     fn protocol_query_names_use_underscore_then_base() {
         assert_eq!(
             discovery_query_names("example.com", Some("mcp")),
-            vec!["_agent._mcp.example.com".to_string(), "_agent.example.com".to_string()]
+            vec![
+                "_agent._mcp.example.com".to_string(),
+                "_agent.example.com".to_string()
+            ]
         );
     }
 
@@ -192,7 +256,8 @@ mod tests {
             "v=aid2;u=https://example.com/b;p=mcp",
         ]);
 
-        let err = select_supported_record(records, "_agent.example.com").expect_err("multiple aid2 records fail");
+        let err = select_supported_record(records, "_agent.example.com")
+            .expect_err("multiple aid2 records fail");
         assert_eq!(err.error_code, "ERR_INVALID_TXT");
         assert!(err.message.contains("Multiple valid aid2 AID records"));
     }
@@ -258,5 +323,201 @@ mod tests {
         .expect("non-aid TXT is not invalid");
 
         assert!(selected.is_none());
+    }
+
+    #[tokio::test]
+    async fn finished_discovery_result_defaults_domain_bound_false_without_pka() {
+        let record = parse("v=aid2;u=https://example.com/mcp;p=mcp").expect("valid aid2");
+
+        let result = finish_discovered_record(
+            record,
+            "_agent.example.com",
+            "example.com",
+            Duration::from_secs(1),
+        )
+        .await
+        .expect("finish result");
+
+        assert_eq!(result.record.uri, "https://example.com/mcp");
+        assert_eq!(result.query_name, "_agent.example.com");
+        assert!(!result.domain_bound);
+    }
+
+    #[cfg(feature = "handshake")]
+    mod domain_bound_tests {
+        use super::*;
+        use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
+        use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
+        use sha2::Digest;
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+        use std::thread;
+
+        fn v2_test_key() -> (SigningKey, String) {
+            let seed = [7u8; 32];
+            let sk = SigningKey::from_bytes(&seed);
+            let vk = VerifyingKey::from(&sk);
+            let k = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(vk.as_bytes());
+            (sk, k)
+        }
+
+        fn header_value<'a>(request: &'a str, name: &str) -> Option<&'a str> {
+            request.lines().find_map(|line| {
+                let (key, value) = line.split_once(':')?;
+                if key.eq_ignore_ascii_case(name) {
+                    Some(value.trim())
+                } else {
+                    None
+                }
+            })
+        }
+
+        fn nonce_from_accept_signature(value: &str) -> String {
+            let marker = "nonce=\"";
+            let start = value.find(marker).expect("nonce parameter") + marker.len();
+            let rest = &value[start..];
+            let end = rest.find('"').expect("nonce closing quote");
+            rest[..end].to_string()
+        }
+
+        fn derive_v2_keyid(pka: &str) -> String {
+            let jwk = format!("{{\"crv\":\"Ed25519\",\"kty\":\"OKP\",\"x\":\"{}\"}}", pka);
+            let digest = sha2::Sha256::digest(jwk.as_bytes());
+            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(digest)
+        }
+
+        fn sign_v2_response(
+            sk: &SigningKey,
+            keyid: &str,
+            target_uri: &str,
+            authority: &str,
+            status: u16,
+            nonce: &str,
+            aid_domain: Option<&str>,
+        ) -> (String, String) {
+            let created = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("system time")
+                .as_secs() as i64;
+            let expires = created + 60;
+            let covered = if aid_domain.is_some() {
+                "(\"@method\";req \"@target-uri\";req \"@authority\";req \"aid-domain\";req \"@status\")"
+            } else {
+                "(\"@method\";req \"@target-uri\";req \"@authority\";req \"@status\")"
+            };
+            let signature_params_raw = format!(
+                "{};created={};expires={};keyid=\"{}\";alg=\"ed25519\";nonce=\"{}\";tag=\"aid-pka-v2\"",
+                covered, created, expires, keyid, nonce
+            );
+            let mut lines = vec![
+                "\"@method\";req: GET".to_string(),
+                format!("\"@target-uri\";req: {}", target_uri),
+                format!("\"@authority\";req: {}", authority),
+            ];
+            if let Some(domain) = aid_domain {
+                lines.push(format!("\"aid-domain\";req: {}", domain));
+            }
+            lines.push(format!("\"@status\": {}", status));
+            lines.push(format!("\"@signature-params\": {}", signature_params_raw));
+            let signature = sk.sign(lines.join("\n").as_bytes());
+            (
+                format!("aid-pka={}", signature_params_raw),
+                format!("aid-pka=:{}:", B64.encode(signature.to_bytes())),
+            )
+        }
+
+        fn spawn_v2_pka_server(sk: SigningKey, keyid: String, bind_response: bool) -> String {
+            let listener = TcpListener::bind("127.0.0.1:0").expect("bind test server");
+            let address = listener.local_addr().expect("local addr");
+            let url = format!("http://{}/mcp", address);
+            let response_target_uri = url.clone();
+            thread::spawn(move || {
+                let (mut stream, _) = listener.accept().expect("accept request");
+                let mut buffer = [0u8; 8192];
+                let bytes_read = stream.read(&mut buffer).expect("read request");
+                let request = String::from_utf8_lossy(&buffer[..bytes_read]);
+                let accept_signature =
+                    header_value(&request, "Accept-Signature").expect("Accept-Signature");
+                let nonce = nonce_from_accept_signature(accept_signature);
+                let aid_domain = header_value(&request, "AID-Domain");
+                let signed_domain = if bind_response { aid_domain } else { None };
+                let status = 401;
+                let (sig_input, sig_header) = sign_v2_response(
+                    &sk,
+                    &keyid,
+                    &response_target_uri,
+                    &address.to_string(),
+                    status,
+                    &nonce,
+                    signed_domain,
+                );
+                let response = format!(
+                    "HTTP/1.1 {} Unauthorized\r\nCache-Control: no-store\r\nSignature-Input: {}\r\nSignature: {}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                    status, sig_input, sig_header
+                );
+                stream
+                    .write_all(response.as_bytes())
+                    .expect("write response");
+            });
+            url
+        }
+
+        #[tokio::test]
+        async fn finished_discovery_result_surfaces_domain_bound_true_for_v2_pka() {
+            let (sk, pka) = v2_test_key();
+            let keyid = derive_v2_keyid(&pka);
+            let uri = spawn_v2_pka_server(sk, keyid, true);
+            let record = AidRecord {
+                v: SPEC_VERSION_V2.to_string(),
+                uri,
+                proto: "mcp".to_string(),
+                auth: None,
+                desc: None,
+                docs: None,
+                dep: None,
+                pka: Some(pka),
+                kid: None,
+            };
+
+            let result = finish_discovered_record(
+                record,
+                "_agent.example.com",
+                "Example.COM.",
+                Duration::from_secs(2),
+            )
+            .await
+            .expect("finish result");
+
+            assert!(result.domain_bound);
+        }
+
+        #[tokio::test]
+        async fn finished_discovery_result_surfaces_domain_bound_false_for_unbound_v2_pka() {
+            let (sk, pka) = v2_test_key();
+            let keyid = derive_v2_keyid(&pka);
+            let uri = spawn_v2_pka_server(sk, keyid, false);
+            let record = AidRecord {
+                v: SPEC_VERSION_V2.to_string(),
+                uri,
+                proto: "mcp".to_string(),
+                auth: None,
+                desc: None,
+                docs: None,
+                dep: None,
+                pka: Some(pka),
+                kid: None,
+            };
+
+            let result = finish_discovered_record(
+                record,
+                "_agent.example.com",
+                "example.com",
+                Duration::from_secs(2),
+            )
+            .await
+            .expect("finish result");
+
+            assert!(!result.domain_bound);
+        }
     }
 }

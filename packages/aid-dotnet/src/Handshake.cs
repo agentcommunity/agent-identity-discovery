@@ -10,7 +10,17 @@ public static class Pka
 {
     internal static Action<byte[]> FillRandomBytesForTesting { get; set; } = bytes => RandomNumberGenerator.Fill(bytes);
     internal static Func<long> NowUnixForTesting { get; set; } = () => DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-    internal static Func<HttpRequestMessage, TimeSpan, Task<HttpResponseMessage>> SendAsyncForTesting { get; set; } = SendWithDefaultClientAsync;
+    internal static Func<HttpRequestMessage, TimeSpan, CancellationToken, Task<HttpResponseMessage>> SendAsyncForTesting { get; set; } = SendWithDefaultClientAsync;
+
+    // Single shared client (with a redirect-blocking, connection-pooling handler) reused across
+    // all handshakes. Creating/disposing an HttpClient per call exhausts ephemeral ports under
+    // load; per-request timeouts are applied via a linked CancellationTokenSource instead of
+    // HttpClient.Timeout so the shared instance stays usable across differing timeouts.
+    private static readonly HttpClient SharedClient = new(new SocketsHttpHandler
+    {
+        AllowAutoRedirect = false,
+        PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+    });
 
     private static string AsciiToLower(string s)
     {
@@ -24,10 +34,26 @@ public static class Pka
         });
     }
 
-    private static async Task<HttpResponseMessage> SendWithDefaultClientAsync(HttpRequestMessage request, TimeSpan timeout)
+    internal static string CanonicalizeAidDomain(string domain)
     {
-        using var http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = timeout };
-        return await http.SendAsync(request).ConfigureAwait(false);
+        var value = AsciiToLower(domain.Trim());
+        // Strip exactly one trailing dot
+        if (value.EndsWith(".", StringComparison.Ordinal))
+        {
+            value = value[..^1];
+        }
+        if (value.Length == 0 || !Regex.IsMatch(value, @"^[a-z0-9.:\[\]_-]+$"))
+        {
+            throw new AidError(nameof(Constants.ERR_SECURITY), "Invalid AID-Domain value");
+        }
+        return value;
+    }
+
+    private static async Task<HttpResponseMessage> SendWithDefaultClientAsync(HttpRequestMessage request, TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        using var timeoutCts = new CancellationTokenSource(timeout);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+        return await SharedClient.SendAsync(request, linked.Token).ConfigureAwait(false);
     }
 
     private static byte[] MultibaseDecode(string s)
@@ -159,17 +185,17 @@ public static class Pka
         return Encoding.UTF8.GetBytes(string.Join('\n', lines));
     }
 
-    public static async Task PerformHandshakeAsync(string uri, string pka, string kid, TimeSpan timeout)
+    public static async Task<bool> PerformHandshakeAsync(string uri, string pka, string kid, TimeSpan timeout, string? domain = null, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrEmpty(kid))
         {
-            await PerformV2HandshakeAsync(uri, pka, timeout).ConfigureAwait(false);
-            return;
+            return await PerformV2HandshakeAsync(uri, pka, timeout, domain, cancellationToken).ConfigureAwait(false);
         }
-        await PerformV1HandshakeAsync(uri, pka, kid, timeout).ConfigureAwait(false);
+        await PerformV1HandshakeAsync(uri, pka, kid, timeout, cancellationToken).ConfigureAwait(false);
+        return false;
     }
 
-    private static async Task PerformV1HandshakeAsync(string uri, string pka, string kid, TimeSpan timeout)
+    private static async Task PerformV1HandshakeAsync(string uri, string pka, string kid, TimeSpan timeout, CancellationToken cancellationToken)
     {
         var u = new Uri(uri);
         var challengeBytes = new byte[32];
@@ -179,7 +205,7 @@ public static class Pka
         using var req = new HttpRequestMessage(HttpMethod.Get, uri);
         req.Headers.TryAddWithoutValidation("AID-Challenge", challenge);
         req.Headers.TryAddWithoutValidation("Date", date);
-        using var res = await SendAsyncForTesting(req, timeout).ConfigureAwait(false);
+        using var res = await SendAsyncForTesting(req, timeout, cancellationToken).ConfigureAwait(false);
         if (!res.IsSuccessStatusCode) throw new AidError(nameof(Constants.ERR_SECURITY), $"Handshake HTTP {(int)res.StatusCode}");
 
         var (covered, created, keyidRaw, keyidNorm, alg, signature, respDate) = ParseSignatureHeaders(res);
@@ -206,7 +232,7 @@ public static class Pka
         VerifyEd25519(pub, baseBytes, signature);
     }
 
-    private static async Task PerformV2HandshakeAsync(string uri, string pka, TimeSpan timeout)
+    private static async Task<bool> PerformV2HandshakeAsync(string uri, string pka, TimeSpan timeout, string? domain, CancellationToken cancellationToken)
     {
         var (pub, expectedKeyid) = DeriveAid2KeyMaterial(pka);
         var requestUri = NormalizeRequestUri(uri);
@@ -215,10 +241,18 @@ public static class Pka
         FillRandomBytesForTesting(nonceBytes);
         var nonce = Base64UrlEncode(nonceBytes);
 
+        // Canonicalize domain ONCE; thread the SAME value to header + sig base
+        string? canonicalDomain = domain is not null ? CanonicalizeAidDomain(domain) : null;
+        var requestDomainBound = canonicalDomain is not null;
+
         using var req = new HttpRequestMessage(HttpMethod.Get, requestUri);
-        req.Headers.TryAddWithoutValidation("Accept-Signature", BuildAcceptSignatureV2(expectedKeyid, nonce));
+        req.Headers.TryAddWithoutValidation("Accept-Signature", BuildAcceptSignatureV2(expectedKeyid, nonce, requestDomainBound));
         req.Headers.CacheControl = new CacheControlHeaderValue { NoStore = true };
-        using var res = await SendAsyncForTesting(req, timeout).ConfigureAwait(false);
+        if (canonicalDomain is not null)
+        {
+            req.Headers.TryAddWithoutValidation("AID-Domain", canonicalDomain);
+        }
+        using var res = await SendAsyncForTesting(req, timeout, cancellationToken).ConfigureAwait(false);
 
         var status = (int)res.StatusCode;
         if (status >= 300 && status < 400)
@@ -253,13 +287,23 @@ public static class Pka
         {
             throw new AidError(nameof(Constants.ERR_SECURITY), "Signature nonce mismatch");
         }
+
         if (!TimingSafeEqualString(parsed.Tag, "aid-pka-v2"))
         {
             throw new AidError(nameof(Constants.ERR_SECURITY), "Invalid signature tag");
         }
+        // Domain binding is derived from the signed covered set (aid-domain coverage), not the tag.
+        var isDomainBound = parsed.DomainBound;
+        // Primary protection: a response that covers aid-domain is only meaningful when the client
+        // committed to a domain via the AID-Domain header. Reject otherwise (fail closed).
+        if (isDomainBound && canonicalDomain is null)
+        {
+            throw new AidError(nameof(Constants.ERR_SECURITY), "Response covers aid-domain but no AID-Domain was sent");
+        }
 
-        var baseBytes = BuildV2SignatureBase(parsed.Covered, parsed.SignatureParamsRaw, "GET", requestUri, authority, status);
+        var baseBytes = BuildV2SignatureBase(parsed.Covered, parsed.SignatureParamsRaw, "GET", requestUri, authority, status, canonicalDomain);
         VerifyEd25519(pub, baseBytes, parsed.Signature);
+        return isDomainBound;
     }
 
     private static (byte[] PublicKey, string Keyid) DeriveAid2KeyMaterial(string pka)
@@ -304,9 +348,14 @@ public static class Pka
         return $"{host}:{parsed.Port}";
     }
 
-    private static string BuildAcceptSignatureV2(string keyid, string nonce)
+    private static string BuildAcceptSignatureV2(string keyid, string nonce, bool domainBound = false)
     {
-        return $"aid-pka=(\"@method\";req \"@target-uri\";req \"@authority\";req \"@status\");created;expires;keyid=\"{keyid}\";alg=\"ed25519\";nonce=\"{nonce}\";tag=\"aid-pka-v2\"";
+        // The tag is a fixed profile identifier (RFC 9421 section 2.3); domain binding is signalled
+        // by including "aid-domain";req in the covered set, not by a distinct tag.
+        var covered = domainBound
+            ? "(\"@method\";req \"@target-uri\";req \"@authority\";req \"aid-domain\";req \"@status\")"
+            : "(\"@method\";req \"@target-uri\";req \"@authority\";req \"@status\")";
+        return $"aid-pka={covered};created;expires;keyid=\"{keyid}\";alg=\"ed25519\";nonce=\"{nonce}\";tag=\"aid-pka-v2\"";
     }
 
     private static bool HasNoStoreDirective(string cacheControl)
@@ -332,6 +381,7 @@ public static class Pka
         string Alg,
         string Nonce,
         string Tag,
+        bool DomainBound,
         byte[] Signature
     );
 
@@ -358,7 +408,6 @@ public static class Pka
         var coveredRaw = signatureParamsRaw[1..closeIndex].Trim();
         var paramsRaw = signatureParamsRaw[(closeIndex + 1)..];
         var covered = SplitInnerListItems(coveredRaw).Select(ParseV2CoveredItem).ToList();
-        ValidateV2CoveredSet(covered);
 
         var parameters = ParseSignatureParams(paramsRaw);
         foreach (var required in new[] { "created", "expires", "keyid", "alg", "nonce", "tag" })
@@ -372,6 +421,9 @@ public static class Pka
         {
             throw new AidError(nameof(Constants.ERR_SECURITY), "Invalid Signature-Input timestamp");
         }
+
+        // Domain binding is derived from the signed covered set (aid-domain coverage), not the tag.
+        var domainBound = ValidateV2CoveredSet(covered);
 
         var signatureRaw = ExtractDictionaryMember(sig, "aid-pka");
         if (!signatureRaw.StartsWith(":", StringComparison.Ordinal) || !signatureRaw.EndsWith(":", StringComparison.Ordinal) || signatureRaw.Length < 3)
@@ -397,6 +449,7 @@ public static class Pka
             parameters["alg"],
             parameters["nonce"],
             parameters["tag"],
+            domainBound,
             signature
         );
     }
@@ -550,34 +603,50 @@ public static class Pka
                 req = true;
             }
         }
-        if (name is not ("@method" or "@target-uri" or "@authority" or "@status"))
+        if (name is not ("@method" or "@target-uri" or "@authority" or "@status" or "aid-domain"))
         {
             throw new AidError(nameof(Constants.ERR_SECURITY), $"Unsupported covered field: {name}");
         }
         return new V2CoveredItem(raw, name, req);
     }
 
-    private static void ValidateV2CoveredSet(List<V2CoveredItem> covered)
+    // Validates the covered set against the two permitted shapes and returns whether the
+    // proof is domain-bound (i.e. the signed covered set includes "aid-domain";req).
+    // Shape A (unbound): @method;req @target-uri;req @authority;req @status
+    // Shape B (bound):   @method;req @target-uri;req @authority;req aid-domain;req @status
+    // The covered set lives in the signed @signature-params, so this distinction is authenticated.
+    private static bool ValidateV2CoveredSet(List<V2CoveredItem> covered)
     {
-        var expected = new Dictionary<string, bool>(StringComparer.Ordinal)
+        var baseSet = new (string Name, bool Req)[]
         {
-            ["@method"] = true,
-            ["@target-uri"] = true,
-            ["@authority"] = true,
-            ["@status"] = false,
+            ("@method", true),
+            ("@target-uri", true),
+            ("@authority", true),
+            ("@status", false),
         };
-        if (covered.Count != expected.Count)
+
+        var domainBound = covered.Count == baseSet.Length + 1
+            && covered.Count > 3
+            && covered[3].Name == "aid-domain";
+
+        var expected = domainBound
+            ? new (string Name, bool Req)[] { baseSet[0], baseSet[1], baseSet[2], ("aid-domain", true), baseSet[3] }
+            : baseSet;
+
+        if (covered.Count != expected.Length)
         {
             throw new AidError(nameof(Constants.ERR_SECURITY), "Signature-Input must cover required fields");
         }
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var item in covered)
+
+        for (int i = 0; i < expected.Length; i++)
         {
-            if (!expected.TryGetValue(item.Name, out var req) || req != item.Req || !seen.Add(item.Name))
+            if (covered[i].Name != expected[i].Name || covered[i].Req != expected[i].Req)
             {
                 throw new AidError(nameof(Constants.ERR_SECURITY), "Signature-Input must cover required fields");
             }
         }
+
+        return domainBound;
     }
 
     private static string UnquoteSfString(string value)
@@ -677,7 +746,7 @@ public static class Pka
                c == '-';
     }
 
-    private static byte[] BuildV2SignatureBase(List<V2CoveredItem> covered, string signatureParamsRaw, string method, string targetUri, string authority, int status)
+    private static byte[] BuildV2SignatureBase(List<V2CoveredItem> covered, string signatureParamsRaw, string method, string targetUri, string authority, int status, string? aidDomain = null)
     {
         var lines = new List<string>();
         foreach (var item in covered)
@@ -695,6 +764,13 @@ public static class Pka
                     break;
                 case "@status":
                     lines.Add($"{item.Raw}: {status}");
+                    break;
+                case "aid-domain":
+                    if (aidDomain is null)
+                    {
+                        throw new AidError(nameof(Constants.ERR_SECURITY), "Signature covers aid-domain but no AID-Domain was sent");
+                    }
+                    lines.Add($"{item.Raw}: {aidDomain}");
                     break;
                 default:
                     throw new AidError(nameof(Constants.ERR_SECURITY), $"Unsupported covered field: {item.Name}");

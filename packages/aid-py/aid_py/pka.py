@@ -458,7 +458,7 @@ def _parse_v2_covered_item(raw: str) -> dict[str, object]:
         raise AidError("ERR_SECURITY", "Invalid Signature-Input covered item")
     name = match.group(1)
     params = [part for part in match.group(2).split(";") if part]
-    if not _token_in(name, ("@method", "@target-uri", "@authority", "@status")):
+    if not _token_in(name, ("@method", "@target-uri", "@authority", "@status", "aid-domain")):
         raise AidError("ERR_SECURITY", f"Unsupported covered field: {name}")
     seen_params: set[str] = set()
     for param in params:
@@ -471,35 +471,42 @@ def _parse_v2_covered_item(raw: str) -> dict[str, object]:
     return {"raw": raw, "name": name, "req": req}
 
 
-def _validate_v2_covered_set(covered: list[dict[str, object]]) -> None:
-    expected = {
-        "@method": True,
-        "@target-uri": True,
-        "@authority": True,
-        "@status": False,
-    }
+def _validate_v2_covered_set(covered: list[dict[str, object]]) -> bool:
+    """Validate the covered set against the two permitted shapes and return whether the
+    proof is domain-bound (i.e. the signed covered set includes "aid-domain";req).
+
+    Shape A (unbound): @method;req @target-uri;req @authority;req @status
+    Shape B (bound):   @method;req @target-uri;req @authority;req aid-domain;req @status
+
+    The covered set lives in the signed @signature-params, so this distinction is
+    authenticated. Compares BOTH name and the ;req flag at each position.
+    """
+    base: list[tuple[str, bool]] = [
+        ("@method", True),
+        ("@target-uri", True),
+        ("@authority", True),
+        ("@status", False),
+    ]
+
+    third = covered[3]["name"] if len(covered) > 3 else None
+    domain_bound = len(covered) == len(base) + 1 and isinstance(third, str) and _token_eq(third, "aid-domain")
+
+    expected: list[tuple[str, bool]] = (
+        [base[0], base[1], base[2], ("aid-domain", True), base[3]] if domain_bound else base
+    )
+
     if len(covered) != len(expected):
         raise AidError("ERR_SECURITY", "Signature-Input must cover required fields")
-    seen: set[str] = set()
-    for item in covered:
-        name = item["name"]
-        req = item["req"]
-        if not isinstance(name, str):
+
+    for item, (name, req) in zip(covered, expected):
+        item_name = item["name"]
+        item_req = item["req"]
+        if not isinstance(item_name, str) or not isinstance(item_req, bool):
             raise AidError("ERR_SECURITY", "Signature-Input must cover required fields")
-        if not isinstance(req, bool):
+        if not _token_eq(item_name, name) or item_req is not req:
             raise AidError("ERR_SECURITY", "Signature-Input must cover required fields")
-        expected_req = None
-        for expected_name, candidate_req in expected.items():
-            if _token_eq(name, expected_name):
-                expected_req = candidate_req
-                break
-        if _token_in(name, seen) or expected_req is None:
-            raise AidError("ERR_SECURITY", "Signature-Input must cover required fields")
-        if (expected_req is True and req is not True) or (expected_req is False and req is not False):
-            raise AidError("ERR_SECURITY", "Signature-Input must cover required fields")
-        seen.add(name)
-    if len(seen) != len(expected) or any(not _token_in(expected_name, seen) for expected_name in expected):
-        raise AidError("ERR_SECURITY", "Signature-Input must cover required fields")
+
+    return domain_bound
 
 
 def _parse_v2_signature_headers(headers) -> dict[str, object]:
@@ -518,7 +525,6 @@ def _parse_v2_signature_headers(headers) -> dict[str, object]:
     covered_raw = signature_params_raw[1:close_index].strip()
     params_raw = signature_params_raw[close_index + 1:]
     covered = [_parse_v2_covered_item(item) for item in _split_inner_list_items(covered_raw)]
-    _validate_v2_covered_set(covered)
 
     required = ("created", "expires", "keyid", "alg", "nonce", "tag")
     required_set = set(required)
@@ -532,6 +538,7 @@ def _parse_v2_signature_headers(headers) -> dict[str, object]:
         raise AidError("ERR_SECURITY", "Invalid Signature-Input")
     if not re.fullmatch(r"\d+", params["created"]) or not re.fullmatch(r"\d+", params["expires"]):
         raise AidError("ERR_SECURITY", "Invalid Signature-Input timestamp")
+    domain_bound = _validate_v2_covered_set(covered)
 
     signature_raw = _extract_dictionary_member(sig, "aid-pka")
     sig_match = re.fullmatch(r":\s*([^:]+?)\s*:", signature_raw)
@@ -551,6 +558,7 @@ def _parse_v2_signature_headers(headers) -> dict[str, object]:
         "alg": params["alg"],
         "nonce": params["nonce"],
         "tag": params["tag"],
+        "domain_bound": domain_bound,
         "signature": signature,
     }
 
@@ -588,6 +596,19 @@ def _request_authority(uri: str) -> str:
     return host
 
 
+def _canonicalize_aid_domain(domain: str) -> str:
+    """Normalize an AID-Domain value: ASCII-lowercase, strip exactly one trailing dot,
+    and validate the charset [a-z0-9.:[]_-]. Raises ERR_SECURITY on invalid input."""
+    value = _ascii_lower_ct(domain.strip())
+    if value.endswith("."):
+        value = value[:-1]
+    if not value:
+        raise AidError("ERR_SECURITY", "Invalid AID-Domain value")
+    if not re.fullmatch(r"[a-z0-9.:\[\]_-]+", value):
+        raise AidError("ERR_SECURITY", "Invalid AID-Domain value")
+    return value
+
+
 def _build_v2_signature_base(
     covered: list[dict[str, object]],
     signature_params_raw: str,
@@ -596,6 +617,7 @@ def _build_v2_signature_base(
     target_uri: str,
     authority: str,
     status: int,
+    aid_domain: str | None = None,
 ) -> bytes:
     lines: list[str] = []
     for item in covered:
@@ -608,6 +630,10 @@ def _build_v2_signature_base(
             lines.append(f'"@target-uri"{suffix}: {target_uri}')
         elif _token_eq(name, "@authority"):
             lines.append(f'"@authority"{suffix}: {authority}')
+        elif _token_eq(name, "aid-domain"):
+            if aid_domain is None:
+                raise AidError("ERR_SECURITY", "Signature covers aid-domain but no AID-Domain was sent")
+            lines.append(f'"aid-domain"{suffix}: {aid_domain}')
         elif _token_eq(name, "@status"):
             lines.append(f'"@status"{suffix}: {status}')
         else:
@@ -625,8 +651,14 @@ def _derive_aid2_key_material(pka: str) -> tuple[bytes, str]:
     return public_key, keyid
 
 
-def _build_accept_signature_v2(keyid: str, nonce: str) -> str:
-    return f'aid-pka=("@method";req "@target-uri";req "@authority";req "@status");created;expires;keyid="{keyid}";alg="ed25519";nonce="{nonce}";tag="aid-pka-v2"'
+def _build_accept_signature_v2(keyid: str, nonce: str, domain_bound: bool = False) -> str:
+    # The tag is a fixed profile identifier (RFC 9421 2.3); domain binding is signalled by
+    # including "aid-domain";req in the covered set, not by a distinct tag.
+    if domain_bound:
+        covered = '"@method";req "@target-uri";req "@authority";req "aid-domain";req "@status"'
+    else:
+        covered = '"@method";req "@target-uri";req "@authority";req "@status"'
+    return f'aid-pka=({covered});created;expires;keyid="{keyid}";alg="ed25519";nonce="{nonce}";tag="aid-pka-v2"'
 
 
 def _perform_v1_pka_handshake(uri: str, pka: str, kid: str, *, timeout: float = 2.0) -> None:
@@ -676,7 +708,9 @@ def _perform_v1_pka_handshake(uri: str, pka: str, kid: str, *, timeout: float = 
     if not hmac.compare_digest(alg.encode('utf-8'), b"ed25519"):
         raise AidError("ERR_SECURITY", "Unsupported signature algorithm")
 
-    host = parsed.netloc
+    # Match TS reference (URL.host): hostname+port WITHOUT any userinfo component.
+    # urlparse().netloc includes userinfo (user:pass@host:port), so strip it.
+    host = parsed.netloc.rsplit("@", 1)[-1]
     base = _build_signature_base(
         covered,
         created=created,
@@ -698,17 +732,29 @@ def _perform_v1_pka_handshake(uri: str, pka: str, kid: str, *, timeout: float = 
     _verify_ed25519(pub, signature, base)
 
 
-def _perform_v2_pka_handshake(uri: str, pka: str, *, timeout: float = 2.0) -> None:
+def _perform_v2_pka_handshake(uri: str, pka: str, *, domain: str | None = None, timeout: float = 2.0) -> bool:
+    """Perform a v2 PKA handshake. Returns True if the response is domain-bound
+    (its signed covered set includes "aid-domain";req)."""
     public_key, expected_keyid = _derive_aid2_key_material(pka)
     nonce = _b64url_encode(os.urandom(32))
     request_uri = _normalize_request_uri(uri)
     authority = _request_authority(request_uri)
+
+    # Canonicalize ONCE and thread the SAME value to both the request header and the sig base.
+    canonical_domain: str | None = None
+    if domain:
+        canonical_domain = _canonicalize_aid_domain(domain)
+
+    req_headers: dict[str, str] = {
+        "Accept-Signature": _build_accept_signature_v2(expected_keyid, nonce, domain_bound=canonical_domain is not None),
+        "Cache-Control": "no-store",
+    }
+    if canonical_domain is not None:
+        req_headers["AID-Domain"] = canonical_domain
+
     req = urllib.request.Request(
         request_uri,
-        headers={
-            "Accept-Signature": _build_accept_signature_v2(expected_keyid, nonce),
-            "Cache-Control": "no-store",
-        },
+        headers=req_headers,
         method="GET",
     )
 
@@ -750,8 +796,17 @@ def _perform_v2_pka_handshake(uri: str, pka: str, *, timeout: float = 2.0) -> No
         raise AidError("ERR_SECURITY", "Unsupported signature algorithm")
     if not isinstance(response_nonce, str) or not hmac.compare_digest(response_nonce.encode("utf-8"), nonce.encode("utf-8")):
         raise AidError("ERR_SECURITY", "Signature nonce mismatch")
-    if not isinstance(tag, str) or not hmac.compare_digest(tag.encode("utf-8"), b"aid-pka-v2"):
+    if not isinstance(tag, str) or not _token_eq(tag, "aid-pka-v2"):
         raise AidError("ERR_SECURITY", "Invalid signature tag")
+
+    # Domain binding is derived from the signed covered set (aid-domain coverage), not the tag.
+    domain_bound = parsed["domain_bound"]
+    if not isinstance(domain_bound, bool):
+        raise AidError("ERR_SECURITY", "Invalid Signature-Input")
+    # Primary protection: a response that covers aid-domain is only meaningful when the client
+    # committed to a domain via the AID-Domain header. Reject otherwise (fail closed).
+    if domain_bound and canonical_domain is None:
+        raise AidError("ERR_SECURITY", "Response covers aid-domain but no AID-Domain was sent")
 
     covered = parsed["covered"]
     signature_params_raw = parsed["signature_params_raw"]
@@ -766,12 +821,17 @@ def _perform_v2_pka_handshake(uri: str, pka: str, *, timeout: float = 2.0) -> No
         target_uri=request_uri,
         authority=authority,
         status=status,
+        aid_domain=canonical_domain,
     )
     _verify_ed25519(public_key, signature, base)
+    return domain_bound
 
 
-def perform_pka_handshake(uri: str, pka: str, kid: str | None = None, *, timeout: float = 2.0) -> None:
+def perform_pka_handshake(uri: str, pka: str, kid: str | None = None, *, domain: str | None = None, timeout: float = 2.0) -> bool:
+    """Perform a PKA handshake. Returns True if the response is domain-bound, False otherwise.
+
+    A v2 proof is domain-bound iff its signed covered set includes "aid-domain";req."""
     if kid is not None:
         _perform_v1_pka_handshake(uri, pka, kid, timeout=timeout)
-        return
-    _perform_v2_pka_handshake(uri, pka, timeout=timeout)
+        return False
+    return _perform_v2_pka_handshake(uri, pka, domain=domain, timeout=timeout)

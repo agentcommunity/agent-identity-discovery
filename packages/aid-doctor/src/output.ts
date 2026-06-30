@@ -31,6 +31,12 @@ function generateActionableSuggestions(report: DoctorReport): string[] {
     suggestions.push(`${icon} ${chalk.bold('Add endpoint proof:')} ${ERROR_MESSAGES.ADD_PKA}`);
   }
 
+  if (record.parsed?.v === 'aid2' && pka.present && pka.verified && pka.domainBound === false) {
+    suggestions.push(
+      `${icon} ${chalk.bold('Enable domain binding:')} Your endpoint proof is valid but not domain-bound. Configure your endpoint to cover the AID-Domain header in its HTTP Message Signature so the endpoint attests that it serves the queried domain.`,
+    );
+  }
+
   if (tls.checked && tls.valid && tls.daysRemaining !== null && tls.daysRemaining < 21) {
     suggestions.push(`${icon} ${chalk.bold('Renew TLS certificate:')} ${ERROR_MESSAGES.RENEW_TLS}`);
   }
@@ -109,7 +115,16 @@ export function formatCheckResult(report: DoctorReport): string {
         record.parsed?.v === 'aid2'
           ? `keyid=${derivePkaKeyid(record.parsed.pka ?? null)?.keyid ?? 'unknown'}`
           : `legacy kid=${pka.kid ?? record.parsed?.kid ?? 'unknown'}`;
-      lines.push(`[5/6] PKA handshake ... ${icons.ok} Verified (alg=${pka.alg}, ${keyLabel})`);
+      const isAid2 = record.parsed?.v === 'aid2';
+      const bindingLabel =
+        pka.domainBound === true
+          ? ', domain-bound'
+          : isAid2 && pka.domainBound === false
+            ? ', endpoint-proof only'
+            : '';
+      lines.push(
+        `[5/6] PKA handshake ... ${icons.ok} Verified (alg=${pka.alg}, ${keyLabel}${bindingLabel})`,
+      );
     } else {
       const reason =
         record.errors.find((e) => e.message.includes('PKA'))?.message ?? 'Verification failed';
@@ -130,6 +145,10 @@ export function formatCheckResult(report: DoctorReport): string {
       lines.push(`[6/6] Downgrade check ... ${icons.ok} PKA added`);
     } else if (status === 'version_downgrade') {
       lines.push(`[6/6] Downgrade check ... ${icons.warn} AID version downgrade aid2->aid1`);
+    } else if (status === 'binding_loss') {
+      lines.push(
+        `[6/6] Downgrade check ... ${icons.warn} Domain-binding lost (endpoint-proof only)`,
+      );
     } else if (status === 'fallback_well_known_tls') {
       lines.push(
         `[6/6] Downgrade check ... ${icons.warn} DNS failed; using TLS-hosted fallback metadata (trustSource=well-known-tls)`,

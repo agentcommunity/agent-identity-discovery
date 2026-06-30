@@ -490,4 +490,49 @@ describe('PKA integration (Ed25519 handshake)', () => {
       errorCode: 'ERR_SECURITY',
     });
   });
+
+  it('rejects a malformed (non-base64) V1 Signature value with ERR_SECURITY', async () => {
+    const kp = await nodeWebcrypto.subtle.generateKey('Ed25519', true, ['sign', 'verify']);
+    const rawPub = new Uint8Array(await nodeWebcrypto.subtle.exportKey('raw', kp.publicKey));
+    const pka = 'z' + b58encode(rawPub);
+    const nowSec = Math.floor(Date.now() / 1000);
+    const kid = 'g1';
+    const order = ['AID-Challenge', '@method', '@target-uri', 'host', 'date'];
+
+    g.fetch = vi.fn(async (url: string) => {
+      if (url.includes('/.well-known/agent')) {
+        return {
+          ok: true,
+          status: 200,
+          headers: {
+            get: (n: string) => (n.toLowerCase() === 'content-type' ? 'application/json' : null),
+          },
+          text: async () =>
+            JSON.stringify({
+              v: 'aid1',
+              u: 'https://api.example.com/mcp',
+              p: 'mcp',
+              k: pka,
+              i: kid,
+            }),
+        };
+      }
+      // Valid Signature-Input, but the Signature value carries non-base64 bytes.
+      // atob would throw a DOMException; the handshake must surface ERR_SECURITY.
+      const headers = {
+        get: (name: string) => {
+          const k = name.toLowerCase();
+          if (k === 'signature-input')
+            return `sig=("${order.join('" "')}");created=${nowSec};keyid=${kid};alg="ed25519"`;
+          if (k === 'signature') return 'sig=:@@@not-base64@@@:';
+          return null;
+        },
+      };
+      return { ok: true, status: 200, headers, text: async () => '' };
+    });
+
+    await expect(discover('example.com', { wellKnownFallback: true })).rejects.toMatchObject({
+      errorCode: 'ERR_SECURITY',
+    });
+  });
 });

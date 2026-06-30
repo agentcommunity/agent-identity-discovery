@@ -604,7 +604,8 @@ function generateRustConstants(constants: ProtocolConstants): string {
     `// Auth tokens\n` +
     sortedAuthTokens.map((t) => `pub const AUTH_${t.toUpperCase()}: &str = "${t}";`).join('\n') +
     `\n\n` +
-    `// Error codes\n` +
+    `// Error codes (numeric codes only; human-readable messages are intentionally omitted\n` +
+    `// from Rust/C#/Java constants — use ErrorMessages in Go/Python/TypeScript for display).\n` +
     sortedErrorCodes
       .map((e) => `pub const ${e}: u16 = ${constants.errorCodes[e].code};`)
       .join('\n') +
@@ -654,6 +655,8 @@ function generateDotnetConstants(constants: ProtocolConstants): string {
       .map((t) => `    public const string AUTH_${t.toUpperCase()} = "${t}";`)
       .join('\n') +
     `\n` +
+    `    // Error codes (numeric codes only; human-readable messages are intentionally omitted\n` +
+    `    // from C#/Rust/Java constants — use ErrorMessages in Go/Python/TypeScript for display).\n` +
     sortedErrorCodes
       .map((e) => `    public const int ${e} = ${constants.errorCodes[e].code};`)
       .join('\n') +
@@ -705,6 +708,8 @@ function generateJavaConstants(constants: ProtocolConstants): string {
       .map((t) => `  public static final String AUTH_${t.toUpperCase()} = "${t}";`)
       .join('\n') +
     `\n` +
+    `  // Error codes (numeric codes only; human-readable messages are intentionally omitted\n` +
+    `  // from Java/Rust/C# constants — use ErrorMessages in Go/Python/TypeScript for display).\n` +
     sortedErrorCodes
       .map((e) => `  public static final int ${e} = ${constants.errorCodes[e].code};`)
       .join('\n') +

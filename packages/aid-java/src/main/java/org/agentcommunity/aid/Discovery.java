@@ -5,9 +5,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.IDN;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,8 +30,12 @@ public final class Discovery {
     public final AidRecord record;
     public final int ttl;
     public final String queryName;
+    public final boolean domainBound;
     public DiscoveryResult(AidRecord record, int ttl, String queryName) {
-      this.record = record; this.ttl = ttl; this.queryName = queryName;
+      this(record, ttl, queryName, false);
+    }
+    public DiscoveryResult(AidRecord record, int ttl, String queryName, boolean domainBound) {
+      this.record = record; this.ttl = ttl; this.queryName = queryName; this.domainBound = domainBound;
     }
   }
 
@@ -68,12 +74,16 @@ public final class Discovery {
   static final class ParsedRecordWithTtl {
     final AidRecord record;
     final int ttl;
-    ParsedRecordWithTtl(AidRecord record, int ttl) { this.record = record; this.ttl = ttl; }
+    final boolean domainBound;
+    ParsedRecordWithTtl(AidRecord record, int ttl) { this(record, ttl, false); }
+    ParsedRecordWithTtl(AidRecord record, int ttl, boolean domainBound) {
+      this.record = record; this.ttl = ttl; this.domainBound = domainBound;
+    }
   }
 
   @FunctionalInterface
   interface WellKnownFetcher {
-    AidRecord fetch(String domain, Duration timeout);
+    WellKnown.Result fetch(String domain, Duration timeout);
   }
 
   static List<String> queryNames(String alabel, String protocol) {
@@ -89,8 +99,19 @@ public final class Discovery {
     return status == 3;
   }
 
+  static String dohQueryUrl(String fqdn) {
+    return "https://cloudflare-dns.com/dns-query?name=" + dohQueryName(fqdn) + "&type=TXT";
+  }
+
+  // Percent-encodes the FQDN for use in the DoH `name` query parameter. DNS labels for AID query
+  // names only contain unreserved characters (`_`, `.`, alphanumerics, hyphen), so this is a
+  // pass-through for the names AID generates, but encoding keeps the URL well-formed regardless.
+  static String dohQueryName(String fqdn) {
+    return URLEncoder.encode(fqdn, StandardCharsets.UTF_8);
+  }
+
   private static DoHResponse queryTxtDoH(String fqdn, Duration timeout) {
-    String url = "https://cloudflare-dns.com/dns-query?name=" + URI.create("http://x/"+fqdn).getRawPath().substring(3) + "&type=TXT";
+    String url = dohQueryUrl(fqdn);
     HttpClient http = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).connectTimeout(timeout).build();
     HttpRequest req = HttpRequest.newBuilder(URI.create(url)).timeout(timeout).header("Accept", "application/dns-json").GET().build();
     try {
@@ -114,6 +135,10 @@ public final class Discovery {
   }
 
   static ParsedRecordWithTtl selectValidRecord(List<RawTxtAnswer> answers, Duration timeout, String queryName, boolean performHandshake) {
+    return selectValidRecord(answers, timeout, queryName, performHandshake, null);
+  }
+
+  static ParsedRecordWithTtl selectValidRecord(List<RawTxtAnswer> answers, Duration timeout, String queryName, boolean performHandshake, String domain) {
     AidError last = null;
     List<ParsedRecordWithTtl> validRecords = new ArrayList<>();
     for (RawTxtAnswer answer : answers) {
@@ -144,10 +169,11 @@ public final class Discovery {
             "Multiple valid " + selectedVersion + " AID records found for " + queryName + "; publish exactly one valid record per queried DNS name");
       }
       ParsedRecordWithTtl selected = selectedRecords.get(0);
+      boolean domainBound = false;
       if (performHandshake && selected.record.pka != null) {
-        Handshake.performHandshake(selected.record.uri, selected.record.pka, selected.record.kid == null ? "" : selected.record.kid, timeout);
+        domainBound = Handshake.performHandshake(selected.record.uri, selected.record.pka, selected.record.kid == null ? "" : selected.record.kid, timeout, domain);
       }
-      return selected;
+      return new ParsedRecordWithTtl(selected.record, selected.ttl, domainBound);
     }
 
     throw last != null ? last : new AidError("ERR_NO_RECORD", "No valid AID record in TXT answers");
@@ -168,12 +194,12 @@ public final class Discovery {
     return false;
   }
 
-  private static ParsedRecordWithTtl parseSingleValid(List<DoHAnswer> answers, Duration timeout, String queryName) {
+  private static ParsedRecordWithTtl parseSingleValid(List<DoHAnswer> answers, Duration timeout, String queryName, String domain) {
     List<RawTxtAnswer> rawAnswers = new ArrayList<>();
     for (DoHAnswer answer : answers) {
       rawAnswers.add(new RawTxtAnswer(answer.data, answer.ttl));
     }
-    return selectValidRecord(rawAnswers, timeout, queryName, true);
+    return selectValidRecord(rawAnswers, timeout, queryName, true, domain);
   }
 
   public static DiscoveryResult discover(String domain, DiscoveryOptions options) {
@@ -188,15 +214,17 @@ public final class Discovery {
         if (options.requireDnssec && !res.ad) {
           throw new AidError("ERR_SECURITY", "DNSSEC validation failed or was not available for " + name);
         }
-        ParsedRecordWithTtl p = parseSingleValid(res.answer, options.timeout, name);
-        return new DiscoveryResult(p.record, p.ttl, name);
+        ParsedRecordWithTtl p = parseSingleValid(res.answer, options.timeout, name, alabel);
+        return new DiscoveryResult(p.record, p.ttl, name, p.domainBound);
       } catch (AidError e) {
         last = e;
         if (!"ERR_NO_RECORD".equals(e.errorCode)) break;
       }
     }
 
-    return resolveWellKnownFallback(alabel, options, last, (fallbackDomain, timeout) -> WellKnown.fetch(fallbackDomain, timeout, false));
+    final String queriedDomain = alabel;
+    return resolveWellKnownFallback(
+        alabel, options, last, (fallbackDomain, timeout) -> WellKnown.fetchBound(fallbackDomain, timeout, false, queriedDomain));
   }
 
   static DiscoveryResult resolveWellKnownFallback(
@@ -208,8 +236,8 @@ public final class Discovery {
             "DNSSEC is required; .well-known fallback cannot satisfy dnssec=require for " + alabel);
       }
       if (options.wellKnownFallback) {
-        AidRecord rec = fetcher.fetch(alabel, options.wellKnownTimeout);
-        return new DiscoveryResult(rec, Constants.DNS_TTL_MIN, Constants.DNS_SUBDOMAIN+"."+alabel);
+        WellKnown.Result result = fetcher.fetch(alabel, options.wellKnownTimeout);
+        return new DiscoveryResult(result.record, Constants.DNS_TTL_MIN, Constants.DNS_SUBDOMAIN+"."+alabel, result.domainBound);
       }
     }
     throw last != null ? last : new AidError("ERR_DNS_LOOKUP_FAILED", "DNS query failed");

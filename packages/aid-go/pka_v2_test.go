@@ -21,10 +21,12 @@ type pkaV2Vector struct {
 		P string `json:"p"`
 		K string `json:"k"`
 	} `json:"record"`
+	Domain  string `json:"domain"`
 	Request struct {
 		Method          string `json:"method"`
 		TargetURI       string `json:"target_uri"`
 		Authority       string `json:"authority"`
+		AidDomain       string `json:"aid_domain"`
 		AcceptSignature string `json:"accept_signature"`
 		CacheControl    string `json:"cache_control"`
 	} `json:"request"`
@@ -140,7 +142,7 @@ func TestPKAV2CanonicalRFC9421ResponseSignature(t *testing.T) {
 	})}
 	t.Cleanup(func() { httpClient = oldClient })
 
-	if err := performPKAHandshake(vector.Record.U, vector.Record.K, "", time.Second); err != nil {
+	if _, err := performPKAHandshake(vector.Record.U, vector.Record.K, "", "", time.Second); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -172,7 +174,7 @@ func TestPKAV2CanonicalizesUppercaseHostDefaultPortAndFragment(t *testing.T) {
 	})}
 	t.Cleanup(func() { httpClient = oldClient })
 
-	if err := performPKAHandshake(vector.Record.U, vector.Record.K, "", time.Second); err != nil {
+	if _, err := performPKAHandshake(vector.Record.U, vector.Record.K, "", "", time.Second); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -221,7 +223,7 @@ func TestPKAV2RejectsRedirectResponse(t *testing.T) {
 	})}
 	t.Cleanup(func() { httpClient = oldClient })
 
-	err := performPKAHandshake(vector.Record.U, vector.Record.K, "", time.Second)
+	_, err := performPKAHandshake(vector.Record.U, vector.Record.K, "", "", time.Second)
 	if err == nil {
 		t.Fatalf("expected redirect error")
 	}
@@ -465,6 +467,30 @@ func TestPKAV2RejectsQuotedSignatureInputTimestamps(t *testing.T) {
 	}
 }
 
+func TestPKAV2RejectsNegativeSignatureInputTimestamps(t *testing.T) {
+	// The v2 profile grammar for created/expires is digit-only (TS /^\d+$/);
+	// a leading '-' must be rejected at parse time even though RFC 8941
+	// sf-integer would otherwise permit a sign.
+	cases := map[string]struct {
+		original    string
+		replacement string
+	}{
+		"created": {original: `created=1`, replacement: `created=-1`},
+		"expires": {original: `expires=2`, replacement: `expires=-2`},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			headers := validPKAV2SignatureHeaders()
+			sigInput := strings.Replace(headers.Get("Signature-Input"), tc.original, tc.replacement, 1)
+			headers.Set("Signature-Input", sigInput)
+
+			if _, err := parseV2SignatureHeaders(headers); err == nil {
+				t.Fatalf("expected negative %s timestamp to be rejected", name)
+			}
+		})
+	}
+}
+
 func TestPKAV2RejectsRepeatedPhysicalSignatureHeaders(t *testing.T) {
 	cases := []string{"Signature-Input", "Signature"}
 	for _, headerName := range cases {
@@ -474,6 +500,200 @@ func TestPKAV2RejectsRepeatedPhysicalSignatureHeaders(t *testing.T) {
 
 			if _, err := parseV2SignatureHeaders(headers); err == nil {
 				t.Fatalf("expected repeated physical %s header values to be rejected", headerName)
+			}
+		})
+	}
+}
+
+func TestPKAV2DomainBoundPassVector(t *testing.T) {
+	vector := loadPKAV2Vector(t, "v2-db-rfc9421-domain-bound")
+	withPKAV2VectorClockAndNonce(t, vector)
+
+	oldClient := httpClient
+	httpClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		if req.Header.Get("AID-Domain") != vector.Request.AidDomain {
+			t.Fatalf("expected AID-Domain %q got %q", vector.Request.AidDomain, req.Header.Get("AID-Domain"))
+		}
+		if req.Header.Get("Accept-Signature") != vector.Request.AcceptSignature {
+			t.Fatalf("unexpected Accept-Signature: %s", req.Header.Get("Accept-Signature"))
+		}
+		h := http.Header{}
+		h.Set("Cache-Control", vector.Response.CacheControl)
+		h.Set("Signature-Input", vector.Response.SignatureInput)
+		h.Set("Signature", vector.Response.Signature)
+		return &http.Response{StatusCode: vector.Response.Status, Header: h, Body: io.NopCloser(strings.NewReader(""))}, nil
+	})}
+	t.Cleanup(func() { httpClient = oldClient })
+
+	result, err := performPKAHandshake(vector.Record.U, vector.Record.K, "", vector.Domain, time.Second)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.DomainBound {
+		t.Fatalf("expected DomainBound=true")
+	}
+}
+
+func TestPKAV2DomainMismatchRejected(t *testing.T) {
+	// Cross-domain forgery: the response covers aid-domain and the client sent
+	// AID-Domain=example.com, but the signature was computed over a base whose
+	// aid-domain line is evil.example. The verifier rebuilds the base with
+	// example.com, so Ed25519 verification fails and the response is rejected.
+	vector := loadPKAV2Vector(t, "v2-db-domain-mismatch")
+	if vector.Expect != "fail" {
+		t.Fatalf("expected vector expect=fail, got %q", vector.Expect)
+	}
+	withPKAV2VectorClockAndNonce(t, vector)
+
+	oldClient := httpClient
+	httpClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		h := http.Header{}
+		h.Set("Cache-Control", vector.Response.CacheControl)
+		h.Set("Signature-Input", vector.Response.SignatureInput)
+		h.Set("Signature", vector.Response.Signature)
+		return &http.Response{StatusCode: vector.Response.Status, Header: h, Body: io.NopCloser(strings.NewReader(""))}, nil
+	})}
+	t.Cleanup(func() { httpClient = oldClient })
+
+	_, err := performPKAHandshake(vector.Record.U, vector.Record.K, "", vector.Domain, time.Second)
+	if err == nil {
+		t.Fatalf("expected cross-domain forgery to be rejected at Ed25519 verification")
+	}
+	aidErr, ok := err.(*AidError)
+	if !ok {
+		t.Fatalf("expected AidError, got %T", err)
+	}
+	if aidErr.Symbol != "ERR_SECURITY" {
+		t.Fatalf("expected ERR_SECURITY, got %s", aidErr.Symbol)
+	}
+}
+
+func TestPKAV2RejectsInvalidCoveredSet(t *testing.T) {
+	// aid-domain covered, but with an extra disallowed component (host) — validateV2CoveredSet
+	// accepts only the base-4 or base-4 + aid-domain shapes and rejects anything else.
+	headers := http.Header{}
+	headers.Set("Signature-Input", `aid-pka=("@method";req "@target-uri";req "@authority";req "aid-domain";req "host";req "@status");created=1;expires=2;keyid="key";alg="ed25519";nonce="nonce";tag="aid-pka-v2"`)
+	headers.Set("Signature", `aid-pka=:`+base64.StdEncoding.EncodeToString(make([]byte, ed25519.SignatureSize))+`:`)
+
+	_, err := parseV2SignatureHeaders(headers)
+	if err == nil {
+		t.Fatalf("expected invalid covered set to be rejected")
+	}
+	aidErr, ok := err.(*AidError)
+	if !ok {
+		t.Fatalf("expected AidError, got %T", err)
+	}
+	if aidErr.Symbol != "ERR_SECURITY" {
+		t.Fatalf("expected ERR_SECURITY, got %s", aidErr.Symbol)
+	}
+}
+
+func TestPKAV2RejectsAidDomainCoverageWhenNoDomainSent(t *testing.T) {
+	// Under the single-tag model, domain binding is signalled purely by aid-domain coverage.
+	// A response that covers aid-domain is only meaningful when the client committed to a
+	// domain via the AID-Domain header, so it must be rejected when no domain was sent.
+	vector := loadPKAV2Vector(t, "v2-db-rfc9421-domain-bound")
+	withPKAV2VectorClockAndNonce(t, vector)
+
+	oldClient := httpClient
+	httpClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		h := http.Header{}
+		h.Set("Cache-Control", vector.Response.CacheControl)
+		h.Set("Signature-Input", vector.Response.SignatureInput)
+		h.Set("Signature", vector.Response.Signature)
+		return &http.Response{StatusCode: vector.Response.Status, Header: h, Body: io.NopCloser(strings.NewReader(""))}, nil
+	})}
+	t.Cleanup(func() { httpClient = oldClient })
+
+	// No domain passed to the handshake -> fail closed.
+	_, err := performPKAHandshake(vector.Record.U, vector.Record.K, "", "", time.Second)
+	if err == nil {
+		t.Fatalf("expected aid-domain coverage without a sent domain to be rejected")
+	}
+	aidErr, ok := err.(*AidError)
+	if !ok {
+		t.Fatalf("expected AidError, got %T", err)
+	}
+	if aidErr.Symbol != "ERR_SECURITY" {
+		t.Fatalf("expected ERR_SECURITY, got %s", aidErr.Symbol)
+	}
+	if aidErr.Msg != "Response covers aid-domain but no AID-Domain was sent" {
+		t.Fatalf("unexpected message: %s", aidErr.Msg)
+	}
+}
+
+// loadAllPKAV2Vectors returns every aid2 vector from the shared corpus.
+func loadAllPKAV2Vectors(t *testing.T) []pkaV2Vector {
+	t.Helper()
+	path := filepath.Join("..", "..", "protocol", "pka_vectors.json")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read vectors: %v", err)
+	}
+	var root struct {
+		Vectors []json.RawMessage `json:"vectors"`
+	}
+	if err := json.Unmarshal(raw, &root); err != nil {
+		t.Fatalf("parse vectors: %v", err)
+	}
+	var out []pkaV2Vector
+	for _, item := range root.Vectors {
+		var vector pkaV2Vector
+		if err := json.Unmarshal(item, &vector); err != nil {
+			t.Fatalf("parse v2 vector: %v", err)
+		}
+		if vector.Record.V != SpecVersionV2 {
+			continue
+		}
+		out = append(out, vector)
+	}
+	if len(out) == 0 {
+		t.Fatalf("no aid2 vectors found in shared corpus")
+	}
+	return out
+}
+
+// TestPKAV2SharedVectors replays every shared aid2 PKA vector through the Go
+// handshake, mirroring the v1 TestPKAVectors loop. This guarantees that each
+// shared signature-base byte vector (no-store, expires-window math, uppercase
+// alg case-folding, IPv6 authority signing, keyid mismatch, domain binding,
+// etc.) is enforced in Go, not just the handful cherry-picked by id elsewhere.
+func TestPKAV2SharedVectors(t *testing.T) {
+	for _, v := range loadAllPKAV2Vectors(t) {
+		vector := v
+		t.Run(vector.ID, func(t *testing.T) {
+			withPKAV2VectorClockAndNonce(t, vector)
+
+			oldClient := httpClient
+			httpClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+				h := http.Header{}
+				// A missing-cache-control vector intentionally omits/replaces
+				// no-store; honor whatever the vector specifies.
+				if vector.Response.CacheControl != "" {
+					h.Set("Cache-Control", vector.Response.CacheControl)
+				}
+				h.Set("Signature-Input", vector.Response.SignatureInput)
+				h.Set("Signature", vector.Response.Signature)
+				return &http.Response{
+					StatusCode: vector.Response.Status,
+					Header:     h,
+					Body:       io.NopCloser(strings.NewReader("")),
+				}, nil
+			})}
+			t.Cleanup(func() { httpClient = oldClient })
+
+			_, err := performPKAHandshake(vector.Record.U, vector.Record.K, "", vector.Domain, time.Second)
+			switch vector.Expect {
+			case "pass":
+				if err != nil {
+					t.Fatalf("%s expected pass, got error: %v", vector.ID, err)
+				}
+			case "fail":
+				if err == nil {
+					t.Fatalf("%s expected fail, got success", vector.ID)
+				}
+			default:
+				t.Fatalf("%s has unknown expect %q", vector.ID, vector.Expect)
 			}
 		})
 	}

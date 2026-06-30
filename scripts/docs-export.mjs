@@ -33,9 +33,13 @@ const main = async () => {
   const manifestPath = path.join(docsRoot, 'export-manifest.json');
   const checksumPath = path.join(docsRoot, 'export-manifest.sha256');
 
-  const markdownFiles = (await walkMarkdownFiles(docsRoot)).sort((left, right) =>
-    left.localeCompare(right),
-  );
+  const markdownFiles = (await walkMarkdownFiles(docsRoot))
+    .map((absolutePath) => ({
+      absolutePath,
+      relativePath: toPosix(path.relative(docsRoot, absolutePath)),
+    }))
+    .sort(({ relativePath: a }, { relativePath: b }) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(({ absolutePath }) => absolutePath);
 
   const files = [];
   for (const absoluteFile of markdownFiles) {

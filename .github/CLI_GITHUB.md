@@ -18,16 +18,16 @@ Secret scanning uses diff mode on PRs and pushes to avoid base and head being th
 
 ### Optimization Matrix
 
-| Workflow            | Trigger Behavior                                                          |
-| ------------------- | ------------------------------------------------------------------------- |
-| **CI (TypeScript)** | Runs on all PRs and pushes (required)                                     |
-| **CI (Go)**         | Runs on all PRs and pushes (required)                                     |
-| **CI (Java)**       | Runs on all PRs and pushes (required)                                     |
-| **CI (Python)**     | Runs on all PRs and pushes (required)                                     |
-| **CI (Rust)**       | Runs on all PRs and pushes (required)                                     |
-| **CI (.NET)**       | Runs on all PRs and pushes (required)                                     |
-| **Parity Check**    | Any `packages/**` or `protocol/**` (to ensure cross-language consistency) |
-| **Security Scan**   | Diff scan on PRs and pushes. Full scan on schedule or manual runs.        |
+| Workflow            | Trigger Behavior                                                                   |
+| ------------------- | ---------------------------------------------------------------------------------- |
+| **CI (TypeScript)** | Runs on all PRs and pushes (required)                                              |
+| **CI (Go)**         | Runs on all PRs and pushes (required)                                              |
+| **CI (Java)**       | Runs on all PRs and pushes (required)                                              |
+| **CI (Python)**     | Runs on all PRs and pushes (required)                                              |
+| **CI (Rust)**       | Runs on all PRs and pushes (required)                                              |
+| **CI (.NET)**       | Runs on all PRs and pushes (required)                                              |
+| **Parity Check**    | Runs on all PRs and pushes to main (no path filter; required by branch protection) |
+| **Security Scan**   | Diff scan on PRs and pushes. Full scan on schedule or manual runs.                 |
 
 ## Result
 

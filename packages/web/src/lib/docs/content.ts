@@ -12,12 +12,10 @@
  */
 
 import { preprocessMarkdown } from './markdown';
+import { extractHeadings } from './headings';
+import type { Heading } from './headings';
 
-export interface Heading {
-  depth: number; // 2–6
-  text: string;
-  id: string;
-}
+export type { Heading } from './headings';
 
 export interface DocPage {
   slug: string; // "index" for root; e.g. "quickstart/quickstart_ts" otherwise
@@ -67,32 +65,6 @@ function toRouteSlug(slug: string): string {
   return slug;
 }
 
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replaceAll(/[^\w\s-]/g, '')
-    .replaceAll(/\s+/g, '-')
-    .replaceAll(/-+/g, '-')
-    .trim();
-}
-
-function extractHeadings(content: string): Heading[] {
-  const headings: Heading[] = [];
-  for (const line of content.split('\n')) {
-    const match = line.match(/^(#{2,6})\s+(.+)/);
-    if (match) {
-      const depth = match[1].length;
-      const text = match[2]
-        .replaceAll(/`([^`]*)`/g, '$1')
-        .replaceAll(/\*\*([^*]*)\*\*/g, '$1')
-        .replaceAll(/\*([^*]*)\*/g, '$1')
-        .trim();
-      headings.push({ depth, text, id: slugify(text) });
-    }
-  }
-  return headings;
-}
-
 function getDocFromFs(slug: string): DocPage | null {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -107,6 +79,11 @@ function getDocFromFs(slug: string): DocPage | null {
       : path.join(process.cwd(), '..', 'docs');
 
     const normalized = slug.replaceAll(/^\/+|\/+$/g, '');
+    // Path-traversal guard: this dev-only fs fallback joins the catch-all slug
+    // into a filesystem path, so reject any '..' segment or backslash before
+    // touching the disk. (Production resolves via the pre-compiled JSON index
+    // and never reaches this branch.)
+    if (normalized.includes('..') || normalized.includes('\\')) return null;
     const candidates = normalized ? [normalized, `${normalized}/index`] : ['index'];
 
     let fileSlug: string | null = null;

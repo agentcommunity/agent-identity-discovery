@@ -158,6 +158,7 @@ const { publicKey, privateKeyPem } = await generateEd25519KeyPair();
 ### ✅ Security Built-In (v2 default)
 
 - **PKA Handshake**: aid2 uses Ed25519 HTTP Message Signatures with RFC 9421 nonce, derived JWK thumbprint `keyid`, `created`, `expires`, and response `Cache-Control: no-store`
+- **PKA Domain Binding**: discovery sends `AID-Domain` by default, keeps the single `aid-pka-v2` tag, derives `domainBound` from signed `"aid-domain";req` coverage, and enforces unbound-proof rejection only when `domain-binding=require`
 - **TLS Validation**: Certificate chain verification and expiry warnings
 - **DNSSEC Presence**: RRSIG detection for integrity verification
 - **Redirect Policy**: Cross-origin redirect protection

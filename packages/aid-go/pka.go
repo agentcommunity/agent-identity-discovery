@@ -21,6 +21,28 @@ var pkaNowUnix = func() int64 {
 	return time.Now().Unix()
 }
 
+// PKAHandshakeResult reports the outcome of a successful PKA handshake.
+type PKAHandshakeResult struct {
+	// DomainBound is true when the endpoint signed the AID-Domain binding for the queried domain.
+	DomainBound bool
+}
+
+// canonicalizeAidDomain normalizes an AID-Domain value: ASCII-lowercase, strip
+// exactly one trailing dot, and validate the charset [a-z0-9.:[\]_-].
+func canonicalizeAidDomain(domain string) (string, error) {
+	value := asciiToLower(strings.TrimSpace(domain))
+	value = strings.TrimSuffix(value, ".")
+	if value == "" {
+		return "", newAidError("ERR_SECURITY", "Invalid AID-Domain value")
+	}
+	for _, c := range value {
+		if !((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '.' || c == ':' || c == '[' || c == ']' || c == '_' || c == '-') {
+			return "", newAidError("ERR_SECURITY", "Invalid AID-Domain value")
+		}
+	}
+	return value, nil
+}
+
 // asciiToLower performs constant-time ASCII lowercasing.
 func asciiToLower(s string) string {
 	var b strings.Builder
@@ -36,11 +58,14 @@ func asciiToLower(s string) string {
 }
 
 // performPKAHandshake performs an RFC 9421 Ed25519 verification against the agent endpoint.
-func performPKAHandshake(uri, pka, kid string, timeout time.Duration) error {
+func performPKAHandshake(uri, pka, kid, domain string, timeout time.Duration) (PKAHandshakeResult, error) {
 	if kid == "" {
-		return performV2PKAHandshake(uri, pka, timeout)
+		return performV2PKAHandshake(uri, pka, domain, timeout)
 	}
-	return performV1PKAHandshake(uri, pka, kid, timeout)
+	if err := performV1PKAHandshake(uri, pka, kid, timeout); err != nil {
+		return PKAHandshakeResult{}, err
+	}
+	return PKAHandshakeResult{DomainBound: false}, nil
 }
 
 func performV1PKAHandshake(uri, pka, kid string, timeout time.Duration) error {
@@ -141,31 +166,43 @@ func performV1PKAHandshake(uri, pka, kid string, timeout time.Duration) error {
 	return nil
 }
 
-func performV2PKAHandshake(uri, pka string, timeout time.Duration) error {
+func performV2PKAHandshake(uri, pka, domain string, timeout time.Duration) (PKAHandshakeResult, error) {
 	pub, expectedKeyID, err := deriveAid2KeyMaterial(pka)
 	if err != nil {
-		return err
+		return PKAHandshakeResult{}, err
+	}
+	// Canonicalize the domain ONCE and reuse the same value for both the
+	// AID-Domain request header and the signature base.
+	canonicalDomain := ""
+	if domain != "" {
+		canonicalDomain, err = canonicalizeAidDomain(domain)
+		if err != nil {
+			return PKAHandshakeResult{}, err
+		}
 	}
 	requestURI, err := normalizeRequestURI(uri)
 	if err != nil {
-		return err
+		return PKAHandshakeResult{}, err
 	}
 	authority, err := requestAuthority(requestURI)
 	if err != nil {
-		return err
+		return PKAHandshakeResult{}, err
 	}
 	nonceBytes, err := generatePKANonce()
 	if err != nil {
-		return err
+		return PKAHandshakeResult{}, err
 	}
 	nonce := base64.RawURLEncoding.EncodeToString(nonceBytes)
 
 	req, err := http.NewRequest("GET", requestURI, nil)
 	if err != nil {
-		return newAidError("ERR_SECURITY", err.Error())
+		return PKAHandshakeResult{}, newAidError("ERR_SECURITY", err.Error())
 	}
-	req.Header.Set("Accept-Signature", buildAcceptSignatureV2(expectedKeyID, nonce))
+	req.Header.Set("Accept-Signature", buildAcceptSignatureV2(expectedKeyID, nonce, canonicalDomain))
 	req.Header.Set("Cache-Control", "no-store")
+	if canonicalDomain != "" {
+		req.Header.Set("AID-Domain", canonicalDomain)
+	}
 
 	client := *httpClient
 	client.Timeout = timeout
@@ -174,40 +211,47 @@ func performV2PKAHandshake(uri, pka string, timeout time.Duration) error {
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return newAidError("ERR_SECURITY", err.Error())
+		return PKAHandshakeResult{}, newAidError("ERR_SECURITY", err.Error())
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
-		return newAidError("ERR_SECURITY", "PKA redirects are not allowed")
+		return PKAHandshakeResult{}, newAidError("ERR_SECURITY", "PKA redirects are not allowed")
 	}
 	if !hasNoStoreDirective(resp.Header.Get("Cache-Control")) {
-		return newAidError("ERR_SECURITY", "PKA response must include Cache-Control: no-store")
+		return PKAHandshakeResult{}, newAidError("ERR_SECURITY", "PKA response must include Cache-Control: no-store")
 	}
 
 	parsed, err := parseV2SignatureHeaders(resp.Header)
 	if err != nil {
-		return err
+		return PKAHandshakeResult{}, err
 	}
 	now := pkaNowUnix()
 	if parsed.expires <= parsed.created || parsed.expires-parsed.created > 300 {
-		return newAidError("ERR_SECURITY", "Invalid signature freshness window")
+		return PKAHandshakeResult{}, newAidError("ERR_SECURITY", "Invalid signature freshness window")
 	}
 	const skewSeconds = 30
 	if parsed.created-now > skewSeconds || now-parsed.expires > skewSeconds {
-		return newAidError("ERR_SECURITY", "Signature timestamp outside acceptance window")
+		return PKAHandshakeResult{}, newAidError("ERR_SECURITY", "Signature timestamp outside acceptance window")
 	}
 	if !timingSafeEqualString(parsed.keyid, expectedKeyID) {
-		return newAidError("ERR_SECURITY", "Signature keyid mismatch")
+		return PKAHandshakeResult{}, newAidError("ERR_SECURITY", "Signature keyid mismatch")
 	}
 	if !timingSafeEqualString(asciiToLower(parsed.alg), "ed25519") {
-		return newAidError("ERR_SECURITY", "Unsupported signature algorithm")
+		return PKAHandshakeResult{}, newAidError("ERR_SECURITY", "Unsupported signature algorithm")
 	}
 	if !timingSafeEqualString(parsed.nonce, nonce) {
-		return newAidError("ERR_SECURITY", "Signature nonce mismatch")
+		return PKAHandshakeResult{}, newAidError("ERR_SECURITY", "Signature nonce mismatch")
 	}
 	if !timingSafeEqualString(parsed.tag, "aid-pka-v2") {
-		return newAidError("ERR_SECURITY", "Invalid signature tag")
+		return PKAHandshakeResult{}, newAidError("ERR_SECURITY", "Invalid signature tag")
+	}
+	// Domain binding is derived from the signed covered set (aid-domain coverage), not the tag.
+	isDomainBound := parsed.domainBound
+	// Primary protection: a response that covers aid-domain is only meaningful when the client
+	// committed to a domain via the AID-Domain header. Reject otherwise (fail closed).
+	if isDomainBound && canonicalDomain == "" {
+		return PKAHandshakeResult{}, newAidError("ERR_SECURITY", "Response covers aid-domain but no AID-Domain was sent")
 	}
 
 	base, err := buildV2SignatureBase(parsed.covered, parsed.signatureParamsRaw, v2SignatureContext{
@@ -215,14 +259,15 @@ func performV2PKAHandshake(uri, pka string, timeout time.Duration) error {
 		targetURI: requestURI,
 		authority: authority,
 		status:    resp.StatusCode,
+		domain:    canonicalDomain,
 	})
 	if err != nil {
-		return err
+		return PKAHandshakeResult{}, err
 	}
 	if !ed25519.Verify(pub, base, parsed.signature) {
-		return newAidError("ERR_SECURITY", "PKA signature verification failed")
+		return PKAHandshakeResult{}, newAidError("ERR_SECURITY", "PKA signature verification failed")
 	}
-	return nil
+	return PKAHandshakeResult{DomainBound: isDomainBound}, nil
 }
 
 func generatePKANonce() ([]byte, error) {
@@ -284,8 +329,14 @@ func requestAuthority(raw string) (string, error) {
 	return hostname + ":" + port, nil
 }
 
-func buildAcceptSignatureV2(keyID, nonce string) string {
-	return fmt.Sprintf(`aid-pka=("@method";req "@target-uri";req "@authority";req "@status");created;expires;keyid="%s";alg="ed25519";nonce="%s";tag="aid-pka-v2"`, keyID, nonce)
+func buildAcceptSignatureV2(keyID, nonce, domain string) string {
+	// Single tag aid-pka-v2 for both modes; domain binding is signalled by
+	// including "aid-domain";req in the covered set, not by a distinct tag.
+	covered := `("@method";req "@target-uri";req "@authority";req "@status")`
+	if domain != "" {
+		covered = `("@method";req "@target-uri";req "@authority";req "aid-domain";req "@status")`
+	}
+	return fmt.Sprintf(`aid-pka=%s;created;expires;keyid="%s";alg="ed25519";nonce="%s";tag="aid-pka-v2"`, covered, keyID, nonce)
 }
 
 func hasNoStoreDirective(cacheControl string) bool {
@@ -323,7 +374,9 @@ type v2SignatureHeaders struct {
 	alg                string
 	nonce              string
 	tag                string
-	signature          []byte
+	// domainBound is true when the signed covered set includes "aid-domain";req.
+	domainBound bool
+	signature   []byte
 }
 
 type v2SignatureContext struct {
@@ -331,6 +384,7 @@ type v2SignatureContext struct {
 	targetURI string
 	authority string
 	status    int
+	domain    string
 }
 
 func parseV2SignatureHeaders(headers http.Header) (v2SignatureHeaders, error) {
@@ -368,9 +422,6 @@ func parseV2SignatureHeaders(headers http.Header) (v2SignatureHeaders, error) {
 		}
 		covered = append(covered, item)
 	}
-	if err := validateV2CoveredSet(covered); err != nil {
-		return v2SignatureHeaders{}, err
-	}
 
 	params, err := parseSignatureParams(paramsRaw)
 	if err != nil {
@@ -384,6 +435,10 @@ func parseV2SignatureHeaders(headers http.Header) (v2SignatureHeaders, error) {
 	tag, hasTag := params["tag"]
 	if !hasCreated || !hasExpires || !hasKeyID || !hasAlg || !hasNonce || !hasTag {
 		return v2SignatureHeaders{}, newAidError("ERR_SECURITY", "Invalid Signature-Input")
+	}
+	domainBound, err := validateV2CoveredSet(covered)
+	if err != nil {
+		return v2SignatureHeaders{}, err
 	}
 	created, err := strconv.ParseInt(createdRaw, 10, 64)
 	if err != nil {
@@ -416,6 +471,7 @@ func parseV2SignatureHeaders(headers http.Header) (v2SignatureHeaders, error) {
 		alg:                alg,
 		nonce:              nonce,
 		tag:                tag,
+		domainBound:        domainBound,
 		signature:          signature,
 	}, nil
 }
@@ -570,35 +626,54 @@ func parseV2CoveredItem(raw string) (v2CoveredItem, error) {
 		}
 	}
 	switch name {
-	case "@method", "@target-uri", "@authority", "@status":
+	case "@method", "@target-uri", "@authority", "@status", "aid-domain":
 	default:
 		return v2CoveredItem{}, newAidError("ERR_SECURITY", "Unsupported covered field: "+name)
 	}
 	return v2CoveredItem{raw: raw, name: name, req: req}, nil
 }
 
-func validateV2CoveredSet(covered []v2CoveredItem) error {
-	if len(covered) != 4 {
-		return newAidError("ERR_SECURITY", "Signature-Input must cover required fields")
+type v2CoveredExpectation struct {
+	name string
+	req  bool
+}
+
+// validateV2CoveredSet validates the covered set against the two permitted shapes
+// and returns whether the proof is domain-bound (i.e. the signed covered set includes
+// "aid-domain";req in slot index 3, strictly between @authority and @status).
+//
+//	Shape A (unbound): @method;req @target-uri;req @authority;req @status
+//	Shape B (bound):   @method;req @target-uri;req @authority;req aid-domain;req @status
+//
+// The covered set lives in the signed @signature-params, so this distinction is authenticated.
+func validateV2CoveredSet(covered []v2CoveredItem) (bool, error) {
+	base := []v2CoveredExpectation{
+		{name: "@method", req: true},
+		{name: "@target-uri", req: true},
+		{name: "@authority", req: true},
+		{name: "@status", req: false},
 	}
-	expected := map[string]bool{
-		"@method":     true,
-		"@target-uri": true,
-		"@authority":  true,
-		"@status":     false,
-	}
-	seen := map[string]bool{}
-	for _, item := range covered {
-		req, ok := expected[item.name]
-		if !ok || seen[item.name] || req != item.req {
-			return newAidError("ERR_SECURITY", "Signature-Input must cover required fields")
+
+	domainBound := len(covered) == len(base)+1 && covered[3].name == "aid-domain"
+
+	expected := base
+	if domainBound {
+		expected = []v2CoveredExpectation{
+			base[0], base[1], base[2],
+			{name: "aid-domain", req: true},
+			base[3],
 		}
-		seen[item.name] = true
 	}
-	if len(seen) != len(expected) {
-		return newAidError("ERR_SECURITY", "Signature-Input must cover required fields")
+
+	if len(covered) != len(expected) {
+		return false, newAidError("ERR_SECURITY", "Signature-Input must cover required fields")
 	}
-	return nil
+	for i, want := range expected {
+		if covered[i].name != want.name || covered[i].req != want.req {
+			return false, newAidError("ERR_SECURITY", "Signature-Input must cover required fields")
+		}
+	}
+	return domainBound, nil
 }
 
 func unquoteSfString(value string) string {
@@ -690,18 +765,15 @@ func parseSignatureParams(raw string) (map[string]string, error) {
 	return params, nil
 }
 
+// isBareIntegerToken reports whether value is a digit-only token, matching the
+// TS reference grammar /^\d+$/. Signs are rejected: the v2 PKA profile only
+// permits non-negative created/expires timestamps, so a leading '-' is invalid
+// even though RFC 8941 sf-integer would otherwise allow it.
 func isBareIntegerToken(value string) bool {
 	if value == "" {
 		return false
 	}
-	start := 0
-	if value[0] == '-' {
-		if len(value) == 1 {
-			return false
-		}
-		start = 1
-	}
-	for i := start; i < len(value); i++ {
+	for i := 0; i < len(value); i++ {
 		if value[i] < '0' || value[i] > '9' {
 			return false
 		}
@@ -742,6 +814,14 @@ func buildV2SignatureBase(covered []v2CoveredItem, signatureParamsRaw string, ct
 			lines = append(lines, "\"@target-uri\";req: "+ctx.targetURI)
 		case "@authority":
 			lines = append(lines, "\"@authority\";req: "+ctx.authority)
+		case "aid-domain":
+			// Fail-closed: unreachable in normal flow (the tag/coverage gates in
+			// performV2PKAHandshake reject a covered aid-domain without a sent domain),
+			// kept as defense-in-depth.
+			if ctx.domain == "" {
+				return nil, newAidError("ERR_SECURITY", "Signature covers aid-domain but no AID-Domain was sent")
+			}
+			lines = append(lines, "\"aid-domain\";req: "+ctx.domain)
 		case "@status":
 			lines = append(lines, "\"@status\": "+strconv.Itoa(ctx.status))
 		default:

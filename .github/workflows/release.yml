@@ -1,5 +1,25 @@
 name: Release (npm OIDC + PyPI OIDC)
 
+# ─── Manual-release runbook for registries without automation ─────────────────
+# Rust (crates.io) — blocked until the `aid-rs` crate name is transferred to
+# this project or the crate is renamed; crates.io currently has an unrelated
+# `aid-rs` package:
+#   cd packages/aid-rs
+#   cargo publish --token <CRATES_IO_TOKEN>
+#
+# .NET (NuGet) — note: AidDiscovery.csproj needs <PackageId> and <IsPackable>true</IsPackable>:
+#   cd packages/aid-dotnet
+#   dotnet pack -c Release -o ./nupkg
+#   dotnet nuget push ./nupkg/*.nupkg --api-key <NUGET_TOKEN> --source https://api.nuget.org/v3/index.json
+#
+# Java (Maven Central) — note: build.gradle needs maven-publish plugin + signing config:
+#   ./gradlew :aid-java:publishToMavenCentral
+#
+# Do NOT add live CI publish jobs for these until each SDK has the required
+# package metadata (PackageId/IsPackable for NuGet; maven-publish + signing for
+# Maven Central) and credentials are set up as repository secrets.
+# ─────────────────────────────────────────────────────────────────────────────
+
 on:
   push:
     branches: [main]
@@ -10,13 +30,12 @@ on:
       - '.changeset/**'
 
 jobs:
-  publish:
+  publish-npm:
+    name: Publish npm packages
     if: contains(github.event.head_commit.message, 'chore(release)')
     runs-on: ubuntu-latest
-    environment: pypi
-
     permissions:
-      id-token: write # required for npm + PyPI OIDC trusted publishing
+      id-token: write # required for npm OIDC trusted publishing
       contents: read
 
     steps:
@@ -47,8 +66,20 @@ jobs:
         env:
           NPM_CONFIG_PROVENANCE: true
 
+  publish-pypi:
+    name: Publish Python package (PyPI)
+    if: contains(github.event.head_commit.message, 'chore(release)')
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write # required for PyPI OIDC trusted publishing
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
       - name: Set up Python for PyPI publishing
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
@@ -62,3 +93,8 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: packages/aid-py/dist/
+          # skip-existing: prevents failures when the Python package version has
+          # not changed (e.g. an npm-only release). Without this flag, re-uploading
+          # an already-published version makes the step — and the whole release —
+          # fail after npm packages have already been published.
+          skip-existing: true

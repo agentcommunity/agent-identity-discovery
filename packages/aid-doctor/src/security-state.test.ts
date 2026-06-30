@@ -50,8 +50,6 @@ function reportFor(record: DoctorReport['record']['parsed'], usedWellKnown = fal
       verified: record?.pka ? true : null,
       kid: record?.v === 'aid1' ? (record.kid ?? null) : null,
       alg: record?.pka ? 'ed25519' : null,
-      createdSkewSec: null,
-      covered: null,
     },
     downgrade: { checked: false, previous: null, status: null },
     exitCode: record ? 0 : 1,
@@ -132,6 +130,47 @@ describe('security state application', () => {
     expect(result.shouldPersist).toBe(true);
     expect(report.exitCode).toBe(0);
     expect(report.downgrade.status).toBe('fallback_well_known_tls');
+  });
+
+  it('warns on binding_loss without failing, even under downgrade=fail', () => {
+    // previous has domainBound:true; current has domainBound:false and same key material
+    // so key_replaced does NOT fire — only binding_loss fires.
+    const report = reportFor({
+      v: 'aid2',
+      uri: 'https://agent.example.com',
+      proto: 'mcp',
+      pka: OLD_KEY,
+    });
+    // Override pka section to reflect unbound current state
+    report.pka.present = true;
+    report.pka.attempted = true;
+    report.pka.verified = true;
+    report.pka.domainBound = false;
+
+    const prev = previous({ domainBound: true });
+
+    const result = applySecurityState(report, prev, 'fail');
+
+    expect(report.record.warnings.some((w) => w.code === 'BINDING_LOSS')).toBe(true);
+    expect(report.exitCode).not.toBe(1003);
+    expect(result.shouldPersist).toBe(true);
+  });
+
+  it('does not persist a record from a failed PKA/domain-binding check', () => {
+    const report = reportFor({
+      v: 'aid2',
+      uri: 'https://agent.example.com',
+      proto: 'mcp',
+      pka: OLD_KEY,
+    });
+    report.exitCode = 1003;
+    report.pka.verified = false;
+
+    const result = applySecurityState(report, previous(), 'warn');
+
+    expect(result.shouldPersist).toBe(false);
+    expect(report.cacheEntry).toBeNull();
+    expect(report.downgrade.checked).toBe(false);
   });
 
   it('preserves the prior cache entry when a fail-policy downgrade is rejected', () => {

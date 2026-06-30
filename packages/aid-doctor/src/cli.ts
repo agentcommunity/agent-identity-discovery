@@ -111,6 +111,7 @@ export function createCliProgram(): Command {
     .option('--pka-policy <policy>', 'PKA policy: if-present | require')
     .option('--downgrade-policy <policy>', 'Downgrade policy: off | warn | fail')
     .option('--well-known-policy <policy>', 'Well-known policy: auto | disable')
+    .option('--domain-binding <policy>', 'Domain binding policy: off | prefer | require')
     .option('--show-details', 'Show TLS/DNSSEC/PKA short details', false)
     .option('--dump-well-known [path]', 'On fallback failure, print or save body snippet', false)
     .option(
@@ -135,6 +136,7 @@ export function createCliProgram(): Command {
           pkaPolicy?: 'if-present' | 'require';
           downgradePolicy?: 'off' | 'warn' | 'fail';
           wellKnownPolicy?: 'auto' | 'disable';
+          domainBinding?: 'off' | 'prefer' | 'require';
           showDetails?: boolean;
           dumpWellKnown?: string | boolean;
           checkDowngrade?: boolean;
@@ -164,6 +166,7 @@ export function createCliProgram(): Command {
             pkaPolicy: options.pkaPolicy,
             downgradePolicy: options.downgradePolicy,
             wellKnownPolicy: options.wellKnownPolicy,
+            ...(options.domainBinding ? { domainBindingPolicy: options.domainBinding } : {}),
             showDetails: options.showDetails,
             probeProtoSubdomain: options.probeProtoSubdomain,
             probeProtoEvenIfBase: options.probeProtoEvenIfBase,
@@ -184,8 +187,10 @@ export function createCliProgram(): Command {
           spinner.stop();
           console.log(formatCheckResult(report));
 
-          // Exit with report exit code
-          process.exit(report.exitCode);
+          // Honor --code: when set, emit the granular report exit code (e.g.
+          // 1001/1003); otherwise collapse any failure to a generic exit 1 so
+          // scripts that opt out of granular codes get a stable success/failure.
+          process.exit(options.code ? report.exitCode : report.exitCode === 0 ? 0 : 1);
         } catch (error) {
           spinner.stop();
           console.log(formatError(error, domain));
@@ -213,6 +218,7 @@ export function createCliProgram(): Command {
     .option('--pka-policy <policy>', 'PKA policy: if-present | require')
     .option('--downgrade-policy <policy>', 'Downgrade policy: off | warn | fail')
     .option('--well-known-policy <policy>', 'Well-known policy: auto | disable')
+    .option('--domain-binding <policy>', 'Domain binding policy: off | prefer | require')
     .option('--show-details', 'Show TLS/DNSSEC/PKA short details', false)
     .option('--dump-well-known [path]', 'On fallback failure, print or save body snippet', false)
     .option(
@@ -235,6 +241,7 @@ export function createCliProgram(): Command {
           pkaPolicy?: 'if-present' | 'require';
           downgradePolicy?: 'off' | 'warn' | 'fail';
           wellKnownPolicy?: 'auto' | 'disable';
+          domainBinding?: 'off' | 'prefer' | 'require';
           showDetails?: boolean;
           dumpWellKnown?: string | boolean;
           checkDowngrade?: boolean;
@@ -256,6 +263,7 @@ export function createCliProgram(): Command {
             pkaPolicy: options.pkaPolicy,
             downgradePolicy: options.downgradePolicy,
             wellKnownPolicy: options.wellKnownPolicy,
+            ...(options.domainBinding ? { domainBindingPolicy: options.domainBinding } : {}),
             showDetails: options.showDetails || false,
             probeProtoSubdomain: false, // JSON command doesn't support proto probing for now
             probeProtoEvenIfBase: false,
@@ -274,7 +282,9 @@ export function createCliProgram(): Command {
           }
 
           console.log(JSON.stringify(report, null, 2));
-          process.exit(report.exitCode);
+          // Honor --code on the report path too (mirrors the catch path below):
+          // granular code when --code is set, otherwise generic 0/1.
+          process.exit(options.code ? report.exitCode : report.exitCode === 0 ? 0 : 1);
         } catch (error) {
           // Output error result
           if (error instanceof AidError) {

@@ -18,8 +18,8 @@ pip install aid-discovery
 from aid_py import discover, AidError
 
 try:
-    result = discover("supabase.agentcommunity.org")
-    print(result.record.proto, result.record.uri, result.record.desc, result.ttl)
+    record, ttl = discover("supabase.agentcommunity.org")
+    print(record["proto"], record["uri"], record.get("desc"), ttl)
 except AidError as e:
     print(e.code, e)
 ```
@@ -52,12 +52,13 @@ rec, ttl = discover(
 ```python
 from aid_py import parse
 rec = parse("v=aid2;u=https://api.example.com/mcp;p=mcp;s=Example")
-print(rec.uri)
+print(rec["uri"])
 ```
 
 Notes
 
 - PKA handshake runs automatically when v2 `pka`/`k` is present. Legacy `aid1` records still use `pka`/`kid`.
+- For `aid2` PKA, the SDK sends the queried host in the `AID-Domain` header by default and surfaces `record.get("domain_bound")` (`True` only for a verified domain-bound proof — one whose `aid-pka-v2` covered set includes `"aid-domain";req`). Requesting binding is not itself a mitigation — only `domain-binding=require` enforces it. See [Specification Appendix B.7](../specification.md#b7-domain-binding).
 - Package is published on PyPI as `aid-discovery`.
 
 ---

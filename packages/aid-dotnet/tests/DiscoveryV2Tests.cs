@@ -10,7 +10,8 @@ public class DiscoveryV2Tests
             ?? throw new MissingMethodException("Discovery.ParseSingleValid");
         try
         {
-            return (AidRecord)method.Invoke(null, new object[] { txts, TimeSpan.FromSeconds(1), "_agent.example.com" })!;
+            var task = (Task<(AidRecord, bool)>)method.Invoke(null, new object?[] { txts, TimeSpan.FromSeconds(1), "_agent.example.com", null, CancellationToken.None })!;
+            return task.GetAwaiter().GetResult().Item1;
         }
         catch (TargetInvocationException ex) when (ex.InnerException is not null)
         {

@@ -40,6 +40,7 @@ The AID specification and its surrounding tooling (libraries, validators) are ve
 - **No DNS `kid` in v2:** `kid`/`i` remains valid only for legacy `aid1` PKA.
 - **RFC 9421 endpoint proof:** v2 PKA uses nonce-bound HTTP Message Signatures with `created`, `expires`, and `Cache-Control: no-store`.
 - **Trust source:** Discovery results distinguish DNS-rooted records from `.well-known` records with `trustSource=dns` or `trustSource=well-known-tls`.
+- PKA domain-binding profile (Appendix B.7): the `AID-Domain` request header and covering `"aid-domain";req` in the `aid-pka-v2` response signature let an endpoint consent to — or refuse — serving as the agent for the queried domain. Clients **SHOULD** send `AID-Domain` by default (`domain-binding=prefer`) and report `domainBound` on discovery results. Hard enforcement uses `domain-binding=require` (Section 3.3). A future `aid3` is expected to make this mandatory; clients sending `AID-Domain` by default need no change at that transition.
 
 ### v1.2.0 — Compatibility Baseline
 
@@ -50,7 +51,7 @@ The AID specification and its surrounding tooling (libraries, validators) are ve
 
 ### v1.1.0 — August 2025
 
-- **Public Key Attestation (PKA):** Optional Ed25519 endpoint proof via HTTP Message Signatures (RFC 9421)
+- **Public Key for Agent (PKA):** Optional Ed25519 endpoint proof via HTTP Message Signatures (RFC 9421)
 - **Key aliases:** Single-letter aliases for all TXT record keys (`v`, `p`, `u`, `s`, `a`, `d`, `e`, `k`, `i`) for byte efficiency
 - **Metadata keys:** `docs`/`d` for documentation URL, `dep`/`e` for deprecation timestamp
 - **Protocol extensions:** Added `grpc`, `graphql`, `websocket`, `zeroconf`, and `ucp` protocol tokens

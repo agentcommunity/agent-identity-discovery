@@ -58,8 +58,6 @@ const makeReport = (overrides: Partial<DoctorReport> = {}): DoctorReport => ({
     verified: true,
     kid: 'legacy-dns-kid-that-must-not-render',
     alg: 'ed25519',
-    createdSkewSec: 1,
-    covered: [],
   },
   downgrade: { checked: true, previous: null, status: 'first_seen' },
   exitCode: 0,
@@ -185,6 +183,63 @@ describe('AID Doctor CLI', () => {
       expect(processExitSpy).toHaveBeenCalledWith(0);
     });
 
+    it('maps --domain-binding to domainBindingPolicy for the check command', async () => {
+      const runCheck = vi.fn().mockResolvedValue(makeReport());
+      const { createCliProgram } = await importCliWithMocks(runCheck);
+      const program = createCliProgram();
+
+      await program.parseAsync(['check', 'example.com', '--domain-binding', 'require'], {
+        from: 'user',
+      });
+
+      expect(runCheck).toHaveBeenCalledWith(
+        'example.com',
+        expect.objectContaining({ domainBindingPolicy: 'require' }),
+      );
+      expect(processExitSpy).toHaveBeenCalledWith(0);
+    });
+
+    it('leaves domainBindingPolicy unset by default so security-mode strict can require it', async () => {
+      const runCheck = vi.fn().mockResolvedValue(makeReport());
+      const { createCliProgram } = await importCliWithMocks(runCheck);
+      const program = createCliProgram();
+
+      await program.parseAsync(['check', 'example.com'], { from: 'user' });
+
+      const opts = runCheck.mock.calls[0]?.[1];
+      expect(opts).not.toHaveProperty('domainBindingPolicy');
+    });
+
+    it('does not weaken --security-mode strict with an implicit domain-binding prefer', async () => {
+      const runCheck = vi.fn().mockResolvedValue(makeReport());
+      const { createCliProgram } = await importCliWithMocks(runCheck);
+      const program = createCliProgram();
+
+      await program.parseAsync(['check', 'example.com', '--security-mode', 'strict'], {
+        from: 'user',
+      });
+
+      const opts = runCheck.mock.calls[0]?.[1];
+      expect(opts).toMatchObject({ securityMode: 'strict' });
+      expect(opts).not.toHaveProperty('domainBindingPolicy');
+    });
+
+    it('maps --domain-binding to domainBindingPolicy for the json command', async () => {
+      const runCheck = vi.fn().mockResolvedValue(makeReport());
+      const { createCliProgram } = await importCliWithMocks(runCheck);
+      const program = createCliProgram();
+
+      await program.parseAsync(['json', 'example.com', '--domain-binding', 'off'], {
+        from: 'user',
+      });
+
+      expect(runCheck).toHaveBeenCalledWith(
+        'example.com',
+        expect.objectContaining({ domainBindingPolicy: 'off' }),
+      );
+      expect(processExitSpy).toHaveBeenCalledWith(0);
+    });
+
     it('renders the strict PKA check path with the derived v2 keyid', async () => {
       const runCheck = vi.fn().mockResolvedValue(makeReport());
       const { createCliProgram } = await importCliWithMocks(runCheck);
@@ -226,6 +281,57 @@ describe('AID Doctor CLI', () => {
       expect(consoleLogSpy.mock.calls.map(([line]) => String(line)).join('\n')).toContain(
         'AID Discovery Failed for missing.example',
       );
+      expect(processExitSpy).toHaveBeenCalledWith(1003);
+    });
+
+    it('collapses a report-level failure to exit 1 without --code (check command)', async () => {
+      const runCheck = vi.fn().mockResolvedValue(makeReport({ exitCode: 1001 }));
+      const { createCliProgram } = await importCliWithMocks(runCheck);
+      const program = createCliProgram();
+
+      await program.parseAsync(['check', 'bad.example'], { from: 'user' });
+
+      // Without --code the granular report code is NOT leaked; failures map to 1.
+      expect(processExitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it('emits the granular report exit code with --code (check command)', async () => {
+      const runCheck = vi.fn().mockResolvedValue(makeReport({ exitCode: 1001 }));
+      const { createCliProgram } = await importCliWithMocks(runCheck);
+      const program = createCliProgram();
+
+      await program.parseAsync(['check', 'bad.example', '--code'], { from: 'user' });
+
+      expect(processExitSpy).toHaveBeenCalledWith(1001);
+    });
+
+    it('still exits 0 on a successful report regardless of --code (check command)', async () => {
+      const runCheck = vi.fn().mockResolvedValue(makeReport({ exitCode: 0 }));
+      const { createCliProgram } = await importCliWithMocks(runCheck);
+      const program = createCliProgram();
+
+      await program.parseAsync(['check', 'ok.example'], { from: 'user' });
+
+      expect(processExitSpy).toHaveBeenCalledWith(0);
+    });
+
+    it('collapses a report-level failure to exit 1 without --code (json command)', async () => {
+      const runCheck = vi.fn().mockResolvedValue(makeReport({ exitCode: 1003 }));
+      const { createCliProgram } = await importCliWithMocks(runCheck);
+      const program = createCliProgram();
+
+      await program.parseAsync(['json', 'bad.example'], { from: 'user' });
+
+      expect(processExitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it('emits the granular report exit code with --code (json command)', async () => {
+      const runCheck = vi.fn().mockResolvedValue(makeReport({ exitCode: 1003 }));
+      const { createCliProgram } = await importCliWithMocks(runCheck);
+      const program = createCliProgram();
+
+      await program.parseAsync(['json', 'bad.example', '--code'], { from: 'user' });
+
       expect(processExitSpy).toHaveBeenCalledWith(1003);
     });
   });
@@ -361,8 +467,6 @@ describe('AID Doctor CLI', () => {
           verified: true,
           kid: 'g1',
           alg: 'ed25519',
-          createdSkewSec: 1,
-          covered: [],
         },
         downgrade: { checked: true, previous: null, status: 'first_seen' },
         exitCode: 0,
@@ -426,8 +530,6 @@ describe('AID Doctor CLI', () => {
           verified: true,
           kid: 'legacy-dns-kid-that-must-not-render',
           alg: 'ed25519',
-          createdSkewSec: 1,
-          covered: [],
         },
         downgrade: { checked: true, previous: null, status: 'first_seen' },
         exitCode: 0,
@@ -485,8 +587,6 @@ describe('AID Doctor CLI', () => {
           verified: null,
           kid: null,
           alg: null,
-          createdSkewSec: null,
-          covered: null,
         },
         downgrade: {
           checked: true,
@@ -500,6 +600,35 @@ describe('AID Doctor CLI', () => {
       const output = formatCheckResult(report);
       expect(output).toContain('TLS-hosted fallback metadata');
       expect(output).toContain('well-known-tls');
+    });
+
+    it('renders a binding_loss downgrade as a warning step, not a green "No change"', () => {
+      const report = makeReport({
+        record: {
+          ...makeReport().record,
+          warnings: [
+            {
+              code: 'BINDING_LOSS',
+              message:
+                'Domain-binding proof was present in the previous check but is now absent (endpoint-proof only).',
+            },
+          ],
+        },
+        downgrade: {
+          checked: true,
+          previous: { pka: 'same', kid: null },
+          status: 'binding_loss',
+        },
+      });
+
+      const output = formatCheckResult(report);
+      const stepLine = output.split('\n').find((line) => line.includes('[6/6]')) ?? '';
+      // The [6/6] step line must surface the binding loss as a warning and must
+      // NOT fall through to the green "No change" else-branch.
+      expect(stepLine).toContain('Domain-binding lost');
+      expect(stepLine).not.toContain('No change');
+      // The warning is still listed in the Summary.
+      expect(output).toContain('endpoint-proof only');
     });
 
     it('should generate actionable suggestions', () => {
@@ -546,8 +675,6 @@ describe('AID Doctor CLI', () => {
           verified: null,
           kid: null,
           alg: null,
-          createdSkewSec: null,
-          covered: null,
         },
         downgrade: { checked: false, previous: null, status: null },
         exitCode: 0,
@@ -557,6 +684,52 @@ describe('AID Doctor CLI', () => {
       expect(output).toContain('💡 Enable DNSSEC');
       expect(output).toContain('💡 Add endpoint proof');
       expect(output).toContain('💡 Renew TLS certificate');
+    });
+
+    it('shows "domain-bound" when domainBound is true', () => {
+      const out = formatCheckResult({
+        ...makeReport(),
+        pka: { ...makeReport().pka, present: true, verified: true, domainBound: true },
+      });
+      expect(out).toContain('domain-bound');
+    });
+
+    it('shows "endpoint-proof only" when domainBound is false', () => {
+      const out = formatCheckResult({
+        ...makeReport(),
+        pka: { ...makeReport().pka, present: true, verified: true, domainBound: false },
+      });
+      expect(out).toContain('endpoint-proof only');
+    });
+
+    it('shows no binding label when domainBound is null/absent', () => {
+      const report = makeReport();
+      // makeReport default: pka.domainBound not set (undefined)
+      const out = formatCheckResult(report);
+      expect(out).not.toContain('domain-bound');
+      expect(out).not.toContain('endpoint-proof only');
+    });
+
+    it('suggests enabling domain binding when endpoint-proof only', () => {
+      const out = formatCheckResult({
+        ...makeReport(),
+        pka: { ...makeReport().pka, present: true, verified: true, domainBound: false },
+      });
+      expect(out).toContain('Enable domain binding');
+      expect(out).toContain('attests that it serves the queried domain');
+    });
+
+    it('does not show binding label or domain-binding suggestion for verified aid1 record with domainBound=false', () => {
+      const out = formatCheckResult({
+        ...makeReport(),
+        record: {
+          ...makeReport().record,
+          parsed: { v: 'aid1', uri: 'https://a.co', proto: 'mcp' },
+        },
+        pka: { ...makeReport().pka, present: true, verified: true, domainBound: false },
+      });
+      expect(out).not.toContain('endpoint-proof only');
+      expect(out).not.toContain('Enable domain binding');
     });
 
     it('should suggest canonical short keys when long TXT keys are detected', () => {
@@ -608,8 +781,6 @@ describe('AID Doctor CLI', () => {
           verified: true,
           kid: 'g1',
           alg: 'ed25519',
-          createdSkewSec: 1,
-          covered: [],
         },
         downgrade: { checked: true, previous: null, status: 'first_seen' },
         exitCode: 0,

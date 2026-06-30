@@ -7,11 +7,26 @@ import type { NextRequest } from 'next/server';
 // bundle edge-runtime-flagged routes into a single Worker bundle; omitting the
 // flag lets it bundle the route normally while ImageResponse still works fine.
 
+// Hard caps on untrusted query params. This is a public, unauthenticated
+// endpoint and Satori lays text out as glyph paths (roughly superlinear in
+// length), so an arbitrarily long ?title=... is a cheap CPU-burn vector that
+// also defeats the edge cache via distinct query strings. Clamp before render.
+const MAX_TITLE = 120;
+const MAX_DESCRIPTION = 200;
+const MAX_SLUG = 120;
+
 export function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
-  const title = searchParams.get('title') ?? 'Documentation';
-  const description = searchParams.get('description') ?? 'Agent Identity & Discovery';
-  const slug = searchParams.get('slug') ?? '';
+  const title = (searchParams.get('title') ?? 'Documentation').slice(0, MAX_TITLE);
+  const description = (searchParams.get('description') ?? 'Agent Identity & Discovery').slice(
+    0,
+    MAX_DESCRIPTION,
+  );
+  // slug is interpolated into the displayed URL string — normalize to the
+  // path-safe charset before clamping so it can't break the layout text.
+  const slug = (searchParams.get('slug') ?? '')
+    .replaceAll(/[^A-Za-z0-9/_-]/g, '')
+    .slice(0, MAX_SLUG);
 
   return new ImageResponse(
     <div
@@ -60,6 +75,9 @@ export function GET(request: NextRequest) {
             lineHeight: 1.1,
             letterSpacing: '-0.03em',
             maxWidth: '900px',
+            maxHeight: '260px',
+            overflow: 'hidden',
+            textOverflow: 'clip',
           }}
         >
           {title}
@@ -71,6 +89,9 @@ export function GET(request: NextRequest) {
               color: '#888',
               lineHeight: 1.4,
               maxWidth: '800px',
+              maxHeight: '140px',
+              overflow: 'hidden',
+              textOverflow: 'clip',
             }}
           >
             {description}

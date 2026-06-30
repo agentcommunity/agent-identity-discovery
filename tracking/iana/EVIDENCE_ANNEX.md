@@ -26,13 +26,13 @@ The strongest evidence in this repository is the consistency between the spec so
 
 The `_agent` label is already the stable discovery label for AID. The record semantics are specific, narrow, and versioned:
 
-- AID v1.x uses a TXT record at `_agent.<domain>`
+- AID uses a TXT record at `_agent.<domain>` across both published protocol versions
 - The required record members are version, endpoint URI, and protocol token
-- The current deployed version is `aid1`
-- The label remains `_agent` even if a future AID version adopts SRV or SVCB
+- The current deployed version is `aid2` (normative since v2.0.0, June 2026); `aid1` remains a supported legacy compatibility version
+- The label remains `_agent` even as the record schema evolves across protocol versions
 - Protocol-specific descendants such as `_agent._mcp.<domain>` remain subordinate names under `_agent`
 
-That combination is exactly the type of narrowly scoped, protocol-specific meaning that RFC 8552 expects.
+That label stability across record-version evolution is exactly the type of narrowly scoped, protocol-specific meaning that RFC 8552 expects. The `_agent` label has proven stable through two major protocol versions (aid1 → aid2), strengthening the case that it represents a durable, well-scoped registration.
 
 ## Verifiable Milestones
 
@@ -58,26 +58,29 @@ The following milestones are derived from repository history and can be reproduc
 `packages/web/src/spec-adapters/index.ts` currently exports:
 
 ```ts
+// The current UI adapter normalizes the stable app-facing shape used by aid1 and aid2 records.
 export const selectAdapter = (_version?: string): SpecAdapter => v1Adapter;
 ```
 
 This is useful evidence for IANA because it shows:
 
 1. the protocol is explicitly versioned,
-2. the deployed consumer surface is already normalized around a stable v1 adapter, and
-3. the maintainers expect future protocol versions while preserving a stable discovery abstraction.
+2. the deployed consumer surface is normalized around a stable shared adapter that handles both `aid1` (legacy) and `aid2` (current) records — a concrete demonstration of the label-stability argument, and
+3. the maintainers maintain a stable discovery abstraction across protocol versions.
 
-That is consistent with the spec's label-stability claim for `_agent`.
+That is consistent with the spec's label-stability claim for `_agent` and is now validated by real two-version history (aid1 → aid2).
 
 ## Evidence From the Generated Type Surface
 
-The generated AID record type in `protocol/spec.ts` includes these v1 fields:
+The generated AID record type in `protocol/spec.ts` (derived from `protocol/constants.yml`, the canonical source of truth) includes these v2 fields:
 
 - required: `v`, `uri`, `proto`
-- optional: `auth`, `desc`, `docs`, `dep`, `pka`, `kid`
-- recognized aliases in the raw record shape: `p`, `u`, `a`, `s`, `d`, `e`, `k`, `i`
+- optional: `auth`, `desc`, `docs`, `dep`, `pka`
+- recognized aliases in the raw record shape: `p`, `u`, `a`, `s`, `d`, `e`, `k`
 
-This is important because the requested DNS node name is not just a free-form convention. The repository encodes a concrete, versioned record schema consumed by implementations.
+The v1 legacy record additionally recognized `kid` / `i` (key-id field, superseded in v2 by a derived thumbprint). Implementations handle both schemas under the same `_agent` label, demonstrating that the DNS node name is stable across protocol evolution.
+
+This is important because the requested DNS node name is not just a free-form convention. The repository encodes a concrete, versioned record schema consumed by six language implementations (TypeScript, Go, Python, Rust, .NET, Java).
 
 ## Stability Arguments Relevant to RFC 8552
 

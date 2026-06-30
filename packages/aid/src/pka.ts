@@ -27,6 +27,24 @@ function base64ToUint8(b64: string): Uint8Array {
   return bytes;
 }
 
+/**
+ * Decode the base64 bytes carried inside a (V1 or V2) Signature header.
+ *
+ * `atob` throws a raw DOMException on non-base64 input. Left unguarded, that
+ * escapes the PKA handshake as a non-AidError, gets mapped to
+ * ERR_DNS_LOOKUP_FAILED in client.ts, and silently triggers the .well-known
+ * fallback — i.e. a failed endpoint proof fails open onto a different trust
+ * path. Wrapping it here turns a malformed signature into a hard ERR_SECURITY
+ * failure so discovery fails closed.
+ */
+function decodeSignatureBytes(b64: string): Uint8Array {
+  try {
+    return base64ToUint8(b64);
+  } catch {
+    throw new AidError('ERR_SECURITY', 'Invalid PKA signature encoding');
+  }
+}
+
 function base64UrlToUint8(value: string): Uint8Array {
   if (!/^[A-Za-z0-9_-]+$/.test(value) || value.includes('=')) {
     throw new AidError('ERR_SECURITY', 'Invalid aid2 PKA encoding');
@@ -84,6 +102,23 @@ function asciiLowerCase(s: string): string {
     }
   }
   return res;
+}
+
+export interface PKAHandshakeResult {
+  /** True when the endpoint signed the AID-Domain binding for the queried domain. */
+  domainBound: boolean;
+}
+
+export const AID_DOMAIN_HEADER = 'AID-Domain';
+const AID_PKA_TAG_V2 = 'aid-pka-v2';
+
+export function canonicalizeAidDomain(domain: string): string {
+  let value = asciiLowerCase(domain.trim());
+  if (value.endsWith('.')) value = value.slice(0, -1);
+  if (!value || !/^[a-z0-9.:[\]_-]+$/.test(value)) {
+    throw new AidError('ERR_SECURITY', 'Invalid AID-Domain value');
+  }
+  return value;
 }
 
 // Minimal types to avoid DOM deps
@@ -225,7 +260,7 @@ function parseV1SignatureHeaders(headers: HeaderLike): {
   // Extract signature value from Signature header
   const sigMatch = /sig\s*=\s*:\s*([^:]+)\s*:/i.exec(sig);
   if (!sigMatch) throw new AidError('ERR_SECURITY', 'Invalid Signature header');
-  const signature = base64ToUint8(sigMatch[1]);
+  const signature = decodeSignatureBytes(sigMatch[1]);
   const responseDate = (headers.get('Date') || headers.get('date') || null) as string | null;
   return { covered, created, keyid, keyidRaw, alg, signature, responseDate };
 }
@@ -439,7 +474,7 @@ function parseSignatureParams(
 
 interface V2CoveredItem {
   raw: string;
-  name: '@method' | '@target-uri' | '@authority' | '@status';
+  name: '@method' | '@target-uri' | '@authority' | '@status' | 'aid-domain';
   req: boolean;
 }
 
@@ -452,6 +487,8 @@ interface V2SignatureHeaders {
   alg: string;
   nonce: string;
   tag: string;
+  /** True when the signed covered set includes "aid-domain";req. */
+  domainBound: boolean;
   signature: Uint8Array;
 }
 
@@ -461,7 +498,7 @@ function parseV2CoveredItem(raw: string): V2CoveredItem {
   const name = match[1] as V2CoveredItem['name'];
   const params = match[2] ? match[2].split(';').filter(Boolean) : [];
 
-  if (!['@method', '@target-uri', '@authority', '@status'].includes(name)) {
+  if (!['@method', '@target-uri', '@authority', '@status', 'aid-domain'].includes(name)) {
     throw new AidError('ERR_SECURITY', `Unsupported covered field: ${name}`);
   }
   const reqCount = params.filter((param) => param === 'req').length;
@@ -472,29 +509,37 @@ function parseV2CoveredItem(raw: string): V2CoveredItem {
   return { raw, name, req: reqCount === 1 };
 }
 
-function validateV2CoveredSet(covered: V2CoveredItem[]): void {
-  if (covered.length !== 4) {
-    throw new AidError('ERR_SECURITY', 'Signature-Input must cover required fields');
-  }
-
-  const expected = new Map<V2CoveredItem['name'], boolean>([
+// Validates the covered set against the two permitted shapes and returns whether the
+// proof is domain-bound (i.e. the signed covered set includes "aid-domain";req).
+// Shape A (unbound): @method;req @target-uri;req @authority;req @status
+// Shape B (bound):   @method;req @target-uri;req @authority;req aid-domain;req @status
+// The covered set lives in the signed @signature-params, so this distinction is authenticated.
+function validateV2CoveredSet(covered: V2CoveredItem[]): boolean {
+  const base: ReadonlyArray<[V2CoveredItem['name'], boolean]> = [
     ['@method', true],
     ['@target-uri', true],
     ['@authority', true],
     ['@status', false],
-  ]);
-  const seen = new Set<string>();
+  ];
 
-  for (const item of covered) {
-    if (seen.has(item.name) || expected.get(item.name) !== item.req) {
-      throw new AidError('ERR_SECURITY', 'Signature-Input must cover required fields');
-    }
-    seen.add(item.name);
-  }
+  const domainBound = covered.length === base.length + 1 && covered[3]?.name === 'aid-domain';
 
-  if (seen.size !== expected.size) {
+  const expected: ReadonlyArray<[V2CoveredItem['name'], boolean]> = domainBound
+    ? [base[0], base[1], base[2], ['aid-domain', true], base[3]]
+    : base;
+
+  if (covered.length !== expected.length) {
     throw new AidError('ERR_SECURITY', 'Signature-Input must cover required fields');
   }
+
+  for (let i = 0; i < expected.length; i++) {
+    const [name, req] = expected[i];
+    if (covered[i].name !== name || covered[i].req !== req) {
+      throw new AidError('ERR_SECURITY', 'Signature-Input must cover required fields');
+    }
+  }
+
+  return domainBound;
 }
 
 function parseV2SignatureHeaders(headers: HeaderLike): V2SignatureHeaders {
@@ -511,7 +556,6 @@ function parseV2SignatureHeaders(headers: HeaderLike): V2SignatureHeaders {
   const coveredRaw = signatureParamsRaw.slice(1, closeIndex).trim();
   const paramsRaw = signatureParamsRaw.slice(closeIndex + 1);
   const covered = splitInnerListItems(coveredRaw).map(parseV2CoveredItem);
-  validateV2CoveredSet(covered);
 
   const params = parseSignatureParams(paramsRaw);
   const createdRaw = params.get('created')?.rawValue;
@@ -534,6 +578,8 @@ function parseV2SignatureHeaders(headers: HeaderLike): V2SignatureHeaders {
     throw new AidError('ERR_SECURITY', 'Invalid Signature-Input timestamp');
   }
 
+  const domainBound = validateV2CoveredSet(covered);
+
   const signatureRaw = extractDictionaryMember(sig, 'aid-pka');
   const sigMatch = /^:\s*([^:]+?)\s*:$/.exec(signatureRaw);
   if (!sigMatch) throw new AidError('ERR_SECURITY', 'Invalid Signature header');
@@ -547,7 +593,8 @@ function parseV2SignatureHeaders(headers: HeaderLike): V2SignatureHeaders {
     alg,
     nonce,
     tag,
-    signature: base64ToUint8(sigMatch[1]),
+    domainBound,
+    signature: decodeSignatureBytes(sigMatch[1]),
   };
 }
 
@@ -577,13 +624,24 @@ function requestAuthority(uri: string): string {
 function buildV2SignatureBase(
   covered: V2CoveredItem[],
   signatureParamsRaw: string,
-  ctx: { method: string; targetUri: string; authority: string; status: number },
+  ctx: { method: string; targetUri: string; authority: string; status: number; aidDomain?: string },
 ): Uint8Array {
   const lines: string[] = [];
   for (const item of covered) {
     if (item.name === '@method') lines.push(`"@method";req: ${ctx.method}`);
     if (item.name === '@target-uri') lines.push(`"@target-uri";req: ${ctx.targetUri}`);
     if (item.name === '@authority') lines.push(`"@authority";req: ${ctx.authority}`);
+    if (item.name === 'aid-domain') {
+      // Fail-closed invariant: unreachable in normal flow (performV2PKAHandshake rejects a
+      // covered aid-domain without a sent domain before reaching here), kept as defense-in-depth.
+      if (ctx.aidDomain === undefined) {
+        throw new AidError(
+          'ERR_SECURITY',
+          'Signature covers aid-domain but no AID-Domain was sent',
+        );
+      }
+      lines.push(`"aid-domain";req: ${ctx.aidDomain}`);
+    }
     if (item.name === '@status') lines.push(`"@status": ${ctx.status}`);
   }
   lines.push(`"@signature-params": ${signatureParamsRaw}`);
@@ -604,8 +662,13 @@ async function deriveAid2KeyMaterial(
   return { publicKey, keyid: uint8ToBase64Url(new Uint8Array(digest)) };
 }
 
-function buildAcceptSignatureV2(keyid: string, nonce: string): string {
-  return `aid-pka=("@method";req "@target-uri";req "@authority";req "@status");created;expires;keyid="${keyid}";alg="ed25519";nonce="${nonce}";tag="aid-pka-v2"`;
+function buildAcceptSignatureV2(keyid: string, nonce: string, domainBound: boolean): string {
+  // The tag is a fixed profile identifier (RFC 9421 §2.3); domain binding is signalled by
+  // including "aid-domain";req in the covered set, not by a distinct tag.
+  const covered = domainBound
+    ? '("@method";req "@target-uri";req "@authority";req "aid-domain";req "@status")'
+    : '("@method";req "@target-uri";req "@authority";req "@status")';
+  return `aid-pka=${covered};created;expires;keyid="${keyid}";alg="ed25519";nonce="${nonce}";tag="${AID_PKA_TAG_V2}"`;
 }
 
 async function performV1PKAHandshake(uri: string, pka: string, kid: string): Promise<void> {
@@ -666,11 +729,16 @@ async function performV1PKAHandshake(uri: string, pka: string, kid: string): Pro
   if (!ok) throw new AidError('ERR_SECURITY', 'PKA signature verification failed');
 }
 
-async function performV2PKAHandshake(uri: string, pka: string): Promise<void> {
+async function performV2PKAHandshake(
+  uri: string,
+  pka: string,
+  domain?: string,
+): Promise<PKAHandshakeResult> {
   const cryptoImpl: CryptoLike =
     (globalThis as unknown as { crypto?: CryptoLike }).crypto ??
     (nodeWebcrypto as unknown as CryptoLike);
   const { publicKey, keyid: expectedKeyid } = await deriveAid2KeyMaterial(pka, cryptoImpl);
+  const canonicalDomain = domain === undefined ? undefined : canonicalizeAidDomain(domain);
   const nonce = uint8ToBase64Url(cryptoImpl.getRandomValues(new Uint8Array(32)));
   const requestUri = normalizeRequestUri(uri);
   const authority = requestAuthority(requestUri);
@@ -684,8 +752,13 @@ async function performV2PKAHandshake(uri: string, pka: string): Promise<void> {
     res = await fetchImpl(requestUri, {
       method: 'GET',
       headers: {
-        'Accept-Signature': buildAcceptSignatureV2(expectedKeyid, nonce),
+        'Accept-Signature': buildAcceptSignatureV2(
+          expectedKeyid,
+          nonce,
+          canonicalDomain !== undefined,
+        ),
         'Cache-Control': 'no-store',
+        ...(canonicalDomain !== undefined ? { [AID_DOMAIN_HEADER]: canonicalDomain } : {}),
       },
       redirect: 'error',
     });
@@ -718,8 +791,15 @@ async function performV2PKAHandshake(uri: string, pka: string): Promise<void> {
   if (!timingSafeEqual(parsed.nonce, nonce)) {
     throw new AidError('ERR_SECURITY', 'Signature nonce mismatch');
   }
-  if (!timingSafeEqual(parsed.tag, 'aid-pka-v2')) {
+  if (!timingSafeEqual(parsed.tag, AID_PKA_TAG_V2)) {
     throw new AidError('ERR_SECURITY', 'Invalid signature tag');
+  }
+  // Domain binding is derived from the signed covered set (aid-domain coverage), not the tag.
+  const isDomainBound = parsed.domainBound;
+  // Primary protection: a response that covers aid-domain is only meaningful when the client
+  // committed to a domain via the AID-Domain header. Reject otherwise (fail closed).
+  if (isDomainBound && canonicalDomain === undefined) {
+    throw new AidError('ERR_SECURITY', 'Response covers aid-domain but no AID-Domain was sent');
   }
 
   const base = buildV2SignatureBase(parsed.covered, parsed.signatureParamsRaw, {
@@ -727,18 +807,25 @@ async function performV2PKAHandshake(uri: string, pka: string): Promise<void> {
     targetUri: requestUri,
     authority,
     status: res.status,
+    ...(canonicalDomain !== undefined ? { aidDomain: canonicalDomain } : {}),
   });
   const key = await cryptoImpl.subtle.importKey('raw', publicKey, { name: 'Ed25519' }, false, [
     'verify',
   ]);
   const ok = await cryptoImpl.subtle.verify('Ed25519', key, parsed.signature, base);
   if (!ok) throw new AidError('ERR_SECURITY', 'PKA signature verification failed');
+  return { domainBound: isDomainBound };
 }
 
-export async function performPKAHandshake(uri: string, pka: string, kid?: string): Promise<void> {
+export async function performPKAHandshake(
+  uri: string,
+  pka: string,
+  kid?: string,
+  domain?: string,
+): Promise<PKAHandshakeResult> {
   if (kid !== undefined) {
     await performV1PKAHandshake(uri, pka, kid);
-    return;
+    return { domainBound: false };
   }
-  await performV2PKAHandshake(uri, pka);
+  return await performV2PKAHandshake(uri, pka, domain);
 }

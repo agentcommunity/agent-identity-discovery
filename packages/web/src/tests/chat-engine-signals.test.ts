@@ -89,6 +89,47 @@ describe('chat-engine signal builders', () => {
     expect(signal.title.toLowerCase()).toContain('authentication required');
   });
 
+  it('shows Domain-bound in PKA detail when domainBound is true', () => {
+    const result = discoveryOk();
+    if (!result.ok) throw new Error('Expected successful discovery fixture');
+    result.value.metadata.pka = {
+      present: true,
+      verified: true,
+      domainBound: true,
+      keyid: 'abc123',
+    };
+
+    const signal = buildDiscoveryResultSignal('example.com', result);
+    const pkaDetail = signal.details?.find((d) => d.label === 'PKA');
+    expect(pkaDetail).toBeDefined();
+    expect(pkaDetail?.value).toContain('Domain-bound');
+  });
+
+  it('labels connection-stage PKA binding as endpoint-bound', () => {
+    const handshake: HandshakeResult = {
+      ok: true,
+      value: {
+        protocolVersion: '2024-11-05',
+        serverInfo: { name: 'Connected Server', version: '1.0.0' },
+        capabilities: [{ id: 'tool.list', type: 'tool' }],
+        security: {
+          pka: {
+            present: true,
+            attempted: true,
+            verified: true,
+            keyid: 'abc123',
+            domainBound: true,
+          },
+        },
+      },
+    };
+
+    const signal = buildConnectionResultSignal(discoveryContext(), handshake);
+    const pkaDetail = signal.details?.find((d) => d.label === 'PKA');
+    expect(pkaDetail?.value).toContain('Endpoint-bound');
+    expect(pkaDetail?.value).not.toContain('Domain-bound');
+  });
+
   it('builds auth-retry success signal', () => {
     const handshake: HandshakeResult = {
       ok: true,

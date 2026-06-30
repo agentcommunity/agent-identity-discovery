@@ -10,10 +10,10 @@ type SnippetLanguage = 'typescript' | 'python' | 'go' | 'rust' | 'java' | 'dotne
 const INSTALL_COMMANDS: Record<SnippetLanguage, string> = {
   typescript: 'npm install @agentcommunity/aid',
   python: 'pip install aid-discovery',
-  go: 'go get github.com/agentcommunity/aid-go',
-  rust: 'cargo add aid-rs',
-  java: '// Add org.agentcommunity:aid to pom.xml or build.gradle',
-  dotnet: 'dotnet add package AidDiscovery',
+  go: 'source checkout: packages/aid-go + go mod replace',
+  rust: 'source checkout: packages/aid-rs',
+  java: 'source checkout: packages/aid-java',
+  dotnet: 'source checkout: packages/aid-dotnet',
 };
 
 function buildSnippets(domain: string): Record<SnippetLanguage, string> {
@@ -24,13 +24,18 @@ const { record } = await discover('${domain}')
 console.log(record.proto, record.uri)`,
     python: `from aid_py import discover
 
-record = discover('${domain}')
-print(record.uri)`,
-    go: `import "github.com/agentcommunity/aid-go"
+record, ttl = discover('${domain}')
+print(record["uri"], ttl)`,
+    go: `import (
+    "fmt"
+    "time"
 
-rec, err := aid.Discover("${domain}")
+    aid "github.com/agentcommunity/aid-go"
+)
+
+record, ttl, err := aid.Discover("${domain}", 5*time.Second)
 if err != nil { /* handle */ }
-fmt.Println(rec.Record.URI)`,
+fmt.Println(record.URI, ttl)`,
     rust: `use aid_rs::discover;
 use std::time::Duration;
 

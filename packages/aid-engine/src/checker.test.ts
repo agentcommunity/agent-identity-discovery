@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { performPKAHandshake } from '@agentcommunity/aid';
 
 let nextDiscovery: any;
 
@@ -19,7 +20,7 @@ vi.mock('@agentcommunity/aid', () => {
   return {
     AidError,
     enforceRedirectPolicy: vi.fn().mockResolvedValue(undefined),
-    performPKAHandshake: vi.fn().mockResolvedValue(undefined),
+    performPKAHandshake: vi.fn().mockResolvedValue({ domainBound: false }),
   };
 });
 
@@ -48,6 +49,7 @@ vi.mock('./protoProbe', () => ({
 }));
 
 import { runCheck } from './checker';
+import { runBaseDiscovery } from './dns';
 import type { CacheEntry } from './types';
 
 const ZERO_JWK_X = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
@@ -160,5 +162,231 @@ describe('runCheck security-state downgrade cache', () => {
       keyid: ZERO_THUMBPRINT,
       jwkX: ZERO_JWK_X,
     });
+  });
+
+  it('detects domain-binding loss when previous was bound and current is unbound', async () => {
+    const mockedPerformPKAHandshake = vi.mocked(performPKAHandshake);
+    // Current handshake returns domainBound:false
+    mockedPerformPKAHandshake.mockResolvedValueOnce({ domainBound: false });
+    nextDiscovery = discovery({
+      v: 'aid2',
+      uri: 'https://api.example.com/mcp',
+      proto: 'mcp',
+      pka: ZERO_JWK_X,
+    });
+
+    // Previous entry was domain-bound with the same key
+    const report = await check(previousAid2({ domainBound: true }));
+
+    expect(report.downgrade.status).toBe('binding_loss');
+    expect(report.record.warnings.some((w) => w.code === 'BINDING_LOSS')).toBe(true);
+  });
+
+  it('records domainBound from the v2 handshake result', async () => {
+    const mockedPerformPKAHandshake = vi.mocked(performPKAHandshake);
+    mockedPerformPKAHandshake.mockResolvedValueOnce({ domainBound: true });
+    nextDiscovery = discovery({
+      v: 'aid2',
+      uri: 'https://api.example.com/mcp',
+      proto: 'mcp',
+      pka: ZERO_JWK_X,
+    });
+
+    const report = await check();
+
+    expect(report.pka.domainBound).toBe(true);
+  });
+
+  it('enforces downgradePolicy=fail on a cache-detected downgrade (exit 1003, no persist)', async () => {
+    nextDiscovery = discovery({
+      v: 'aid1',
+      uri: 'https://api.example.com/mcp',
+      proto: 'mcp',
+    });
+
+    const report = await runCheck('example.com', {
+      timeoutMs: 1,
+      allowFallback: true,
+      wellKnownTimeoutMs: 1,
+      checkDowngrade: true,
+      downgradePolicy: 'fail',
+      previousCacheEntry: previousAid2(),
+    });
+
+    expect(report.downgrade.status).toBe('version_downgrade');
+    // The fail policy must set the ERR_SECURITY exit code and refuse to persist
+    // the untrusted entry, matching the doctor's applySecurityState.
+    expect(report.exitCode).toBe(1003);
+    expect(report.cacheEntry).toBeNull();
+  });
+
+  it('does not fail under downgradePolicy=warn for the same downgrade', async () => {
+    nextDiscovery = discovery({
+      v: 'aid1',
+      uri: 'https://api.example.com/mcp',
+      proto: 'mcp',
+    });
+
+    const report = await runCheck('example.com', {
+      timeoutMs: 1,
+      allowFallback: true,
+      wellKnownTimeoutMs: 1,
+      checkDowngrade: true,
+      downgradePolicy: 'warn',
+      previousCacheEntry: previousAid2(),
+    });
+
+    expect(report.downgrade.status).toBe('version_downgrade');
+    expect(report.exitCode).toBe(0);
+    expect(report.cacheEntry).not.toBeNull();
+  });
+
+  it('does not fail under downgradePolicy=fail for a warning-only binding_loss', async () => {
+    const mockedPerformPKAHandshake = vi.mocked(performPKAHandshake);
+    mockedPerformPKAHandshake.mockResolvedValueOnce({ domainBound: false });
+    nextDiscovery = discovery({
+      v: 'aid2',
+      uri: 'https://api.example.com/mcp',
+      proto: 'mcp',
+      pka: ZERO_JWK_X,
+    });
+
+    const report = await runCheck('example.com', {
+      timeoutMs: 1,
+      allowFallback: true,
+      wellKnownTimeoutMs: 1,
+      checkDowngrade: true,
+      downgradePolicy: 'fail',
+      previousCacheEntry: previousAid2({ domainBound: true }),
+    });
+
+    // binding_loss is warning-only and must NOT be rejected by the fail policy.
+    expect(report.downgrade.status).toBe('binding_loss');
+    expect(report.exitCode).toBe(0);
+    expect(report.cacheEntry).not.toBeNull();
+  });
+});
+
+describe('runCheck domain-binding policy', () => {
+  const mockedPerformPKAHandshake = vi.mocked(performPKAHandshake);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function aid2Discovery() {
+    return discovery({
+      v: 'aid2',
+      uri: 'https://api.example.com/mcp',
+      proto: 'mcp',
+      pka: ZERO_JWK_X,
+    });
+  }
+
+  it('require domain-binding fails the PKA step on an unbound v2 proof', async () => {
+    mockedPerformPKAHandshake.mockResolvedValueOnce({ domainBound: false });
+    nextDiscovery = aid2Discovery();
+
+    const report = await runCheck('example.com', {
+      timeoutMs: 1,
+      allowFallback: true,
+      wellKnownTimeoutMs: 1,
+      checkDowngrade: true,
+      domainBindingPolicy: 'require',
+    });
+
+    expect(report.pka.verified).toBe(false);
+    expect(report.exitCode).not.toBe(0); // failing exit code set
+    // A rejected record must not be persisted as verified.
+    expect(report.cacheEntry).toBeNull();
+  });
+
+  it('strict security mode requires domain-binding when no explicit policy overrides it', async () => {
+    mockedPerformPKAHandshake.mockResolvedValueOnce({ domainBound: false });
+    nextDiscovery = aid2Discovery();
+
+    const report = await runCheck('example.com', {
+      timeoutMs: 1,
+      allowFallback: true,
+      wellKnownTimeoutMs: 1,
+      checkDowngrade: true,
+      securityMode: 'strict',
+    });
+
+    expect(report.pka.verified).toBe(false);
+    expect(report.exitCode).not.toBe(0);
+    expect(report.cacheEntry).toBeNull();
+  });
+
+  it('require domain-binding does NOT fail on a bound v2 proof', async () => {
+    mockedPerformPKAHandshake.mockResolvedValueOnce({ domainBound: true });
+    nextDiscovery = aid2Discovery();
+
+    const report = await runCheck('example.com', {
+      timeoutMs: 1,
+      allowFallback: true,
+      wellKnownTimeoutMs: 1,
+      checkDowngrade: true,
+      domainBindingPolicy: 'require',
+    });
+
+    expect(report.pka.verified).toBe(true);
+    expect(report.exitCode).toBe(0);
+  });
+
+  it('off domain-binding does not pass a domain to the handshake and records binding as unknown', async () => {
+    mockedPerformPKAHandshake.mockResolvedValueOnce({ domainBound: false });
+    nextDiscovery = aid2Discovery();
+
+    const report = await runCheck('example.com', {
+      timeoutMs: 1,
+      allowFallback: true,
+      wellKnownTimeoutMs: 1,
+      domainBindingPolicy: 'off',
+    });
+
+    expect(report.pka.verified).toBe(true);
+    expect(report.pka.domainBound).toBeNull();
+    // performPKAHandshake(uri, pka, kid, domain) — 4th arg must be undefined when policy is 'off'
+    expect(mockedPerformPKAHandshake).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      undefined,
+      undefined,
+    );
+  });
+
+  it('threads domain-binding policy into the base discovery wrapper', async () => {
+    nextDiscovery = aid2Discovery();
+
+    await runCheck('example.com', {
+      timeoutMs: 1,
+      allowFallback: true,
+      wellKnownTimeoutMs: 1,
+      domainBindingPolicy: 'off',
+    });
+
+    expect(vi.mocked(runBaseDiscovery)).toHaveBeenCalledWith(
+      'example.com',
+      expect.objectContaining({ domainBindingPolicy: 'off' }),
+    );
+  });
+
+  it('prefer (default) domain-binding passes the normalized domain to the handshake', async () => {
+    mockedPerformPKAHandshake.mockResolvedValueOnce({ domainBound: false });
+    nextDiscovery = aid2Discovery();
+
+    await runCheck('example.com', {
+      timeoutMs: 1,
+      allowFallback: true,
+      wellKnownTimeoutMs: 1,
+    });
+
+    expect(mockedPerformPKAHandshake).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      undefined,
+      'example.com',
+    );
   });
 });

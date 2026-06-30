@@ -1,6 +1,8 @@
 # AID v1.0.0 Post-Release TODO (Prioritized)
 
-This updates the earlier roadmap based on the v1.0.0 specification. Order: spec conformance → security/reliability → CLI/CI → docs/adoption → showcase → language ports → governance. Follow `.cursorrule` and keep `protocol/constants.yml` as the single source of truth.
+> **Historical document.** This roadmap was written against v1.0.0. AID v2.0.0 is now normative (shipped 2026-06-01). Items referencing `v=aid1` schema enforcement, `proto xor p`, or v1-specific semantics should be read in that context; equivalent work for v2 targets `v=aid2`. `.cursorrule` references below are superseded by `CLAUDE.md` and `AGENTS.md`.
+
+This updates the earlier roadmap based on the v1.0.0 specification. Order: spec conformance → security/reliability → CLI/CI → docs/adoption → showcase → language ports → governance. Keep `protocol/constants.yml` as the single source of truth.
 
 ## Open priorities (ordered)
 

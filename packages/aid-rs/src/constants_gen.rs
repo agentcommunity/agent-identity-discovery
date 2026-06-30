@@ -38,7 +38,8 @@ pub const AUTH_OAUTH2_CODE: &str = "oauth2_code";
 pub const AUTH_OAUTH2_DEVICE: &str = "oauth2_device";
 pub const AUTH_PAT: &str = "pat";
 
-// Error codes
+// Error codes (numeric codes only; human-readable messages are intentionally omitted
+// from Rust/C#/Java constants — use ErrorMessages in Go/Python/TypeScript for display).
 pub const ERR_DNS_LOOKUP_FAILED: u16 = 1004;
 pub const ERR_FALLBACK_FAILED: u16 = 1005;
 pub const ERR_INVALID_TXT: u16 = 1001;

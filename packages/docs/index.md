@@ -83,10 +83,10 @@ AID has official libraries and tools across multiple languages, with additional 
 - TypeScript Core Library: `@agentcommunity/aid-engine` – Pure business logic for discovery, validation, and PKA
 - CLI Tool: `@agentcommunity/aid-doctor` – Validate, secure, and generate AID records (wraps aid-engine)
 - Python: `aid-discovery` (transfer to community planned)
-- Go: `aid-go`
-- Rust: `aid-rs`
-- .NET: `aid-dotnet`
-- Java: `aid-java`
+- Go: `aid-go` (source-only until module repo/tags are published)
+- Rust: `aid-rs` (source-only until crate publication is resolved)
+- .NET: `aid-dotnet` (source-only until NuGet publication is ready)
+- Java: `aid-java` (source-only until Maven publication is ready)
 - Web Workbench: Interactive generator/resolver
 
 See the full package overview in [SDKs and Packages](Reference/packages.md) and the cross-language [Discovery API](Reference/discovery_api.md).

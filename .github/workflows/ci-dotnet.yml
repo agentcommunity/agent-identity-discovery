@@ -2,9 +2,13 @@ name: CI (.NET)
 on:
   workflow_dispatch:
   push:
-    branches: [main, feat/aid1.1-spec, feat/next16-react19-modernization]
+    branches: [main]
   pull_request:
-    branches: [main, feat/aid1.1-spec, feat/next16-react19-modernization]
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   dotnet:

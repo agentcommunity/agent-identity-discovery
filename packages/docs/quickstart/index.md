@@ -20,16 +20,15 @@ Install the CLI:
 npm install -g @agentcommunity/aid-doctor
 ```
 
-Generate a record:
+Generate a record interactively:
 
 ```bash
-aid-doctor generate \
-  --uri https://api.example.com/mcp \
-  --proto mcp \
-  --desc "Example AI Tools"
+aid-doctor generate
+# Optional: save the output to a file for later deployment
+aid-doctor generate --save-draft /path/to/my-record.txt
 ```
 
-The output is a TXT value like this:
+The wizard prompts for `uri`, `proto`, optional `auth`, `desc`, and other fields, then prints the canonical TXT value and copies it to your clipboard:
 
 ```text
 v=aid2;u=https://api.example.com/mcp;p=mcp;s=Example AI Tools
@@ -112,7 +111,7 @@ For production or high-trust deployments, add `k` with an Ed25519 public key:
 v=aid2;u=https://api.example.com/mcp;p=mcp;k=ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ
 ```
 
-When `k` is present, compliant clients perform the AID v2 PKA endpoint-proof handshake before trusting the endpoint. The CLI and SDKs handle the wire details.
+When `k` is present, compliant clients perform the AID v2 PKA endpoint-proof handshake before trusting the endpoint. The CLI and SDKs handle the wire details. By default they also send the queried host in the `AID-Domain` header and report a `domainBound` indicator (`true` only for a verified domain-bound proof — one whose `aid-pka-v2` covered set includes `"aid-domain";req`). Requesting binding does not by itself mitigate unauthorized association — only `domain-binding=require` enforces it. See [Specification Appendix B.7](../specification.md#b7-domain-binding).
 
 Read [Identity & PKA](../Reference/identity_pka.md) for the concept and [PKA Endpoint Proof](../Reference/pka.md) for implementation details.
 

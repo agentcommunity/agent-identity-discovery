@@ -6,6 +6,8 @@ icon: material/language-csharp
 
 # .NET
 
+> **Not yet published to NuGet.** Consume the SDK from source (see `packages/aid-dotnet/`) until a NuGet package is available. Package-install instructions will be added here once the package is published.
+
 ## Discover by Domain
 
 ```csharp
@@ -20,7 +22,7 @@ var result = await Discovery.DiscoverAsync(
   }
 );
 
-Console.WriteLine($"{result.Record.Proto} at {result.Record.Uri} ttl={result.Ttl} qname={result.QueryName}");
+Console.WriteLine($"{result.Record.Proto} at {result.Record.Uri} ttl={result.Ttl} qname={result.QueryName} domainBound={result.DomainBound}");
 ```
 
 ### Options
@@ -48,6 +50,7 @@ Console.WriteLine($"proto={rec.Proto}, uri={rec.Uri}");
 Notes
 
 - PKA handshake runs automatically when v2 `pka`/`k` is present. Legacy `aid1` records still use `pka`/`kid`.
+- For `aid2` PKA, the SDK sends the queried host in the `AID-Domain` header by default and surfaces `DiscoveryResult.DomainBound` (`true` only for a verified domain-bound proof — one whose `aid-pka-v2` covered set includes `"aid-domain";req`). Requesting binding is not itself a mitigation — only `domain-binding=require` enforces it. See [Specification Appendix B.7](../specification.md#b7-domain-binding).
 - Errors: `AidError : Exception` exposes `.ErrorCode` (symbol) and `.Code` (number).
 
 ---

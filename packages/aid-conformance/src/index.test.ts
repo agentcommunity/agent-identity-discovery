@@ -58,6 +58,11 @@ describe('aid-conformance fixtures', () => {
         'v2-missing-expires',
         'v2-long-expires-window',
         'v2-ipv6-authority',
+        // Domain-binding (one-tag) vectors: a pass vector that covers aid-domain
+        // and a cross-domain forgery fail vector. Pinning their presence guards
+        // against a future edit dropping or mislabelling them.
+        'v2-db-rfc9421-domain-bound',
+        'v2-db-domain-mismatch',
       ]),
     );
 

@@ -125,7 +125,9 @@ export function DiscoveryToolBlock({ status, result, domain }: DiscoveryToolBloc
               }
             >
               {result.value.metadata.pka.verified === true
-                ? 'PKA verified'
+                ? (result.value.metadata.pka.domainBound === true
+                  ? 'PKA domain-bound'
+                  : 'PKA verified')
                 : (result.value.metadata.pka.present
                   ? 'PKA present'
                   : 'PKA not present')}

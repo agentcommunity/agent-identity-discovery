@@ -2,30 +2,15 @@ import type { DoctorReport } from '@agentcommunity/aid-engine';
 import {
   buildCacheEntryFromReport,
   classifySecurityChange,
+  shouldRejectForFailPolicy,
   type CacheEntry,
   type SecurityChangeStatus,
 } from './cache';
 
 type DowngradePolicy = 'off' | 'warn' | 'fail';
 
-const FAIL_POLICY_STATUSES = new Set<SecurityChangeStatus>([
-  'pka_removed',
-  'key_replaced',
-  'version_downgrade',
-]);
-
 interface ApplySecurityStateResult {
   shouldPersist: boolean;
-}
-
-function shouldRejectForFailPolicy(
-  status: SecurityChangeStatus,
-  previousCacheEntry: CacheEntry | undefined,
-): boolean {
-  if (FAIL_POLICY_STATUSES.has(status)) return true;
-  if (status !== 'fallback_well_known_tls') return false;
-
-  return Boolean(previousCacheEntry && (previousCacheEntry.trustSource ?? 'dns') === 'dns');
 }
 
 export function applySecurityState(
@@ -34,6 +19,10 @@ export function applySecurityState(
   downgradePolicy?: DowngradePolicy,
 ): ApplySecurityStateResult {
   if (!report.record.parsed) return { shouldPersist: false };
+  if (report.exitCode !== 0 || report.pka.verified === false) {
+    report.cacheEntry = null;
+    return { shouldPersist: false };
+  }
 
   const currentEntry = buildCacheEntryFromReport(report);
   const status = classifySecurityChange(previousCacheEntry, currentEntry);
@@ -70,6 +59,11 @@ export function applySecurityState(
       pka_added: {
         code: 'PKA_ADDED',
         message: 'PKA endpoint proof was added since the previous check.',
+      },
+      binding_loss: {
+        code: 'BINDING_LOSS',
+        message:
+          'Domain-binding proof was present in the previous check but is now absent (endpoint-proof only).',
       },
     };
   const warning = warningByStatus[status];

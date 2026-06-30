@@ -191,6 +191,11 @@ def test_v2_pka_accepts_canonical_rfc9421_signed_401(monkeypatch):
 
     vector = _vector_by_id("v2-rfc9421-response-signature")
 
+    # Derive keyid from the vector's response signature_input rather than hardcoding.
+    keyid_match = re.search(r'keyid="([^"]+)"', vector["response"]["signature_input"])
+    assert keyid_match is not None, "keyid not found in vector response signature_input"
+    keyid = keyid_match.group(1)
+
     def _no_record(name, rdtype, lifetime=5.0):
         raise dns.resolver.NXDOMAIN()
 
@@ -203,8 +208,12 @@ def test_v2_pka_accepts_canonical_rfc9421_signed_401(monkeypatch):
         if url.endswith("/.well-known/agent"):
             return _Resp(200, {"Content-Type": "application/json"}, json.dumps(vector["record"]))
         assert url == vector["request"]["target_uri"]
-        assert _header(req, "Accept-Signature") == vector["request"]["accept_signature"]
         assert _header(req, "Cache-Control") == vector["request"]["cache_control"]
+        # discover() always sends domain_alabel, so the client uses the db form.
+        expected_accept_sig = pka_module._build_accept_signature_v2(keyid, vector["nonce"], domain_bound=True)
+        assert _header(req, "Accept-Signature") == expected_accept_sig
+        # AID-Domain must be the canonicalized queried host.
+        assert _header(req, "AID-Domain") == "example.com"
         return _Resp(
             401,
             {
@@ -224,6 +233,8 @@ def test_v2_pka_accepts_canonical_rfc9421_signed_401(monkeypatch):
     rec, _ = discover("example.com", well_known_fallback=True)
     assert rec["v"] == "aid2"
     assert rec["pka"] == vector["record"]["k"]
+    # The server replied with a 4-component covered set (no aid-domain); domain_bound False.
+    assert rec.get("domain_bound") is False
 
 
 def test_v2_pka_canonicalizes_uppercase_host_default_port_and_fragment(monkeypatch):
@@ -233,6 +244,11 @@ def test_v2_pka_canonicalizes_uppercase_host_default_port_and_fragment(monkeypat
 
     vector = _vector_by_id("v2-uppercase-host-default-port-canonical-target")
 
+    # Derive keyid from the vector's response signature_input rather than hardcoding.
+    keyid_match = re.search(r'keyid="([^"]+)"', vector["response"]["signature_input"])
+    assert keyid_match is not None, "keyid not found in vector response signature_input"
+    keyid = keyid_match.group(1)
+
     def _no_record(name, rdtype, lifetime=5.0):
         raise dns.resolver.NXDOMAIN()
 
@@ -245,7 +261,11 @@ def test_v2_pka_canonicalizes_uppercase_host_default_port_and_fragment(monkeypat
         if url.endswith("/.well-known/agent"):
             return _Resp(200, {"Content-Type": "application/json"}, json.dumps(vector["record"]))
         assert url == vector["request"]["target_uri"]
-        assert _header(req, "Accept-Signature") == vector["request"]["accept_signature"]
+        # discover() always sends domain_alabel, so the client uses the db form.
+        expected_accept_sig = pka_module._build_accept_signature_v2(keyid, vector["nonce"], domain_bound=True)
+        assert _header(req, "Accept-Signature") == expected_accept_sig
+        # AID-Domain must be the canonicalized queried host.
+        assert _header(req, "AID-Domain") == "example.com"
         return _Resp(
             401,
             {
@@ -265,6 +285,97 @@ def test_v2_pka_canonicalizes_uppercase_host_default_port_and_fragment(monkeypat
     rec, _ = discover("example.com", well_known_fallback=True)
     assert rec["v"] == "aid2"
     assert rec["pka"] == vector["record"]["k"]
+    # The server replied with a 4-component covered set (no aid-domain); domain_bound False.
+    assert rec.get("domain_bound") is False
+
+
+def _replay_v2_vector_through_discover(monkeypatch, vector):
+    """Drive a signed v2 vector through discover() via the .well-known fallback.
+
+    Returns the discovered record on success, or raises AidError exactly as the
+    verifier would. Mirrors the setup of the canonical v2 happy-path test:
+    pin os.urandom to the vector nonce and time.time inside the freshness window.
+    """
+    import dns.resolver
+    import urllib.request
+    import aid_py.pka as pka_module
+
+    def _no_record(name, rdtype, lifetime=5.0):
+        raise dns.resolver.NXDOMAIN()
+
+    monkeypatch.setattr(dns.resolver, "resolve", _no_record)
+    monkeypatch.setattr(pka_module.os, "urandom", lambda n: _b64url_decode(vector["nonce"]))
+    monkeypatch.setattr(pka_module.time, "time", lambda: vector["created"] + 30)
+
+    response_headers = {
+        "Signature-Input": vector["response"]["signature_input"],
+        "Signature": vector["response"]["signature"],
+    }
+    cache_control = vector["response"].get("cache_control")
+    if cache_control is not None:
+        response_headers["Cache-Control"] = cache_control
+
+    def _fake_open(req, timeout=2.0):
+        url = req.full_url if hasattr(req, "full_url") else req
+        if url.endswith("/.well-known/agent"):
+            return _Resp(200, {"Content-Type": "application/json"}, json.dumps(vector["record"]))
+        return _Resp(vector["response"].get("status", 401), dict(response_headers), "")
+
+    class _FakeOpener:
+        def open(self, req, timeout=2.0):
+            return _fake_open(req, timeout)
+
+    monkeypatch.setattr(urllib.request, "build_opener", lambda *args, **kwargs: _FakeOpener())
+
+    rec, _ = discover("example.com", well_known_fallback=True)
+    return rec
+
+
+# Signed v2 vectors that discover() can replay end-to-end through the well-known
+# fallback. Their response covers a 4-component set (no aid-domain), so a valid
+# signature yields domain_bound=False even though discover() sends AID-Domain.
+_V2_REPLAY_PASS_IDS = [
+    "v2-uppercase-alg",
+    "v2-ipv6-authority",
+]
+_V2_REPLAY_FAIL_IDS = [
+    "v2-keyid-thumbprint-mismatch",
+    "v2-missing-cache-control-no-store",
+    "v2-missing-expires",
+    "v2-long-expires-window",
+]
+
+
+@pytest.mark.parametrize("vector_id", _V2_REPLAY_PASS_IDS)
+def test_v2_pka_vector_replay_pass(monkeypatch, vector_id):
+    vector = _vector_by_id(vector_id)
+    assert vector["expect"] == "pass"
+    rec = _replay_v2_vector_through_discover(monkeypatch, vector)
+    assert rec["v"] == "aid2"
+    assert rec["pka"] == vector["record"]["k"]
+    # 4-component covered set (no aid-domain) → not domain-bound.
+    assert rec.get("domain_bound") is False
+
+
+@pytest.mark.parametrize("vector_id", _V2_REPLAY_FAIL_IDS)
+def test_v2_pka_vector_replay_fail(monkeypatch, vector_id):
+    vector = _vector_by_id(vector_id)
+    assert vector["expect"] == "fail"
+    with pytest.raises(AidError) as exc_info:
+        _replay_v2_vector_through_discover(monkeypatch, vector)
+    assert exc_info.value.error_code == "ERR_SECURITY"
+
+
+def test_v2_pka_rejects_response_missing_cache_control_no_store(monkeypatch):
+    """Explicit regression: a v2 response that omits Cache-Control: no-store must
+    be rejected even though its signature is otherwise valid (vector
+    v2-missing-cache-control-no-store carries a public, max-age=60 directive)."""
+    vector = _vector_by_id("v2-missing-cache-control-no-store")
+    assert vector["response"]["cache_control"] == "public, max-age=60"
+    with pytest.raises(AidError) as exc_info:
+        _replay_v2_vector_through_discover(monkeypatch, vector)
+    assert exc_info.value.error_code == "ERR_SECURITY"
+    assert "no-store" in str(exc_info.value)
 
 
 def test_v2_pka_rejects_modified_response_signature(monkeypatch):
@@ -534,6 +645,184 @@ def test_v2_signature_input_rejects_quoted_integer_params(param):
     with pytest.raises(AidError) as exc_info:
         pka_module._parse_v2_signature_headers(headers)
     assert exc_info.value.error_code == "ERR_SECURITY"
+
+
+def test_v2_pka_rejects_cross_domain_mismatch(monkeypatch):
+    """Fail vector: response covers aid-domain (tag aid-pka-v2) but was signed over a base whose
+    aid-domain line is evil.example. discover() sends AID-Domain example.com, so the verifier
+    rebuilds the base with example.com and Ed25519 verification fails. Must be rejected."""
+    import dns.resolver
+    import urllib.request
+    import aid_py.pka as pka_module
+
+    vector = _vector_by_id("v2-db-domain-mismatch")
+
+    def _no_record(name, rdtype, lifetime=5.0):
+        raise dns.resolver.NXDOMAIN()
+
+    monkeypatch.setattr(dns.resolver, "resolve", _no_record)
+    monkeypatch.setattr(pka_module.os, "urandom", lambda n: _b64url_decode(vector["nonce"]))
+    monkeypatch.setattr(pka_module.time, "time", lambda: vector["created"] + 30)
+
+    def _fake_open(req, timeout=2.0):
+        url = req.full_url if hasattr(req, "full_url") else req
+        if url.endswith("/.well-known/agent"):
+            return _Resp(200, {"Content-Type": "application/json"}, json.dumps(vector["record"]))
+        return _Resp(
+            vector["response"]["status"],
+            {
+                "Cache-Control": vector["response"]["cache_control"],
+                "Signature-Input": vector["response"]["signature_input"],
+                "Signature": vector["response"]["signature"],
+            },
+            "",
+        )
+
+    class _FakeOpener:
+        def open(self, req, timeout=2.0):
+            return _fake_open(req, timeout)
+
+    monkeypatch.setattr(urllib.request, "build_opener", lambda *args, **kwargs: _FakeOpener())
+
+    with pytest.raises(AidError) as exc_info:
+        discover("example.com", well_known_fallback=True)
+    assert exc_info.value.error_code == "ERR_SECURITY"
+
+
+def test_v2_pka_accepts_domain_bound_signature(monkeypatch):
+    """Pass vector: single tag aid-pka-v2 with aid-domain covered; AID-Domain header sent;
+    domain binding signalled by coverage (not a separate tag); domain_bound=True."""
+    import dns.resolver
+    import urllib.request
+    import aid_py.pka as pka_module
+
+    vector = _vector_by_id("v2-db-rfc9421-domain-bound")
+
+    def _no_record(name, rdtype, lifetime=5.0):
+        raise dns.resolver.NXDOMAIN()
+
+    monkeypatch.setattr(dns.resolver, "resolve", _no_record)
+    monkeypatch.setattr(pka_module.os, "urandom", lambda n: _b64url_decode(vector["nonce"]))
+    monkeypatch.setattr(pka_module.time, "time", lambda: vector["created"] + 30)
+
+    captured_aid_domain: list[str] = []
+
+    def _fake_open(req, timeout=2.0):
+        url = req.full_url if hasattr(req, "full_url") else req
+        if url.endswith("/.well-known/agent"):
+            return _Resp(200, {"Content-Type": "application/json"}, json.dumps(vector["record"]))
+        # Capture and assert the AID-Domain header
+        aid_domain_hdr = _header(req, "AID-Domain")
+        captured_aid_domain.append(aid_domain_hdr or "")
+        return _Resp(
+            vector["response"]["status"],
+            {
+                "Cache-Control": vector["response"]["cache_control"],
+                "Signature-Input": vector["response"]["signature_input"],
+                "Signature": vector["response"]["signature"],
+            },
+            "",
+        )
+
+    class _FakeOpener:
+        def open(self, req, timeout=2.0):
+            return _fake_open(req, timeout)
+
+    monkeypatch.setattr(urllib.request, "build_opener", lambda *args, **kwargs: _FakeOpener())
+
+    rec, _ = discover("example.com", well_known_fallback=True)
+    assert rec["v"] == "aid2"
+    assert rec.get("domain_bound") is True
+    assert captured_aid_domain and captured_aid_domain[0] == vector["request"]["aid_domain"]
+
+
+def test_v2_pka_rejects_aid_domain_coverage_when_no_domain_sent(monkeypatch):
+    """Fail-closed gate: under the single-tag model, domain binding is signalled purely by
+    aid-domain coverage. A response that covers aid-domain is only meaningful when the client
+    committed to a domain via the AID-Domain header, so it must be rejected when domain=None."""
+    import urllib.request
+    import aid_py.pka as pka_module
+
+    vector = _vector_by_id("v2-db-rfc9421-domain-bound")
+
+    monkeypatch.setattr(pka_module.os, "urandom", lambda n: _b64url_decode(vector["nonce"]))
+    monkeypatch.setattr(pka_module.time, "time", lambda: vector["created"] + 30)
+
+    def _fake_open(req, timeout=2.0):
+        # No AID-Domain header is sent when domain=None.
+        assert _header(req, "AID-Domain") is None
+        return _Resp(
+            vector["response"]["status"],
+            {
+                "Cache-Control": vector["response"]["cache_control"],
+                "Signature-Input": vector["response"]["signature_input"],
+                "Signature": vector["response"]["signature"],
+            },
+            "",
+        )
+
+    class _FakeOpener:
+        def open(self, req, timeout=2.0):
+            return _fake_open(req, timeout)
+
+    monkeypatch.setattr(urllib.request, "build_opener", lambda *args, **kwargs: _FakeOpener())
+
+    with pytest.raises(AidError) as exc_info:
+        pka_module._perform_v2_pka_handshake(
+            vector["record"]["u"],
+            vector["record"]["k"],
+            domain=None,
+        )
+    assert exc_info.value.error_code == "ERR_SECURITY"
+    assert "Response covers aid-domain but no AID-Domain was sent" in str(exc_info.value)
+
+
+def test_v2_pka_no_domain_handshake_sends_legacy_accept_signature(monkeypatch):
+    """Calling the v2 handshake directly with domain=None sends the legacy 4-component
+    aid-pka-v2 Accept-Signature (no AID-Domain header). This path is no longer exercised
+    by discover() — which always passes domain_alabel — so it is tested here directly."""
+    import urllib.request
+    import aid_py.pka as pka_module
+
+    vector = _vector_by_id("v2-rfc9421-response-signature")
+
+    # Derive keyid from the vector's response signature_input.
+    keyid_match = re.search(r'keyid="([^"]+)"', vector["response"]["signature_input"])
+    assert keyid_match is not None, "keyid not found in vector response signature_input"
+    keyid = keyid_match.group(1)
+
+    monkeypatch.setattr(pka_module.os, "urandom", lambda n: _b64url_decode(vector["nonce"]))
+    monkeypatch.setattr(pka_module.time, "time", lambda: vector["created"] + 30)
+
+    def _fake_open(req, timeout=2.0):
+        # Assert: no AID-Domain header is sent when domain=None.
+        assert _header(req, "AID-Domain") is None
+        # Assert: the legacy 4-component (non-db) Accept-Signature is used.
+        expected_accept_sig = pka_module._build_accept_signature_v2(keyid, vector["nonce"], domain_bound=False)
+        assert _header(req, "Accept-Signature") == expected_accept_sig
+        return _Resp(
+            401,
+            {
+                "Cache-Control": vector["response"]["cache_control"],
+                "Signature-Input": vector["response"]["signature_input"],
+                "Signature": vector["response"]["signature"],
+            },
+            "",
+        )
+
+    class _FakeOpener:
+        def open(self, req, timeout=2.0):
+            return _fake_open(req, timeout)
+
+    monkeypatch.setattr(urllib.request, "build_opener", lambda *args, **kwargs: _FakeOpener())
+
+    domain_bound = pka_module._perform_v2_pka_handshake(
+        vector["request"]["target_uri"],
+        vector["record"]["k"],
+        domain=None,
+    )
+    # Unbound response (4-component covered set) → not domain-bound.
+    assert domain_bound is False
 
 
 def test_debug_write_does_not_create_package_debug_dir_by_default(tmp_path, monkeypatch):

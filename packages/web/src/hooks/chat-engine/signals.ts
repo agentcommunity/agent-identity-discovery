@@ -158,10 +158,13 @@ function formatPkaStatus(
     | {
         present?: boolean;
         verified?: boolean | null;
+        domainBound?: boolean;
       }
     | undefined,
+  boundLabel = 'Domain-bound',
 ): string {
   if (!pka?.present) return 'Not present';
+  if (pka.verified === true && pka.domainBound === true) return boundLabel;
   if (pka.verified === true) return 'Verified';
   if (pka.verified === false) return 'Verification failed';
   return 'Present (verification unknown)';
@@ -366,7 +369,7 @@ export function buildConnectionResultSignal(
     if (security?.pka) {
       details.push({
         label: 'PKA',
-        value: formatPkaStatus(security.pka),
+        value: formatPkaStatus(security.pka, 'Endpoint-bound'),
         tone: security.pka.verified === false ? 'error' : 'default',
       });
       if (security.pka.keyid) {
