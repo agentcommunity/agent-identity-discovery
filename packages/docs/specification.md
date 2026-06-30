@@ -6,13 +6,13 @@ icon: material/file-document-outline
 extra_css_class: aid-page
 
 tags:
-  - v2.0
+  - v2.1
   - '2026-06-01'
 ---
 
 [View raw markdown](https://github.com/agentcommunity/agent-identity-discovery/raw/main/packages/docs/specification.md)
 
-# **Agent Identity & Discovery (AID) - v2.0.0**
+# **Agent Identity & Discovery (AID) - v2.1.0**
 
 _Minimal, DNS-first agent bootstrap standard_
 

@@ -1,6 +1,6 @@
 {
   "name": "@agentcommunity/aid-doctor",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "CLI tool for Agent Identity & Discovery (AID) - validate and check AID records",
   "keywords": [
     "agent",

@@ -31,9 +31,16 @@ The AID specification and its surrounding tooling (libraries, validators) are ve
 
 ## Version History
 
+### v2.1.0 — June 2026
+
+- **Current record profile:** `v=aid2` remains the preferred profile for new records.
+- **PKA domain binding:** v2 clients send `AID-Domain` by default for PKA and surface whether the endpoint returned a domain-bound proof.
+- **Strict enforcement:** `domain-binding=require` rejects unbound PKA proofs and is the mitigation for unauthorized association.
+- **SDK parity:** TypeScript, Python, Go, Rust, .NET, Java, `aid-engine`, `aid-doctor`, and conformance fixtures share the v2.1 domain-binding behavior.
+
 ### v2.0.0 — June 2026
 
-- **Current record profile:** `v=aid2` is the preferred profile for new records.
+- **Record profile:** `v=aid2` became the preferred profile for new records.
 - **Base-first discovery:** `_agent.<domain>` is the canonical lookup. Protocol-prefixed names are legacy, diagnostic, or explicitly configured base-failure probing.
 - **PKA key cleanup:** `k` is the unpadded base64url Ed25519 JWK `x` value.
 - **Derived key identity:** HTTP signature `keyid` is the RFC 7638 JWK thumbprint derived from `k`.

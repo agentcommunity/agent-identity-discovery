@@ -1,5 +1,18 @@
 # @agentcommunity/aid
 
+## 2.1.0
+
+### Minor Changes
+
+- 0717dd4: Make PKA domain binding the default. Discovery sends `AID-Domain` by default (`domain-binding=prefer`) and exposes `domainBound`; a new `domain-binding: off | prefer | require` policy lets clients require domain-bound proofs (the `strict` preset now requires them). `aid-doctor` shows domain-bound vs endpoint-proof-only, persists `domainBound` (cache schema v3), warns on binding loss, and accepts `--domain-binding`. Unbound `aid-pka-v2` proofs remain valid, so existing deployments are unaffected. The spec marks domain binding as optional-but-default with an `aid3` mandate trajectory.
+- 0717dd4: Introduce PKA domain binding. During discovery the client sends the queried domain in an `AID-Domain` request header by default; endpoints that support binding cover it in the RFC 9421 response signature by adding `"aid-domain";req` to the `aid-pka-v2` covered set (`domain-binding=prefer` default, `require` enforces it). Discovery results expose `pka.domainBound` (`true` only when `aid-domain` is covered and verified). `aid-doctor` now sends `AID-Domain` when verifying v2 endpoints and reports whether the proof is domain-bound. Plain `aid-pka-v2` proofs without `aid-domain` coverage remain valid unbound proofs, so existing deployments are unaffected.
+
+### Patch Changes
+
+- 0717dd4: All official SDKs (Go, Python, Rust, .NET, Java) now reach parity with the TypeScript SDK's PKA domain-binding profile: they send `AID-Domain` by default for v2 PKA, verify the `"aid-domain";req` covered component on an `aid-pka-v2` signature, and surface a `domainBound`/`domain_bound` result. Unbound `aid-pka-v2` proofs without `aid-domain` coverage remain valid.
+
+  Note: this entry bumps `@agentcommunity/aid` as a version marker only — the TS SDK code is unchanged. The substantive changes are in the Go, Python, Rust, .NET, and Java packages, which are not Changesets-managed.
+
 ## 2.0.0
 
 ### Major Changes
