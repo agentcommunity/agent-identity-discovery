@@ -1,21 +1,25 @@
 ---
 title: '@agentcommunity/aid-engine'
-description: 'Pure business logic library for AID discovery, validation, and PKA'
+description: 'Core TypeScript library for AID discovery diagnostics, validation, and PKA'
 icon: material/cogs
 ---
 
 # @agentcommunity/aid-engine
 
-A pure, stateless TypeScript library containing all AID business logic for discovery, validation, and cryptographic verification.
+A reusable TypeScript core library for AID validation, record generation, discovery diagnostics, and cryptographic verification.
 
 ## Overview
 
-`aid-engine` is the core library that implements the AID specification. Unlike `aid-doctor` (the CLI wrapper), this library contains no side effects, file system operations, or user interfaces. It's designed for:
+`aid-engine` is the core library that implements AID validation, record generation, discovery diagnostics, and cryptographic verification. Unlike `aid-doctor` (the CLI wrapper), this library has no CLI prompts, process exits, filesystem cache writes, or user interface concerns.
+
+`runCheck` intentionally performs network I/O for discovery diagnostics: DNS-over-HTTPS, optional `.well-known` fallback, TLS inspection, DNSSEC probing, and PKA verification. Pure helper functions such as `validateTxtRecord`, `buildTxtRecordVariant`, and `verifyPka` remain deterministic and side-effect free.
+
+It's designed for:
 
 - **Custom integrations** and tools
 - **Server-side applications** needing AID functionality
 - **Advanced use cases** requiring programmatic access
-- **Testing and validation** scenarios
+- **Testing and validation** scenarios without CLI prompts or filesystem cache writes
 
 ## Installation
 
@@ -111,6 +115,13 @@ interface CheckOptions {
   timeoutMs: number;
   allowFallback: boolean;
   wellKnownTimeoutMs: number;
+  securityMode?: 'balanced' | 'strict';
+  dnssecPolicy?: 'off' | 'prefer' | 'require';
+  pkaPolicy?: 'if-present' | 'require';
+  downgradePolicy?: 'off' | 'warn' | 'fail';
+  wellKnownPolicy?: 'auto' | 'disable';
+  domainBindingPolicy?: 'off' | 'prefer' | 'require';
+  previousSecurity?: PreviousSecurityState;
   showDetails?: boolean;
   probeProtoSubdomain?: boolean;
   probeProtoEvenIfBase?: boolean;
@@ -128,7 +139,7 @@ interface CheckOptions {
 - **Custom tooling** or integrations
 - **Server-side processing** without CLI dependencies
 - **Fine-grained control** over discovery options
-- **Testing scenarios** requiring pure functions
+- **Testing scenarios** that need engine helpers without CLI prompts or filesystem cache writes
 
 ### Use aid-doctor when you need:
 
@@ -140,12 +151,12 @@ interface CheckOptions {
 
 ## Architecture Notes
 
-`aid-engine` is designed with functional programming principles:
+`aid-engine` keeps the boundary between reusable core logic and the CLI wrapper clear:
 
-- **Pure functions** with no side effects
-- **Stateless operations** (no global state)
-- **Deterministic behavior** (same inputs = same outputs)
-- **Testable logic** (easy to unit test)
+- **No CLI or filesystem side effects** in the engine
+- **Explicit network diagnostics** in `runCheck` for DNS, `.well-known`, TLS, DNSSEC, and PKA
+- **Pure helper functions** for record validation, generation, and key-format checks
+- **Stateless operations** where callers provide previous security/cache state explicitly
 
 The CLI wrapper `aid-doctor` handles:
 

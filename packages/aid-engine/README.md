@@ -13,7 +13,7 @@ No more hunting through API docs. No more manual configuration. It's the zero-fr
 Built by the team at [agentcommunity.org](https://agentcommunity.org).
 
 - **Website**: [aid.agentcommunity.org](https://aid.agentcommunity.org)
-- **Docs**: [docs.agentcommunity.org/aid](https://docs.agentcommunity.org/aid)
+- **Docs**: [aid.agentcommunity.org/docs](https://aid.agentcommunity.org/docs)
 - **GitHub**: [github.com/agentcommunity/agent-identity-discovery](https://github.com/agentcommunity/agent-identity-discovery)
 
 ## What is AID?
@@ -24,10 +24,11 @@ It uses a single DNS `TXT` record to make any agent service instantly discoverab
 
 ## Overview
 
-`@agentcommunity/aid-engine` is the **pure business logic** library that powers the AID ecosystem. Unlike the CLI wrapper (`@agentcommunity/aid-doctor`), this library contains:
+`@agentcommunity/aid-engine` is the reusable TypeScript core that powers the AID ecosystem. Unlike the CLI wrapper (`@agentcommunity/aid-doctor`), this library keeps terminal prompts, process exits, filesystem cache writes, and UI concerns out of the core package.
 
-- ✅ **No side effects** (no filesystem, no network I/O beyond DNS/well-known)
-- ✅ **Pure functions** with deterministic behavior
+- ✅ **No CLI/filesystem side effects** in the core package
+- ✅ **Explicit network diagnostics** in `runCheck` for DNS, `.well-known`, TLS, DNSSEC, and PKA
+- ✅ **Pure helper functions** for validation, generation, and key-format checks
 - ✅ **Stateless operations** (no global state)
 - ✅ **Comprehensive test coverage** (25+ tests)
 - ✅ **Easy to test** and integrate
@@ -143,7 +144,7 @@ import { verifyPka, generateEd25519KeyPair } from '@agentcommunity/aid-engine';
 // Verify a PKA public key
 const verification = verifyPka('ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ');
 
-// Generate a new key pair (pure function)
+// Generate a new key pair
 const { publicKey, privateKeyPem } = await generateEd25519KeyPair();
 ```
 
@@ -194,7 +195,7 @@ const { publicKey, privateKeyPem } = await generateEd25519KeyPair();
 - **Server-side processing** without CLI dependencies
 - **Programmatic access** to AID functionality
 - **Fine-grained control** over discovery options
-- **Testing scenarios** requiring pure functions
+- **Testing scenarios** that need engine helpers without CLI prompts or filesystem cache writes
 
 ### 🔄 Use aid-doctor when you need:
 
@@ -235,12 +236,12 @@ try {
 
 ## Architecture
 
-`aid-engine` follows functional programming principles:
+`aid-engine` keeps reusable core logic separate from CLI concerns:
 
-- **Pure Functions**: No side effects, deterministic behavior
-- **Stateless**: No global state or mutable shared data
-- **Testable**: Easy to unit test with predictable inputs/outputs
-- **Composable**: Functions can be combined for complex workflows
+- **No CLI/filesystem side effects**: no prompts, process exits, cache writes, or key-file storage
+- **Networked diagnostics are explicit**: `runCheck` performs DNS, `.well-known`, TLS, DNSSEC, and PKA checks
+- **Pure helpers**: validation, record generation, and key-format checks are easy to unit test
+- **Composable**: functions can be combined for complex workflows
 
 The CLI wrapper (`aid-doctor`) handles:
 

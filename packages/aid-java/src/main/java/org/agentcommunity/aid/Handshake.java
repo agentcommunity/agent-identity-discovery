@@ -11,6 +11,9 @@ import java.security.PublicKey;
 import java.security.Signature;
 import java.security.spec.X509EncodedKeySpec;
 import java.time.Duration;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -22,6 +25,9 @@ public final class Handshake {
   private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
   static final String AID_PKA_TAG_V2 = "aid-pka-v2";
+  private static final DateTimeFormatter IMF_FIXDATE =
+      DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'", Locale.US)
+          .withZone(ZoneOffset.UTC);
 
   private static String asciiToLower(String s) {
     char[] chars = s.toCharArray();
@@ -219,7 +225,7 @@ public final class Handshake {
     HttpClient http = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).connectTimeout(timeout).build();
     byte[] nonce = new byte[32]; SECURE_RANDOM.nextBytes(nonce);
     String challenge = Base64.getUrlEncoder().withoutPadding().encodeToString(nonce);
-    String date = java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME.format(java.time.ZonedDateTime.now(java.time.ZoneOffset.UTC));
+    String date = IMF_FIXDATE.format(ZonedDateTime.now(ZoneOffset.UTC));
     HttpRequest req = HttpRequest.newBuilder(URI.create(uri)).timeout(timeout).header("AID-Challenge", challenge).header("Date", date).GET().build();
     HttpResponse<byte[]> res;
     try { res = http.send(req, HttpResponse.BodyHandlers.ofByteArray()); }

@@ -10,8 +10,7 @@ import { SectionHeader } from './section-header';
 const RECORD_NAME = '_agent.example.com';
 const RECORD_VALUE =
   'v=aid2;u=https://api.example.com/mcp;p=mcp;k=ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ';
-const RECORD_VALUE_DISPLAY =
-  'v=aid2;u=https://api.example.com/mcp;p=mcp;k=ebVWLo_mVPlAeLES6K…';
+const RECORD_VALUE_DISPLAY = 'v=aid2;u=https://api.example.com/mcp;p=mcp;k=ebVWLo_mVPlAeLES6K…';
 const RECORD_FULL = `${RECORD_NAME}. 300 IN TXT "${RECORD_VALUE}"`;
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -63,9 +62,7 @@ export function Identity() {
                     </li>
                     <li className="flex gap-3">
                       <span className="font-mono text-xs text-muted-foreground/50">2</span>
-                      <span>
-                        Client requests a nonce-bound RFC 9421 response signature
-                      </span>
+                      <span>Client requests a nonce-bound RFC 9421 response signature</span>
                     </li>
                     <li className="flex gap-3">
                       <span className="font-mono text-xs text-muted-foreground/50">3</span>
@@ -76,6 +73,13 @@ export function Identity() {
                       <span>
                         Client derives <code>keyid</code> from <code>k</code> and verifies the
                         signature
+                      </span>
+                    </li>
+                    <li className="flex gap-3">
+                      <span className="font-mono text-xs text-muted-foreground/50">5</span>
+                      <span>
+                        Domain-bound proofs also cover <code>AID-Domain</code> and report{' '}
+                        <code>domainBound=true</code>
                       </span>
                     </li>
                   </ol>
