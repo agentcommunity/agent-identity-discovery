@@ -40,6 +40,9 @@ public class HandshakeTest {
         0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04,
         0x20
       };
+  private static final DateTimeFormatter IMF_FIXDATE =
+      DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'", java.util.Locale.US)
+          .withZone(ZoneOffset.UTC);
 
   @Test
   void drivesV1PkaVectorsAgainstRealHandshake() throws Exception {
@@ -91,8 +94,7 @@ public class HandshakeTest {
             } else if (requestDate != null) {
               responseDate = requestDate;
             } else {
-              responseDate =
-                  DateTimeFormatter.RFC_1123_DATE_TIME.format(ZonedDateTime.now(ZoneOffset.UTC));
+              responseDate = IMF_FIXDATE.format(ZonedDateTime.now(ZoneOffset.UTC));
             }
 
             String keyid = overrideKeyId != null ? overrideKeyId : recordKid;
