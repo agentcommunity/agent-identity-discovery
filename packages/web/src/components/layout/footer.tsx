@@ -201,7 +201,7 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="https://agentcommunity.org/blog"
+                  href="https://agentcommunity.org/blog?tag=aid"
                   className="text-muted-foreground hover:text-foreground inline-flex items-center transition-all duration-200 hover:translate-x-1 group"
                   target="_blank"
                 >
