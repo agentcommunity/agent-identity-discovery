@@ -89,12 +89,12 @@ export function Identity() {
                       <Link href="/docs/reference/identity_pka">Learn more</Link>
                     </Button>
                     <Link
-                      href="https://agentcommunity.org/blog/external_identity_anchor"
+                      href="https://agentcommunity.org/blog/trust-anchor-external"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
                     >
-                      PKA as an external trust anchor
+                      What makes a trust anchor external
                       <ArrowUpRight className="h-3 w-3" />
                     </Link>
                   </div>

@@ -71,6 +71,7 @@ export function Header() {
 
   const navigation = [
     { name: 'Docs', href: '/docs', external: false },
+    { name: 'Blog', href: 'https://agentcommunity.org/blog?tag=aid', external: true },
     {
       name: 'GitHub',
       href: 'https://github.com/agentcommunity/agent-identity-discovery',
