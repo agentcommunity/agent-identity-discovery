@@ -1,11 +1,14 @@
 Metadata-Version: 2.4
 Name: aid-discovery
-Version: 2.1.0
-Summary: Python library for Agent Identity & Discovery (AID) - v2.1.0 release
+Version: 2.1.1
+Summary: Python library for Agent Identity & Discovery (AID), a DNS-based discovery protocol for AI agents
 Author-email: Agent Community <maintainers@agentcommunity.org>
 License: MIT
-Project-URL: Homepage, https://github.com/agentcommunity/agent-identity-discovery
+Project-URL: Homepage, https://aid.agentcommunity.org
 Project-URL: Repository, https://github.com/agentcommunity/agent-identity-discovery
+Project-URL: Documentation, https://aid.agentcommunity.org
+Project-URL: Agent Community, https://agentcommunity.org/developers
+Keywords: agent,discovery,dns,mcp,a2a,ai,aid,txt-record
 Classifier: Development Status :: 5 - Production/Stable
 Classifier: Intended Audience :: Developers
 Classifier: License :: OSI Approved :: MIT License
@@ -30,12 +33,18 @@ Requires-Dist: cryptography>=42; extra == "pka"
 
 # aid-discovery (Python)
 
-> Official Python implementation of the [Agent Identity & Discovery (AID)](https://github.com/agentcommunity/agent-identity-discovery) specification.
+> Official Python implementation of the [Agent Identity & Discovery (AID)](https://aid.agentcommunity.org) specification.
 
 [![PyPI version](https://img.shields.io/pypi/v/aid-discovery.svg?color=blue)](https://pypi.org/project/aid-discovery/)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 
 AID enables you to discover AI agents by domain name using DNS TXT records. Type a domain, get the agent's endpoint and protocol - that's it.
+
+Built by the team at [agentcommunity.org](https://agentcommunity.org).
+
+- **Website**: [aid.agentcommunity.org](https://aid.agentcommunity.org)
+- **Docs**: [aid.agentcommunity.org](https://aid.agentcommunity.org)
+- **GitHub**: [github.com/agentcommunity/agent-identity-discovery](https://github.com/agentcommunity/agent-identity-discovery)
 
 ## Installation
 

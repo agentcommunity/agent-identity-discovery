@@ -1,5 +1,11 @@
 # @agentcommunity/aid
 
+## 2.1.1
+
+### Patch Changes
+
+- Improve package-registry discoverability with AID and DNS TXT record keywords, canonical Agent Community links, and corrected public README documentation URLs.
+
 ## 2.1.0
 
 ### Minor Changes
