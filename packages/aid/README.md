@@ -13,7 +13,7 @@ No more hunting through API docs. No more manual configuration. It's the zero-fr
 Built by the team at [agentcommunity.org](https://agentcommunity.org).
 
 - **Website**: [aid.agentcommunity.org](https://aid.agentcommunity.org)
-- **Docs**: [docs.agentcommunity.org/aid](https://docs.agentcommunity.org/aid)
+- **Docs**: [aid.agentcommunity.org](https://aid.agentcommunity.org)
 - **GitHub**: [github.com/agentcommunity/agent-identity-discovery](https://github.com/agentcommunity/agent-identity-discovery)
 
 ## Install

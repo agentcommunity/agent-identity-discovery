@@ -1,6 +1,6 @@
 {
   "name": "@agentcommunity/aid",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Agent Identity & Discovery (AID) - DNS-based discovery protocol for AI agents",
   "keywords": [
     "agent",
@@ -8,7 +8,9 @@
     "dns",
     "mcp",
     "a2a",
-    "ai"
+    "ai",
+    "aid",
+    "txt-record"
   ],
   "author": "Agent Community",
   "license": "MIT",
