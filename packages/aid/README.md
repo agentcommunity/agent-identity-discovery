@@ -13,8 +13,9 @@ No more hunting through API docs. No more manual configuration. It's the zero-fr
 Built by the team at [agentcommunity.org](https://agentcommunity.org).
 
 - **Website**: [aid.agentcommunity.org](https://aid.agentcommunity.org)
-- **Docs**: [aid.agentcommunity.org](https://aid.agentcommunity.org)
+- **Docs**: [aid.agentcommunity.org/docs](https://aid.agentcommunity.org/docs)
 - **GitHub**: [github.com/agentcommunity/agent-identity-discovery](https://github.com/agentcommunity/agent-identity-discovery)
+- **Security**: [security@agentcommunity.org](mailto:security@agentcommunity.org) ([policy](https://github.com/agentcommunity/agent-identity-discovery/blob/main/SECURITY.md))
 
 ## Install
 
@@ -32,7 +33,7 @@ yarn add @agentcommunity/aid
 import { discover, AidError } from '@agentcommunity/aid';
 
 try {
-  const { record, ttl, queryName } = await discover('example.com');
+  const { record, ttl, queryName } = await discover('agentcommunity.org');
   console.log('Found', record.proto, 'at', record.uri, 'TTL:', ttl, 'query:', queryName);
 } catch (e) {
   if (e instanceof AidError) {

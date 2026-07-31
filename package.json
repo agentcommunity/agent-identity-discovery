@@ -40,6 +40,7 @@
     "docs:check": "node scripts/docs-check.mjs",
     "docs:export": "node scripts/docs-export.mjs",
     "docs:verify": "pnpm docs:check && pnpm docs:export && git diff --exit-code packages/docs/export-manifest.json packages/docs/export-manifest.sha256",
+    "verify:package-claims": "node scripts/verify-package-claims.mjs",
     "e2e": "turbo run e2e",
     "issues:spec12:enterprise": "node scripts/open-spec-1.2-enterprise-hardening-issues.mjs --apply",
     "changeset": "changeset",

@@ -106,12 +106,16 @@ jobs:
           }
 
           const textChecks = [
-            ['packages/aid-py/pyproject.toml', /license\s*=\s*\{\s*text\s*=\s*"MIT"\s*\}/],
+            ['packages/aid-py/pyproject.toml', /license\s*=\s*\{\s*file\s*=\s*"LICENSE"\s*\}/],
             ['packages/aid-rs/Cargo.toml', /^license\s*=\s*"MIT"/m],
           ];
           for (const [file, pattern] of textChecks) {
             const body = fs.readFileSync(file, 'utf8');
             if (!pattern.test(body)) missing.push(`${file}: missing MIT license metadata`);
+          }
+
+          if (fs.readFileSync('packages/aid-py/LICENSE', 'utf8') !== fs.readFileSync('LICENSE', 'utf8')) {
+            missing.push('packages/aid-py/LICENSE: must match the root LICENSE');
           }
 
           if (missing.length > 0) {

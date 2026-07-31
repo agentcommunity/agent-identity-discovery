@@ -10,8 +10,9 @@ AID enables you to discover AI agents by domain name using DNS TXT records. Type
 Built by the team at [agentcommunity.org](https://agentcommunity.org).
 
 - **Website**: [aid.agentcommunity.org](https://aid.agentcommunity.org)
-- **Docs**: [aid.agentcommunity.org](https://aid.agentcommunity.org)
+- **Docs**: [aid.agentcommunity.org/docs](https://aid.agentcommunity.org/docs)
 - **GitHub**: [github.com/agentcommunity/agent-identity-discovery](https://github.com/agentcommunity/agent-identity-discovery)
+- **Security**: [security@agentcommunity.org](mailto:security@agentcommunity.org) ([policy](https://github.com/agentcommunity/agent-identity-discovery/blob/main/SECURITY.md))
 
 ## Installation
 
@@ -27,7 +28,7 @@ from aid_py import discover, AidError
 try:
     # discover() returns a (record, ttl) tuple.
     # record is a dict (TypedDict); access fields by key.
-    record, ttl = discover("supabase.agentcommunity.org")
+    record, ttl = discover("agentcommunity.org")
 
     print(f"Protocol: {record['proto']}")          # "mcp"
     print(f"URI: {record['uri']}")                 # "https://api.supabase.com/mcp"

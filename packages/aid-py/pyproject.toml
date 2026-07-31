@@ -8,7 +8,7 @@ version = "2.1.1"
 description = "Python library for Agent Identity & Discovery (AID), a DNS-based discovery protocol for AI agents"
 authors = [{ name = "Agent Community", email = "maintainers@agentcommunity.org" }]
 readme = "README.md"
-license = { text = "MIT" }
+license = { file = "LICENSE" }
 requires-python = ">=3.8"
 dependencies = ["dnspython>=2.6.0", "idna>=3.6"]
 keywords = ["agent", "discovery", "dns", "mcp", "a2a", "ai", "aid", "txt-record"]
@@ -31,10 +31,13 @@ classifiers = [
 [project.urls]
 Homepage = "https://aid.agentcommunity.org"
 Repository = "https://github.com/agentcommunity/agent-identity-discovery"
-Documentation = "https://aid.agentcommunity.org"
+Documentation = "https://aid.agentcommunity.org/docs"
 "Agent Community" = "https://agentcommunity.org/developers"
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
 # Preferred PKA backend (security-focused). Install to enable Ed25519 verification.
 pka = ["cryptography>=42"]
+
+[tool.setuptools.data-files]
+"share/doc/aid-discovery" = ["README.md"]
