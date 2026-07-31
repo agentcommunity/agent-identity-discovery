@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { devNull, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { readPythonWheelLicense } from './package-claim-archive.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '..');
 const temporaryRoot = mkdtempSync(join(tmpdir(), 'aid-package-claims-'));
@@ -249,14 +250,13 @@ function verifyArtifacts() {
   const sdist = findArchive(pythonOutput, '.tar.gz');
   const wheel = findArchive(pythonOutput, '.whl');
   const pythonLicense = read('packages/aid-py/LICENSE');
-  for (const [archive, label, readmeSuffix, licenseSuffix, metadataSuffix] of [
-    [sdist, 'aid-discovery sdist', '/README.md', '/LICENSE', 'aid_discovery-2.1.1/PKG-INFO'],
-    [wheel, 'aid-discovery wheel', '/README.md', 'dist-info/licenses/LICENSE', 'dist-info/METADATA'],
-  ]) {
-    assertPackagedReadme(readPythonArchiveEntry(archive, readmeSuffix), label, 'aid-discovery');
-    assertPackagedLicense(readPythonArchiveEntry(archive, licenseSuffix), label, pythonLicense);
-    assertPythonMetadata(readPythonArchiveEntry(archive, metadataSuffix), label);
-  }
+  assertPackagedReadme(readPythonArchiveEntry(sdist, '/README.md'), 'aid-discovery sdist', 'aid-discovery');
+  assertPackagedLicense(readPythonArchiveEntry(sdist, '/LICENSE'), 'aid-discovery sdist', pythonLicense);
+  assertPythonMetadata(readPythonArchiveEntry(sdist, 'aid_discovery-2.1.1/PKG-INFO'), 'aid-discovery sdist');
+
+  assertPackagedReadme(readPythonArchiveEntry(wheel, '/README.md'), 'aid-discovery wheel', 'aid-discovery');
+  assertPackagedLicense(readPythonWheelLicense(wheel), 'aid-discovery wheel', pythonLicense);
+  assertPythonMetadata(readPythonArchiveEntry(wheel, 'dist-info/METADATA'), 'aid-discovery wheel');
 
   run('python3', ['-m', 'venv', pythonInstallEnvironment]);
   const installPython = join(pythonInstallEnvironment, 'bin', 'python');
