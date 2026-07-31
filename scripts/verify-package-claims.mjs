@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { devNull, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 const repoRoot = resolve(import.meta.dirname, '..');
@@ -9,7 +9,17 @@ const repository = 'https://github.com/agentcommunity/agent-identity-discovery';
 const homepage = 'https://aid.agentcommunity.org';
 const docs = 'https://aid.agentcommunity.org/docs';
 const securityContact = 'security@agentcommunity.org';
+const securityPolicy = `${repository}/blob/main/SECURITY.md`;
 const productionDomain = 'agentcommunity.org';
+const expectedProductionUri = 'https://agentcommunity.org/mcp';
+const checkoutOutputs = [
+  'packages/aid/dist',
+  'packages/aid-engine/dist',
+  'packages/aid-doctor/dist',
+];
+
+let cleaned = false;
+let verifierCheckoutOutputs = [];
 
 function fail(message) {
   throw new Error(`Package claim verification failed: ${message}`);
@@ -27,17 +37,11 @@ function readJson(relativePath) {
   return JSON.parse(read(relativePath));
 }
 
-function run(command, args, options = {}) {
-  execFileSync(command, args, {
-    cwd: repoRoot,
-    stdio: 'inherit',
-    env: registrySafeEnvironment(options.env),
-    ...options,
-  });
-}
-
-function registrySafeEnvironment(overrides) {
+function registrySafeEnvironment() {
   const environment = { ...process.env };
+  for (const name of Object.keys(environment)) {
+    if (name.startsWith('PIP_')) delete environment[name];
+  }
   for (const name of ['NPM_TOKEN', 'NODE_AUTH_TOKEN', 'PYPI_TOKEN', 'TWINE_PASSWORD', 'TWINE_USERNAME']) {
     delete environment[name];
   }
@@ -45,56 +49,126 @@ function registrySafeEnvironment(overrides) {
   return {
     ...environment,
     NPM_CONFIG_USERCONFIG: join(temporaryRoot, 'npmrc'),
-    PIP_CONFIG_FILE: join(temporaryRoot, 'pip.conf'),
-    ...overrides,
+    PIP_CONFIG_FILE: devNull,
   };
 }
 
-function assertReadme(relativePath, packageName) {
-  const contents = read(relativePath);
-  expect(contents.includes(repository), `${relativePath} must link to ${repository}`);
-  expect(contents.includes(homepage), `${relativePath} must link to ${homepage}`);
-  expect(contents.includes(docs), `${relativePath} must link to ${docs}`);
-  expect(contents.includes(securityContact), `${relativePath} must include ${securityContact}`);
-  expect(contents.includes('SECURITY.md'), `${relativePath} must link to SECURITY.md`);
-  expect(contents.includes(packageName), `${relativePath} must use the exact package name ${packageName}`);
-  expect(contents.includes(productionDomain), `${relativePath} must include a ${productionDomain} production example`);
+function run(command, args, options = {}) {
+  const { env: _ignoredEnvironment, ...runOptions } = options;
+  execFileSync(command, args, {
+    cwd: repoRoot,
+    stdio: 'inherit',
+    ...runOptions,
+    env: registrySafeEnvironment(),
+  });
 }
 
-function assertNpmMetadata(relativePath, packageName) {
-  const manifest = readJson(relativePath);
-  expect(manifest.name === packageName, `${relativePath} name must be ${packageName}`);
-  expect(manifest.version === '2.1.1', `${relativePath} version must be 2.1.1`);
-  expect(manifest.repository?.url === repository, `${relativePath} repository must be canonical`);
-  expect(manifest.homepage === homepage, `${relativePath} homepage must be canonical`);
-  expect(manifest.bugs?.url === `${repository}/issues`, `${relativePath} bugs URL must be canonical`);
-  expect(manifest.license === 'MIT', `${relativePath} license must be MIT`);
-  expect(manifest.engines?.node === '>=18.17', `${relativePath} node engine must remain >=18.17`);
+function capture(command, args, options = {}) {
+  const { env: _ignoredEnvironment, ...runOptions } = options;
+  return execFileSync(command, args, {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    ...runOptions,
+    env: registrySafeEnvironment(),
+  });
 }
 
-function assertTarEntries(archivePath, expectedEntries) {
-  const entries = execFileSync('tar', ['-tzf', archivePath], { encoding: 'utf8' });
-  for (const entry of expectedEntries) {
-    expect(entries.split('\n').includes(entry), `${archivePath} must contain ${entry}`);
+function assertReadme(contents, label, packageName) {
+  expect(contents.includes(repository), `${label} must link to ${repository}`);
+  expect(contents.includes(homepage), `${label} must link to ${homepage}`);
+  expect(contents.includes(docs), `${label} must link to ${docs}`);
+  expect(contents.includes(securityContact), `${label} must include ${securityContact}`);
+  expect(contents.includes(securityPolicy), `${label} must link to ${securityPolicy}`);
+  expect(contents.includes(packageName), `${label} must use the exact package name ${packageName}`);
+  expect(contents.includes(productionDomain), `${label} must include a ${productionDomain} production example`);
+}
+
+function assertPackagedReadme(contents, label, packageName) {
+  assertReadme(contents, `${label} README`, packageName);
+}
+
+function assertPackagedLicense(contents, label, expectedLicense) {
+  expect(contents === expectedLicense, `${label} LICENSE must match its package-local license bytes`);
+}
+
+function assertNpmMetadata(manifest, label, packageName) {
+  expect(manifest.name === packageName, `${label} name must be ${packageName}`);
+  expect(manifest.version === '2.1.1', `${label} version must be 2.1.1`);
+  expect(manifest.repository?.url === repository, `${label} repository must be canonical`);
+  expect(manifest.homepage === homepage, `${label} homepage must be canonical`);
+  expect(manifest.bugs?.url === `${repository}/issues`, `${label} bugs URL must be canonical`);
+  expect(manifest.license === 'MIT', `${label} license must be MIT`);
+  expect(manifest.engines?.node === '>=18.17', `${label} node engine must remain >=18.17`);
+}
+
+function assertPackagedMetadata(metadata, label, packageName) {
+  assertNpmMetadata(metadata, `${label} package metadata`, packageName);
+}
+
+function assertPythonMetadata(metadata, label) {
+  for (const expectedLine of [
+    'Name: aid-discovery',
+    'Version: 2.1.1',
+    `Project-URL: Homepage, ${homepage}`,
+    `Project-URL: Repository, ${repository}`,
+    `Project-URL: Documentation, ${docs}`,
+    'License-File: LICENSE',
+  ]) {
+    expect(metadata.includes(expectedLine), `${label} must include ${expectedLine}`);
   }
 }
 
-function assertPythonArchiveEntries(archivePath, expectedSuffixes) {
+function readTarEntry(archivePath, entry) {
+  return execFileSync('tar', ['-xOzf', archivePath, entry], { encoding: 'utf8' });
+}
+
+function readPythonArchiveEntry(archivePath, suffix) {
   const script = [
     'import pathlib, sys, tarfile, zipfile',
     'archive = pathlib.Path(sys.argv[1])',
-    'names = tarfile.open(archive).getnames() if archive.suffix == ".gz" else zipfile.ZipFile(archive).namelist()',
-    'for suffix in sys.argv[2:]:',
-    '    if not any(name.endswith(suffix) for name in names):',
-    '        raise SystemExit(f"missing {suffix} from {archive}")',
+    'suffix = sys.argv[2]',
+    'if archive.suffix == ".gz":',
+    '    with tarfile.open(archive) as container:',
+    '        names = container.getnames()',
+    '        matches = [name for name in names if name.endswith(suffix)]',
+    '        if len(matches) != 1: raise SystemExit(f"expected one {suffix}, found {matches}")',
+    '        source = container.extractfile(matches[0])',
+    '        if source is None: raise SystemExit(f"could not read {matches[0]}")',
+    '        sys.stdout.buffer.write(source.read())',
+    'else:',
+    '    with zipfile.ZipFile(archive) as container:',
+    '        names = container.namelist()',
+    '        matches = [name for name in names if name.endswith(suffix)]',
+    '        if len(matches) != 1: raise SystemExit(f"expected one {suffix}, found {matches}")',
+    '        sys.stdout.buffer.write(container.read(matches[0]))',
   ].join('\n');
-  run('python3', ['-c', script, archivePath, ...expectedSuffixes]);
+  return capture('python3', ['-c', script, archivePath, suffix]);
 }
 
 function findArchive(directory, suffix) {
   const match = readdirSync(directory).find((entry) => entry.endsWith(suffix));
   expect(match, `expected a ${suffix} artifact in ${directory}`);
   return join(directory, match);
+}
+
+function prepareTemporaryConfig() {
+  writeFileSync(join(temporaryRoot, 'npmrc'), '');
+}
+
+function copyNpmPackageSources() {
+  for (const output of checkoutOutputs) {
+    expect(!existsSync(join(repoRoot, output)), `refusing to overwrite pre-existing ${output}`);
+  }
+  verifierCheckoutOutputs = checkoutOutputs;
+}
+
+function cleanup() {
+  if (cleaned) return;
+  cleaned = true;
+  for (const output of verifierCheckoutOutputs) {
+    rmSync(join(repoRoot, output), { recursive: true, force: true });
+  }
+  rmSync(temporaryRoot, { recursive: true, force: true });
 }
 
 function verifySourceClaims() {
@@ -109,11 +183,13 @@ function verifySourceClaims() {
   expect(!rootReadme.includes('not yet community-owned'), 'README.md must not claim aid-discovery is not community-owned');
   expect(rootReadme.includes(productionDomain), 'README.md must include an agentcommunity.org production example');
 
-  assertNpmMetadata('packages/aid/package.json', '@agentcommunity/aid');
-  assertNpmMetadata('packages/aid-doctor/package.json', '@agentcommunity/aid-doctor');
-  assertReadme('packages/aid/README.md', '@agentcommunity/aid');
-  assertReadme('packages/aid-doctor/README.md', '@agentcommunity/aid-doctor');
-  assertReadme('packages/aid-py/README.md', 'aid-discovery');
+  assertNpmMetadata(readJson('packages/aid/package.json'), 'packages/aid/package.json', '@agentcommunity/aid');
+  assertNpmMetadata(readJson('packages/aid-doctor/package.json'), 'packages/aid-doctor/package.json', '@agentcommunity/aid-doctor');
+  assertReadme(read('packages/aid/README.md'), 'packages/aid/README.md', '@agentcommunity/aid');
+  assertReadme(read('packages/aid-doctor/README.md'), 'packages/aid-doctor/README.md', '@agentcommunity/aid-doctor');
+  const pythonReadme = read('packages/aid-py/README.md');
+  assertReadme(pythonReadme, 'packages/aid-py/README.md', 'aid-discovery');
+  expect(pythonReadme.includes(expectedProductionUri), 'Python README must document the live agentcommunity.org endpoint');
 
   const pythonProject = read('packages/aid-py/pyproject.toml');
   expect(pythonProject.includes('name = "aid-discovery"'), 'Python project name must be aid-discovery');
@@ -134,6 +210,7 @@ function verifyArtifacts() {
   const pythonBuildEnvironment = join(temporaryRoot, 'python-build');
   const pythonInstallEnvironment = join(temporaryRoot, 'python-install');
   run('mkdir', ['-p', npmOutput, pythonOutput]);
+  copyNpmPackageSources();
   run('pnpm', ['-C', 'packages/aid', 'build']);
   run('pnpm', ['-C', 'packages/aid-engine', 'build']);
   run('pnpm', ['-C', 'packages/aid-doctor', 'build']);
@@ -142,8 +219,16 @@ function verifyArtifacts() {
 
   const aidArchive = findArchive(npmOutput, 'agentcommunity-aid-2.1.1.tgz');
   const doctorArchive = findArchive(npmOutput, 'agentcommunity-aid-doctor-2.1.1.tgz');
-  assertTarEntries(aidArchive, ['package/README.md', 'package/LICENSE']);
-  assertTarEntries(doctorArchive, ['package/README.md', 'package/LICENSE']);
+  const npmArtifacts = [
+    [aidArchive, '@agentcommunity/aid', 'packages/aid/LICENSE'],
+    [doctorArchive, '@agentcommunity/aid-doctor', 'packages/aid-doctor/LICENSE'],
+  ];
+  for (const [archive, packageName, licensePath] of npmArtifacts) {
+    const label = `${packageName} tarball`;
+    assertPackagedReadme(readTarEntry(archive, 'package/README.md'), label, packageName);
+    assertPackagedLicense(readTarEntry(archive, 'package/LICENSE'), label, read(licensePath));
+    assertPackagedMetadata(JSON.parse(readTarEntry(archive, 'package/package.json')), label, packageName);
+  }
 
   const aidInstall = join(temporaryRoot, 'npm-aid');
   const doctorInstall = join(temporaryRoot, 'npm-doctor');
@@ -159,26 +244,44 @@ function verifyArtifacts() {
   run('python3', ['-m', 'venv', pythonBuildEnvironment]);
   const buildPython = join(pythonBuildEnvironment, 'bin', 'python');
   run('cp', ['-R', 'packages/aid-py', pythonSource]);
-  run(buildPython, ['-m', 'pip', 'install', '--disable-pip-version-check', 'build']);
+  run(buildPython, ['-m', 'pip', '--isolated', 'install', '--disable-pip-version-check', 'build']);
   run(buildPython, ['-m', 'build', '--sdist', '--wheel', '--outdir', pythonOutput, pythonSource]);
   const sdist = findArchive(pythonOutput, '.tar.gz');
   const wheel = findArchive(pythonOutput, '.whl');
-  assertPythonArchiveEntries(sdist, ['LICENSE', 'README.md']);
-  assertPythonArchiveEntries(wheel, ['LICENSE', 'README.md']);
+  const pythonLicense = read('packages/aid-py/LICENSE');
+  for (const [archive, label, readmeSuffix, licenseSuffix, metadataSuffix] of [
+    [sdist, 'aid-discovery sdist', '/README.md', '/LICENSE', 'aid_discovery-2.1.1/PKG-INFO'],
+    [wheel, 'aid-discovery wheel', '/README.md', 'dist-info/licenses/LICENSE', 'dist-info/METADATA'],
+  ]) {
+    assertPackagedReadme(readPythonArchiveEntry(archive, readmeSuffix), label, 'aid-discovery');
+    assertPackagedLicense(readPythonArchiveEntry(archive, licenseSuffix), label, pythonLicense);
+    assertPythonMetadata(readPythonArchiveEntry(archive, metadataSuffix), label);
+  }
 
   run('python3', ['-m', 'venv', pythonInstallEnvironment]);
   const installPython = join(pythonInstallEnvironment, 'bin', 'python');
-  run(installPython, ['-m', 'pip', 'install', '--disable-pip-version-check', wheel]);
-  run(installPython, [
+  run(installPython, ['-m', 'pip', '--isolated', 'install', '--disable-pip-version-check', wheel]);
+  const livePythonUri = capture(installPython, [
     '-c',
-    `from aid_py import discover; record, _ = discover('${productionDomain}'); assert record['uri']`,
-  ]);
+    `from aid_py import discover; record, _ = discover('${productionDomain}'); print(record['uri'])`,
+  ]).trim();
+  expect(livePythonUri === expectedProductionUri, `Python discovery must return ${expectedProductionUri}, received ${livePythonUri}`);
 }
 
+process.on('SIGINT', () => {
+  cleanup();
+  process.exit(130);
+});
+process.on('SIGTERM', () => {
+  cleanup();
+  process.exit(143);
+});
+
 try {
+  prepareTemporaryConfig();
   verifySourceClaims();
   verifyArtifacts();
   console.log('Package claims and artifacts verified.');
 } finally {
-  rmSync(temporaryRoot, { recursive: true, force: true });
+  cleanup();
 }

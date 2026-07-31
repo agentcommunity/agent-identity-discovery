@@ -31,8 +31,8 @@ try:
     record, ttl = discover("agentcommunity.org")
 
     print(f"Protocol: {record['proto']}")          # "mcp"
-    print(f"URI: {record['uri']}")                 # "https://api.supabase.com/mcp"
-    print(f"Description: {record.get('desc')}")    # "Supabase MCP" (optional)
+    print(f"URI: {record['uri']}")                 # "https://agentcommunity.org/mcp"
+    print(f"Description: {record.get('desc')}")
     print(f"TTL: {ttl} seconds")
 
     # PKA domain-binding result (True only when an Ed25519 handshake
@@ -43,6 +43,10 @@ try:
 except AidError as e:
     print(f"Discovery failed: {e}")
 ```
+
+## Release note
+
+PyPI `aid-discovery` 2.1.1 is immutable. Before the corrected provenance-bearing PyPI publication, an owner must create the next `aid-discovery` patch version, coordinate PAGE's advertised version, and configure the PyPI Trusted Publisher. The release workflow uses `skip-existing`, so it cannot replace the existing 2.1.1 artifacts.
 
 ## API Reference
 
