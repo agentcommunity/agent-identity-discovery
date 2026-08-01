@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import test from 'node:test';
 import { join, resolve } from 'node:path';
@@ -33,6 +34,43 @@ function withWheel(entries, callback) {
     rmSync(fixture.directory, { recursive: true, force: true });
   }
 }
+
+function hashTree(directory) {
+  const hash = createHash('sha256');
+  function visit(relativePath) {
+    const absolutePath = join(directory, relativePath);
+    const entries = readdirSync(absolutePath, { withFileTypes: true }).sort(function (left, right) {
+      return left.name.localeCompare(right.name);
+    });
+    for (const entry of entries) {
+      const childRelativePath = join(relativePath, entry.name);
+      const childAbsolutePath = join(directory, childRelativePath);
+      if (entry.isDirectory()) {
+        hash.update(`directory:${childRelativePath}\n`);
+        visit(childRelativePath);
+      } else {
+        const contents = readFileSync(childAbsolutePath);
+        hash.update(`file:${childRelativePath}:${statSync(childAbsolutePath).mode}:${contents.length}\n`);
+        hash.update(contents);
+      }
+    }
+  }
+  visit('.');
+  return hash.digest('hex');
+}
+
+test('verifier preserves a prior aid build output while it verifies package claims', () => {
+  const packageDirectory = join(repoRoot, 'packages/aid');
+  const distDirectory = join(packageDirectory, 'dist');
+  execFileSync('pnpm', ['-C', packageDirectory, 'build'], { cwd: repoRoot, stdio: 'pipe' });
+  const before = hashTree(distDirectory);
+  const verification = spawnSync('node', ['scripts/verify-package-claims.mjs'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.equal(verification.status, 0, verification.stderr);
+  assert.equal(hashTree(distDirectory), before);
+});
 
 test('reads the exact wheel license bytes from each supported setuptools layout', () => {
   const expectedLicense = 'MIT fixture license\n';
@@ -73,12 +111,14 @@ test('rejects wheel license entries that are duplicate or ambiguous', () => {
 test('verifier isolates all pip operations and builds npm artifacts outside the checkout', () => {
   assert.match(verifier, /--isolated/);
   assert.match(verifier, /copyNpmPackageSources/);
+  assert.match(verifier, /const npmPackages = \['aid', 'aid-engine', 'aid-doctor'\]/);
+  assert.match(verifier, /symlinkSync\(join\(repoRoot, 'node_modules'\), join\(temporaryRoot, 'node_modules'\), 'dir'\)/);
+  assert.match(verifier, /path !== join\(source, 'dist'\)/);
   assert.match(verifier, /NPM_CONFIG_USERCONFIG/);
   assert.match(verifier, /PIP_CONFIG_FILE/);
   assert.match(verifier, /const \{ env: _ignoredEnvironment, \.\.\.runOptions \} = options;/);
   assert.match(verifier, /\.\.\.runOptions,\s*env: registrySafeEnvironment\(\)/);
-  assert.match(verifier, /let verifierCheckoutOutputs = \[\];/);
-  assert.match(verifier, /verifierCheckoutOutputs = checkoutOutputs;/);
+  assert.doesNotMatch(verifier, /refusing to overwrite pre-existing/);
 });
 
 test('verifier checks packed README, license, and metadata bytes', () => {

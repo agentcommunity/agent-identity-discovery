@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { devNull, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { readPythonWheelLicense } from './package-claim-archive.mjs';
@@ -13,15 +13,9 @@ const securityContact = 'security@agentcommunity.org';
 const securityPolicy = `${repository}/blob/main/SECURITY.md`;
 const productionDomain = 'agentcommunity.org';
 const expectedProductionUri = 'https://agentcommunity.org/mcp';
-const checkoutOutputs = [
-  'packages/aid/dist',
-  'packages/aid-engine/dist',
-  'packages/aid-doctor/dist',
-];
+const npmPackages = ['aid', 'aid-engine', 'aid-doctor'];
 
 let cleaned = false;
-let verifierCheckoutOutputs = [];
-
 function fail(message) {
   throw new Error(`Package claim verification failed: ${message}`);
 }
@@ -157,18 +151,28 @@ function prepareTemporaryConfig() {
 }
 
 function copyNpmPackageSources() {
-  for (const output of checkoutOutputs) {
-    expect(!existsSync(join(repoRoot, output)), `refusing to overwrite pre-existing ${output}`);
+  const temporaryPackages = join(temporaryRoot, 'packages');
+  run('mkdir', ['-p', temporaryPackages]);
+  for (const file of ['package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.json', 'tsup.config.base.ts', 'turbo.json']) {
+    cpSync(join(repoRoot, file), join(temporaryRoot, file));
   }
-  verifierCheckoutOutputs = checkoutOutputs;
+  symlinkSync(join(repoRoot, 'node_modules'), join(temporaryRoot, 'node_modules'), 'dir');
+  for (const packageName of npmPackages) {
+    const source = join(repoRoot, 'packages', packageName);
+    const destination = join(temporaryPackages, packageName);
+    cpSync(source, destination, {
+      recursive: true,
+      filter(path) {
+        return path !== join(source, 'dist');
+      },
+    });
+  }
+  return temporaryPackages;
 }
 
 function cleanup() {
   if (cleaned) return;
   cleaned = true;
-  for (const output of verifierCheckoutOutputs) {
-    rmSync(join(repoRoot, output), { recursive: true, force: true });
-  }
   rmSync(temporaryRoot, { recursive: true, force: true });
 }
 
@@ -211,12 +215,12 @@ function verifyArtifacts() {
   const pythonBuildEnvironment = join(temporaryRoot, 'python-build');
   const pythonInstallEnvironment = join(temporaryRoot, 'python-install');
   run('mkdir', ['-p', npmOutput, pythonOutput]);
-  copyNpmPackageSources();
-  run('pnpm', ['-C', 'packages/aid', 'build']);
-  run('pnpm', ['-C', 'packages/aid-engine', 'build']);
-  run('pnpm', ['-C', 'packages/aid-doctor', 'build']);
-  run('pnpm', ['-C', 'packages/aid', 'pack', '--pack-destination', npmOutput]);
-  run('pnpm', ['-C', 'packages/aid-doctor', 'pack', '--pack-destination', npmOutput]);
+  const temporaryPackages = copyNpmPackageSources();
+  run('pnpm', ['-C', join(temporaryPackages, 'aid'), 'build']);
+  run('pnpm', ['-C', join(temporaryPackages, 'aid-engine'), 'build']);
+  run('pnpm', ['-C', join(temporaryPackages, 'aid-doctor'), 'build']);
+  run('pnpm', ['-C', join(temporaryPackages, 'aid'), 'pack', '--pack-destination', npmOutput]);
+  run('pnpm', ['-C', join(temporaryPackages, 'aid-doctor'), 'pack', '--pack-destination', npmOutput]);
 
   const aidArchive = findArchive(npmOutput, 'agentcommunity-aid-2.1.1.tgz');
   const doctorArchive = findArchive(npmOutput, 'agentcommunity-aid-doctor-2.1.1.tgz');
