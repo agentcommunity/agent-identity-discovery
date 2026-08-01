@@ -4,6 +4,7 @@ import { devNull, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { readPythonWheelLicense } from './package-claim-archive.mjs';
 import { containsExactHost, containsExactUrl } from './package-claim-url.mjs';
+import { copyPackageWorkspace } from './package-claim-workspace.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '..');
 const temporaryRoot = mkdtempSync(join(tmpdir(), 'aid-package-claims-'));
@@ -153,23 +154,11 @@ function prepareTemporaryConfig() {
 }
 
 function copyNpmPackageSources() {
-  const temporaryPackages = join(temporaryRoot, 'packages');
-  run('mkdir', ['-p', temporaryPackages]);
   for (const file of ['package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.json', 'tsup.config.base.ts', 'turbo.json']) {
     cpSync(join(repoRoot, file), join(temporaryRoot, file));
   }
   symlinkSync(join(repoRoot, 'node_modules'), join(temporaryRoot, 'node_modules'), 'dir');
-  for (const packageName of npmPackages) {
-    const source = join(repoRoot, 'packages', packageName);
-    const destination = join(temporaryPackages, packageName);
-    cpSync(source, destination, {
-      recursive: true,
-      filter(path) {
-        return path !== join(source, 'dist');
-      },
-    });
-  }
-  return temporaryPackages;
+  return copyPackageWorkspace({ checkout: repoRoot, temporaryRoot, packageNames: npmPackages });
 }
 
 function cleanup() {

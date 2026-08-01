@@ -113,7 +113,7 @@ test('verifier isolates all pip operations and builds npm artifacts outside the 
   assert.match(verifier, /copyNpmPackageSources/);
   assert.match(verifier, /const npmPackages = \['aid', 'aid-engine', 'aid-doctor'\]/);
   assert.match(verifier, /symlinkSync\(join\(repoRoot, 'node_modules'\), join\(temporaryRoot, 'node_modules'\), 'dir'\)/);
-  assert.match(verifier, /path !== join\(source, 'dist'\)/);
+  assert.match(verifier, /copyPackageWorkspace/);
   assert.match(verifier, /NPM_CONFIG_USERCONFIG/);
   assert.match(verifier, /PIP_CONFIG_FILE/);
   assert.match(verifier, /const \{ env: _ignoredEnvironment, \.\.\.runOptions \} = options;/);
