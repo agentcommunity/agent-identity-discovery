@@ -3,6 +3,7 @@ import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, sym
 import { devNull, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { readPythonWheelLicense } from './package-claim-archive.mjs';
+import { containsExactHost, containsExactUrl } from './package-claim-url.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '..');
 const temporaryRoot = mkdtempSync(join(tmpdir(), 'aid-package-claims-'));
@@ -69,13 +70,13 @@ function capture(command, args, options = {}) {
 }
 
 function assertReadme(contents, label, packageName) {
-  expect(contents.includes(repository), `${label} must link to ${repository}`);
-  expect(contents.includes(homepage), `${label} must link to ${homepage}`);
-  expect(contents.includes(docs), `${label} must link to ${docs}`);
+  expect(containsExactUrl(contents, repository), `${label} must link to ${repository}`);
+  expect(containsExactUrl(contents, homepage), `${label} must link to ${homepage}`);
+  expect(containsExactUrl(contents, docs), `${label} must link to ${docs}`);
   expect(contents.includes(securityContact), `${label} must include ${securityContact}`);
-  expect(contents.includes(securityPolicy), `${label} must link to ${securityPolicy}`);
+  expect(containsExactUrl(contents, securityPolicy), `${label} must link to ${securityPolicy}`);
   expect(contents.includes(packageName), `${label} must use the exact package name ${packageName}`);
-  expect(contents.includes(productionDomain), `${label} must include a ${productionDomain} production example`);
+  expect(containsExactHost(contents, productionDomain), `${label} must include a ${productionDomain} production example`);
 }
 
 function assertPackagedReadme(contents, label, packageName) {
@@ -101,6 +102,7 @@ function assertPackagedMetadata(metadata, label, packageName) {
 }
 
 function assertPythonMetadata(metadata, label) {
+  const metadataLines = new Set(metadata.split(/\r?\n/));
   for (const expectedLine of [
     'Name: aid-discovery',
     'Version: 2.1.1',
@@ -109,7 +111,7 @@ function assertPythonMetadata(metadata, label) {
     `Project-URL: Documentation, ${docs}`,
     'License-File: LICENSE',
   ]) {
-    expect(metadata.includes(expectedLine), `${label} must include ${expectedLine}`);
+    expect(metadataLines.has(expectedLine), `${label} must include ${expectedLine}`);
   }
 }
 
@@ -180,13 +182,13 @@ function verifySourceClaims() {
   const rootReadme = read('README.md');
   expect(existsSync(join(repoRoot, 'SECURITY.md')), 'root SECURITY.md must exist');
   expect(read('SECURITY.md').includes(securityContact), 'SECURITY.md must name the security contact');
-  expect(rootReadme.includes(repository), 'README.md must link to the canonical repository');
-  expect(rootReadme.includes(homepage), 'README.md must link to the canonical product home');
-  expect(rootReadme.includes(docs), 'README.md must link to the canonical docs');
+  expect(containsExactUrl(rootReadme, repository), 'README.md must link to the canonical repository');
+  expect(containsExactUrl(rootReadme, homepage), 'README.md must link to the canonical product home');
+  expect(containsExactUrl(rootReadme, docs), 'README.md must link to the canonical docs');
   expect(rootReadme.includes(securityContact), 'README.md must include the security contact');
   expect(rootReadme.includes('SECURITY.md'), 'README.md must link to SECURITY.md');
   expect(!rootReadme.includes('not yet community-owned'), 'README.md must not claim aid-discovery is not community-owned');
-  expect(rootReadme.includes(productionDomain), 'README.md must include an agentcommunity.org production example');
+  expect(containsExactHost(rootReadme, productionDomain), 'README.md must include an agentcommunity.org production example');
 
   assertNpmMetadata(readJson('packages/aid/package.json'), 'packages/aid/package.json', '@agentcommunity/aid');
   assertNpmMetadata(readJson('packages/aid-doctor/package.json'), 'packages/aid-doctor/package.json', '@agentcommunity/aid-doctor');
@@ -194,14 +196,14 @@ function verifySourceClaims() {
   assertReadme(read('packages/aid-doctor/README.md'), 'packages/aid-doctor/README.md', '@agentcommunity/aid-doctor');
   const pythonReadme = read('packages/aid-py/README.md');
   assertReadme(pythonReadme, 'packages/aid-py/README.md', 'aid-discovery');
-  expect(pythonReadme.includes(expectedProductionUri), 'Python README must document the live agentcommunity.org endpoint');
+  expect(containsExactUrl(pythonReadme, expectedProductionUri), 'Python README must document the live agentcommunity.org endpoint');
 
   const pythonProject = read('packages/aid-py/pyproject.toml');
   expect(pythonProject.includes('name = "aid-discovery"'), 'Python project name must be aid-discovery');
   expect(pythonProject.includes('version = "2.1.1"'), 'Python version must be 2.1.1');
   expect(pythonProject.includes('requires-python = ">=3.8"'), 'Python must keep >=3.8 support');
   expect(pythonProject.includes('license = { file = "LICENSE" }'), 'Python must use the package-local LICENSE metadata');
-  expect(pythonProject.includes(`Documentation = "${docs}"`), 'Python documentation URL must be canonical');
+  expect(containsExactUrl(pythonProject, docs), 'Python documentation URL must be canonical');
   expect(read('packages/aid-py/LICENSE') === read('LICENSE'), 'Python LICENSE must match root LICENSE');
 
   const webPackage = readJson('packages/web/package.json');
