@@ -120,9 +120,8 @@ pnpm add @agentcommunity/aid
 ```typescript
 import { discover, AidError } from '@agentcommunity/aid';
 
-const { record, ttl } = await discover('supabase.agentcommunity.org');
+const { record, ttl } = await discover('agentcommunity.org');
 console.log(`Found ${record.proto} agent at ${record.uri} (TTL: ${ttl}s)`);
-//=> Found mcp agent at https://api.supabase.com/mcp (TTL: 60s)
 ```
 
 **Browser (uses DNS-over-HTTPS):**
@@ -130,7 +129,7 @@ console.log(`Found ${record.proto} agent at ${record.uri} (TTL: ${ttl}s)`);
 ```typescript
 import { discover } from '@agentcommunity/aid/browser';
 
-const { record } = await discover('supabase.agentcommunity.org');
+const { record } = await discover('agentcommunity.org');
 console.log(`Found ${record.proto} agent at ${record.uri}`);
 ```
 
@@ -149,13 +148,11 @@ pip install aid-discovery
 from aid_py import discover, AidError
 
 try:
-    result = discover("supabase.agentcommunity.org")
-    print(f"Found {result.record.proto} agent at {result.record.uri}")
-    #=> Found mcp agent at https://api.supabase.com/mcp
+    record, ttl = discover("agentcommunity.org")
+    print(f"Found {record['proto']} agent at {record['uri']} (TTL: {ttl}s)")
 except AidError as e:
     print(f"AID Error ({e.code}): {e}")
 
-# NOTE: The Python package is currently published at https://pypi.org/project/aid-discovery/ and is not yet community-owned. Community transfer is planned for a future release.
 ```
 
 </details>
@@ -351,6 +348,7 @@ Thanks to our production-grade setup:
 ## Community & Support
 
 - For questions, ideas, and support, join our **[GitHub Discussions](https://github.com/orgs/agentcommunity/discussions)**.
+- To report a security issue privately, see [SECURITY.md](./SECURITY.md) or email [security@agentcommunity.org](mailto:security@agentcommunity.org).
 - Chat with us on **[Discord](https://discord.gg/S5XqVHrj)**.
 - To contribute, please see our **[Contributing Guide](./CONTRIBUTING.md)** and **[Code of Conduct](https://github.com/agentcommunity/.github/blob/main/CONTRIBUTING.md)**.
 

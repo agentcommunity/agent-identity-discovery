@@ -13,8 +13,9 @@ No more hunting through API docs. No more manual configuration. It's the zero-fr
 Built by the team at [agentcommunity.org](https://agentcommunity.org).
 
 - **Website**: [aid.agentcommunity.org](https://aid.agentcommunity.org)
-- **Docs**: [docs.agentcommunity.org/aid](https://docs.agentcommunity.org/aid)
-- **GitHub**: [github.com/agent-community/agent-identity-discovery](https://github.com/agent-community/agent-identity-discovery)
+- **Docs**: [aid.agentcommunity.org/docs](https://aid.agentcommunity.org/docs)
+- **GitHub**: [github.com/agentcommunity/agent-identity-discovery](https://github.com/agentcommunity/agent-identity-discovery)
+- **Security**: [security@agentcommunity.org](mailto:security@agentcommunity.org) ([policy](https://github.com/agentcommunity/agent-identity-discovery/blob/main/SECURITY.md))
 
 ---
 
@@ -30,10 +31,10 @@ pnpm add -D @agentcommunity/aid-doctor
 
 ```bash
 # Human-readable check
-aid-doctor check example.com
+aid-doctor check agentcommunity.org
 
 # JSON output (machine-readable)
-aid-doctor json example.com
+aid-doctor json agentcommunity.org
 ```
 
 ### Options

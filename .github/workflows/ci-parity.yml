@@ -39,3 +39,6 @@ jobs:
 
       - name: Run parity
         run: pnpm test:parity
+
+      - name: Verify advertised package claims and artifacts
+        run: pnpm verify:package-claims
