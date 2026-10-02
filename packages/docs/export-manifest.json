@@ -29,8 +29,8 @@
     },
     {
       "path": "Reference/protocols.md",
-      "bytes": 6291,
-      "sha256": "769d9dca7272a7bb9bf8838a16f8a5b6748e7630b8b526614f8e0e3ac832fcca"
+      "bytes": 6314,
+      "sha256": "7191dd86d0d63b3e2ebd9db1babb82851c057fc17195366f75085510ac314bee"
     },
     {
       "path": "Reference/security.md",
@@ -158,5 +158,5 @@
       "sha256": "984e7f27479642c67427b58c3502631b27817ba76823059c51fa6148114934c3"
     }
   ],
-  "aggregateSha256": "35770df9f0a59dec51047dd0de9241d4c3027c1663819564db6c0f8ee3b30864"
+  "aggregateSha256": "e6b7426be2e1a12a7a85a8a6d995802b41e8710b388c10ce6a081fcc47682b35"
 }

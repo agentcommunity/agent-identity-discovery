@@ -11,7 +11,7 @@
 locals {
   a2a_showcase = {
     name  = "_agent.a2a"
-    value = "v=aid2;u=https://a2a.agentcommunity.org/.well-known/agent.json;p=a2a;d=https://a2aprotocol.ai/;s=A2A Protocol Showcase"
+    value = "v=aid2;u=https://a2a.agentcommunity.org/.well-known/agent.json;p=a2a;d=https://a2a-protocol.org/;s=A2A Protocol Showcase"
   }
 
   auth0 = {
