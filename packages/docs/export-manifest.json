@@ -44,8 +44,8 @@
     },
     {
       "path": "Reference/versioning.md",
-      "bytes": 6598,
-      "sha256": "e5c2d71c2cd1b2e0929a85ddb9b8a3b101406b6d56fc5b5b76e7f265e0a919e5"
+      "bytes": 6446,
+      "sha256": "cda376f48aeabfb64e0b9b0dcf80689dd1333757fc5dc0906b0fccb08c65bf35"
     },
     {
       "path": "Reference/well_known_json.md",
@@ -149,14 +149,14 @@
     },
     {
       "path": "specification.md",
-      "bytes": 36340,
-      "sha256": "379d91b50ccc0b647a7c84eaab56284b693ca8420c1a7a0a1b02e7e639ce4a3c"
+      "bytes": 37824,
+      "sha256": "cd5e8dac0a9dd588cbef8ac2c258d74e98455ee8382e3b4fb913408ac4e8978e"
     },
     {
       "path": "specification_v2_explained.md",
-      "bytes": 39725,
-      "sha256": "984e7f27479642c67427b58c3502631b27817ba76823059c51fa6148114934c3"
+      "bytes": 41206,
+      "sha256": "b408f211315546130b69cd3939ccbc2f4697a356acaea25864dab21041691cc1"
     }
   ],
-  "aggregateSha256": "e6b7426be2e1a12a7a85a8a6d995802b41e8710b388c10ce6a081fcc47682b35"
+  "aggregateSha256": "8abcac0e48be8df81ec9802d753b261d346c432012cfdb771110681dee38fe82"
 }
