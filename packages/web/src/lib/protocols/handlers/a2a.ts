@@ -47,7 +47,7 @@ export class A2AHandler implements ProtocolHandler {
               title: 'A2A Agent Discovered',
               description:
                 'This agent uses the Agent-to-Agent (A2A) protocol, but the agent card could not be found.',
-              docsUrl: 'https://a2aprotocol.ai/',
+              docsUrl: 'https://a2a-protocol.org/latest/specification/',
               nextSteps: [
                 'Check if the agent card exists at ' + cardUrl,
                 'Verify the agent is running and accessible',
@@ -71,7 +71,7 @@ export class A2AHandler implements ProtocolHandler {
           title: 'A2A Agent Discovered',
           description:
             agentCard.description || 'This agent uses the Agent-to-Agent (A2A) protocol.',
-          docsUrl: 'https://a2aprotocol.ai/',
+          docsUrl: 'https://a2a-protocol.org/latest/specification/',
           nextSteps: [
             'Use an A2A-compatible client to connect',
             'Review the agent card for available skills and auth requirements',
@@ -90,7 +90,7 @@ export class A2AHandler implements ProtocolHandler {
           title: 'A2A Agent Discovered',
           description:
             'This agent uses the Agent-to-Agent (A2A) protocol. Connection testing requires an A2A-compatible client.',
-          docsUrl: 'https://a2aprotocol.ai/',
+          docsUrl: 'https://a2a-protocol.org/latest/specification/',
           nextSteps: [
             'Use an A2A-compatible client to connect',
             'Fetch the agent card at ' + uri,
