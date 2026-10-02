@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import type { NextRequest } from 'next/server';
 import { GET } from '@/app/api/og/docs/route';
