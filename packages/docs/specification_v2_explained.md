@@ -406,17 +406,19 @@ The auth and protocol registries remain compatible with legacy `aid1` records un
 
 ### Protocol Tokens
 
-| Token       | Meaning                       | Allowed URI schemes       |
-| ----------- | ----------------------------- | ------------------------- |
-| `mcp`       | Model Context Protocol        | `https://`                |
-| `a2a`       | Agent-to-Agent Protocol       | `https://`                |
-| `openapi`   | OpenAPI document              | `https://`                |
-| `grpc`      | gRPC over HTTP/2 or HTTP/3    | `https://`                |
-| `graphql`   | GraphQL over HTTP             | `https://`                |
-| `websocket` | WebSocket transport           | `wss://`                  |
-| `local`     | Local client-run agent        | `docker:`, `npx:`, `pip:` |
-| `zeroconf`  | mDNS/DNS-SD service discovery | `zeroconf:<service_type>` |
-| `ucp`       | Universal Commerce Protocol   | `https://`                |
+A protocol token tells the client which protocol to speak at `uri`. The referenced specification defines that protocol, including its transport, authentication, and capability negotiation; AID does not extend or constrain it. Every protocol token **MUST** list a reference, and proposals for new tokens **MUST** include one.
+
+| Token       | Meaning                       | Allowed URI schemes       | Reference                                                                                              |
+| ----------- | ----------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `mcp`       | Model Context Protocol        | `https://`                | [MCP Specification](https://modelcontextprotocol.io/specification)                                     |
+| `a2a`       | Agent-to-Agent Protocol       | `https://`                | [A2A Protocol Specification](https://a2a-protocol.org/latest/specification/)                           |
+| `openapi`   | OpenAPI document              | `https://`                | [OpenAPI Specification](https://spec.openapis.org/oas/latest.html)                                     |
+| `grpc`      | gRPC over HTTP/2 or HTTP/3    | `https://`                | [gRPC over HTTP2](https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md)                      |
+| `graphql`   | GraphQL over HTTP             | `https://`                | [GraphQL over HTTP](https://graphql.github.io/graphql-over-http/)                                      |
+| `websocket` | WebSocket transport           | `wss://`                  | [RFC 6455](https://www.rfc-editor.org/rfc/rfc6455)                                                     |
+| `local`     | Local client-run agent        | `docker:`, `npx:`, `pip:` | This document, Section 3 (local execution safeguards)                                                  |
+| `zeroconf`  | mDNS/DNS-SD service discovery | `zeroconf:<service_type>` | [RFC 6762](https://www.rfc-editor.org/rfc/rfc6762), [RFC 6763](https://www.rfc-editor.org/rfc/rfc6763) |
+| `ucp`       | Universal Commerce Protocol   | `https://`                | [UCP Specification](https://ucp.dev/specification/overview/)                                           |
 
 > **Explainer:** v2 does not add an auth.md-specific auth token. A service that supports OAuth/auth.md can still advertise `a=oauth2_code`; the detailed agent registration flow is discovered at the OAuth/auth.md layer.
 

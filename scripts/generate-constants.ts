@@ -39,6 +39,7 @@ interface ProtocolConstants {
   specVersion: string;
   supportedSpecVersions?: string[];
   protocolTokens: Record<string, string>;
+  protocolTokenReferences?: Record<string, string>;
   authTokens: Record<string, string>;
   errorCodes: Record<string, ErrorCode>;
   aidRecord: AidRecord;
@@ -731,6 +732,14 @@ try {
   const yamlPath = path.resolve(process.cwd(), 'protocol/constants.yml');
   const yamlContent = readFileSync(yamlPath, 'utf8');
   const constants = parse(yamlContent) as ProtocolConstants;
+
+  // Every protocol token must name its defining specification
+  const missingReferences = Object.keys(constants.protocolTokens).filter(
+    (token) => !constants.protocolTokenReferences?.[token],
+  );
+  if (missingReferences.length > 0) {
+    throw new Error(`protocolTokenReferences missing for: ${missingReferences.join(', ')}`);
+  }
 
   // Generate TypeScript constants
   const tsContent = generateTypeScriptConstants(constants);
