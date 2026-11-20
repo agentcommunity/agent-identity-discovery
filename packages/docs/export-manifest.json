@@ -64,8 +64,8 @@
     },
     {
       "path": "Tooling/conformance.md",
-      "bytes": 1739,
-      "sha256": "6210955b12c0ca66f1d4412adc3130909da36c821b8fc7964a71179077258f1f"
+      "bytes": 1965,
+      "sha256": "58586dde519cdbbce2c11ffbb5be9588537ff43c563f1a6d3715bdbbb200a1bf"
     },
     {
       "path": "Understand/comparison.md",
@@ -158,5 +158,5 @@
       "sha256": "b408f211315546130b69cd3939ccbc2f4697a356acaea25864dab21041691cc1"
     }
   ],
-  "aggregateSha256": "a02346494962f0edd3bedbad570e75fdfd37aea3225666faa1ddbc2c77716862"
+  "aggregateSha256": "1ee53be9a18d4ed53a9bc668012e01b70fdf8e413dbee5fcb341f83222d71b5c"
 }

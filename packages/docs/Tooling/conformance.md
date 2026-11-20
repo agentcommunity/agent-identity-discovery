@@ -47,6 +47,9 @@ and select **Run checks**. It verifies three live AID endpoint-proof responses a
 checks the MCP server card against the digest in ModelMarket's ARD catalog.
 Copy the JSON report to share the outcome and the proof headers.
 
+See the [interop proposal in the IETF DAWN archive](https://mailarchive.ietf.org/arch/msg/dawn/OIP8iMn_X-JSh_3ZgtBARvNl3eo/)
+and [ModelMarket's reply](https://mailarchive.ietf.org/arch/msg/dawn/aDirdCx-wqEVap7zUtM1fUvC31Q/).
+
 From a checkout with dependencies installed, run the same checks locally:
 
 ```bash

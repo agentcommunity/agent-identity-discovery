@@ -7,6 +7,7 @@ const manifestUrl = 'https://modelmarket.dev/.well-known/ard.json';
 const cardUrl = 'https://modelmarket.dev/.well-known/mcp/server-card.json';
 const cardIdentifier = 'urn:air:modelmarket.dev:mcp:gateway';
 const timeout = 5000;
+const maxResponseBytes = 1024 ** 2;
 const proofCases = [
   { id: 'unbound', requestedDomain: undefined, expected: 'Verified unbound proof' },
   { id: 'bound', requestedDomain: domain, expected: 'Verified domain-bound proof' },
@@ -46,22 +47,49 @@ function readTxt(data: string) {
   return chunks.map((chunk) => JSON.parse(chunk) as string).join('');
 }
 
-async function fetchPublic(fetcher: typeof fetch, url: string) {
+async function readPublicBody(fetcher: typeof fetch, url: string) {
   const response = await fetcher(url, {
     cache: 'no-store',
-    redirect: 'error',
+    // Workers support manual redirects. The status check below rejects them.
+    redirect: 'manual',
     signal: AbortSignal.timeout(timeout),
   });
-  if (!response.ok) throw new Error(`HTTP ${response.status} fetching ${url}`);
-  return response;
+  if (!response.ok) {
+    await response.body?.cancel();
+    throw new Error(`HTTP ${response.status} fetching ${url}`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error(`Empty response fetching ${url}`);
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > maxResponseBytes) {
+        await reader.cancel();
+        throw new Error(`Response exceeded 1 MiB fetching ${url}`);
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const body = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return body.buffer;
 }
 
 async function readProofKey(fetcher: typeof fetch) {
-  const response = await fetchPublic(
-    fetcher,
-    `https://dns.google/resolve?name=${dnsName}&type=TXT`,
-  );
-  const { Status, Answer = [] } = (await response.json()) as {
+  const body = await readPublicBody(fetcher, `https://dns.google/resolve?name=${dnsName}&type=TXT`);
+  const { Status, Answer = [] } = JSON.parse(new TextDecoder().decode(body)) as {
     Status: number;
     Answer?: { type: number; name: string; data: string }[];
   };
@@ -105,6 +133,8 @@ async function checkProof(
       async (uri, init) => {
         const response = await fetcher(uri, {
           ...init,
+          // Return any redirect to the verifier, which rejects 3xx responses.
+          redirect: 'manual',
           cache: 'no-store',
           signal: AbortSignal.timeout(timeout),
         });
@@ -176,8 +206,8 @@ async function checkLiveCard(fetcher: typeof fetch) {
   const id = 'card-digest';
   const expected = 'Fetched card matches the ARD SHA-256 digest';
   try {
-    const manifest = await fetchPublic(fetcher, manifestUrl);
-    const { entries } = (await manifest.json()) as {
+    const manifest = await readPublicBody(fetcher, manifestUrl);
+    const { entries } = JSON.parse(new TextDecoder().decode(manifest)) as {
       entries: { identifier: string; type: string; url: string; digest?: string }[];
     };
     const [entry, duplicate] = entries.filter(({ identifier }) => identifier === cardIdentifier);
@@ -191,8 +221,8 @@ async function checkLiveCard(fetcher: typeof fetch) {
     ) {
       throw new Error('Expected one ModelMarket MCP server card entry with a SHA-256 digest');
     }
-    const response = await fetchPublic(fetcher, cardUrl);
-    const result = await inspectCard(await response.arrayBuffer(), entry.digest);
+    const card = await readPublicBody(fetcher, cardUrl);
+    const result = await inspectCard(card, entry.digest);
     return { id, expected, passed: result.observed === 'card-digest-match', ...result };
   } catch (error) {
     return { id, expected, passed: false, observed: errorMessage(error) };

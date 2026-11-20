@@ -30,6 +30,7 @@ const key = 'JrQLj5P_89iXES9-vFgrIy29clF9CC_oPPsw3c5D0bs';
 
 function mockFetch({
   negativeStatus = 403,
+  cardStatus = 200,
   negativeSigned = false,
   cardBody = card,
   cardLocation = cardUrl,
@@ -71,7 +72,7 @@ function mockFetch({
         ],
       });
     }
-    if (url === cardUrl) return new Response(cardBody);
+    if (url === cardUrl) return new Response(cardBody, { status: cardStatus });
     throw new Error('Unexpected request: ' + url);
   }
   return vi.fn<typeof fetch>((input, init) => Promise.resolve(responseFor(input, init)));
@@ -100,6 +101,27 @@ describe('ModelMarket interop', () => {
       expect(report.live[2]).toMatchObject({ passed: false });
     },
   );
+
+  it('requests manual redirect handling for HTTP calls and rejects a redirected card', async () => {
+    const fetch = mockFetch({ cardStatus: 302 });
+    const report = await runModelMarketInterop(fetch);
+    expect(fetch).toHaveBeenCalledTimes(6);
+    for (const [, init] of fetch.mock.calls) {
+      expect(init?.redirect).toBe('manual');
+    }
+    expect(report.live[3]).toMatchObject({
+      passed: false,
+      observed: `HTTP 302 fetching ${cardUrl}`,
+    });
+  });
+
+  it('reports an oversized card without losing the proof results', async () => {
+    const report = await runModelMarketInterop(mockFetch({ cardBody: 'x'.repeat(1024 ** 2 + 1) }));
+    expect(report.live.map(({ passed }) => passed)).toEqual([true, true, true, false]);
+    expect(report.live[3]).toMatchObject({
+      observed: `Response exceeded 1 MiB fetching ${cardUrl}`,
+    });
+  });
 
   it('keeps the proof results when only the live digest fails', async () => {
     const report = await runModelMarketInterop(mockFetch({ cardBody: card + '\n' }));

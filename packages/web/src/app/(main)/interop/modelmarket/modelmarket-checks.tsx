@@ -14,22 +14,24 @@ const labels = new Map([
   ['stale-digest', 'Card digest mismatch'],
 ]);
 
+const fixtureDetails = new Map([
+  ['stale-endpoint', 'The card digest matches and its endpoint differs from DNS.'],
+  ['stale-digest', 'The fetched card bytes differ from the catalog digest.'],
+]);
+
 type Result =
   | ModelMarketInteropReport['live'][number]
   | ModelMarketInteropReport['fixtures'][number];
 
 function ResultList({ results }: { results: Result[] }) {
   return (
-    <ul className="divide-y divide-border rounded-xl border bg-card px-4 sm:px-5">
+    <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">
       {results.map((result) => (
-        <li key={result.id} className="flex items-start gap-3 py-4">
+        <li key={result.id} className="flex items-start justify-between gap-4 px-4 py-3.5">
           <div className="min-w-0 flex-1">
             <p className="font-medium">{labels.get(result.id)}</p>
             <p className="mt-1 break-words text-sm text-muted-foreground">
-              {result.passed ? result.expected : result.observed}
-              {'httpStatus' in result && typeof result.httpStatus === 'number'
-                ? ` · HTTP ${result.httpStatus}`
-                : null}
+              {result.passed ? (fixtureDetails.get(result.id) ?? result.expected) : result.observed}
             </p>
           </div>
           <span className="flex shrink-0 items-center gap-1.5 text-sm font-medium">
@@ -102,14 +104,20 @@ export function ModelMarketChecks() {
       {report && (
         <>
           <section aria-labelledby="live-checks" className="space-y-3">
-            <h2 id="live-checks" className="text-xl font-semibold">
+            <h2
+              id="live-checks"
+              className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground"
+            >
               Live checks
             </h2>
             <p className="break-all font-mono text-sm text-muted-foreground">{report.endpoint}</p>
             <ResultList results={report.live} />
           </section>
           <section aria-labelledby="stale-fixtures" className="space-y-3">
-            <h2 id="stale-fixtures" className="text-xl font-semibold">
+            <h2
+              id="stale-fixtures"
+              className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground"
+            >
               Stale card fixtures
             </h2>
             <p className="text-sm text-muted-foreground">
@@ -118,7 +126,7 @@ export function ModelMarketChecks() {
             </p>
             <ResultList results={report.fixtures} />
           </section>
-          <details className="rounded-xl border bg-card p-4">
+          <details className="rounded-lg border border-border bg-card p-4">
             <summary className="cursor-pointer font-medium">View JSON report</summary>
             <pre className="mt-4 max-h-96 overflow-auto rounded-lg bg-muted p-3 text-xs">
               {json}
