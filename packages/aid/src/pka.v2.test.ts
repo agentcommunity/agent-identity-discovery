@@ -128,50 +128,61 @@ describe('AID v2 PKA handshake', () => {
     }));
   }
 
-  it('verifies the canonical nonce-bound RFC 9421 response signature vector', async () => {
-    const vector = loadCanonicalV2Vector();
-    const nonceBytes = Uint8Array.from(Array.from({ length: 32 }, (_, index) => 160 + index));
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date(vector.created * 1000));
-    getRandomValuesSpy = vi.spyOn(g.crypto!, 'getRandomValues').mockImplementation((array) => {
-      (array as Uint8Array).set(nonceBytes);
-      return array;
-    });
+  it.each(['global', 'injected'])(
+    'verifies the canonical nonce-bound RFC 9421 response signature vector with %s fetch',
+    async (transport) => {
+      const vector = loadCanonicalV2Vector();
+      const nonceBytes = Uint8Array.from(Array.from({ length: 32 }, (_, index) => 160 + index));
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date(vector.created * 1000));
+      getRandomValuesSpy = vi.spyOn(g.crypto!, 'getRandomValues').mockImplementation((array) => {
+        (array as Uint8Array).set(nonceBytes);
+        return array;
+      });
 
-    g.fetch = vi.fn(
-      async (
-        url: string,
-        init?: { method?: string; redirect?: string; headers?: Record<string, string> },
-      ) => {
-        expect(url).toBe(vector.request.target_uri);
-        expect(init?.method).toBe(vector.request.method);
-        expect(init?.redirect).toBe('error');
-        expect(init?.headers?.['Accept-Signature']).toBe(vector.request.accept_signature);
-        expect(init?.headers?.['Cache-Control']).toBe(vector.request.cache_control);
-        expect(init?.headers).not.toHaveProperty('AID-Challenge');
-        expect(init?.headers).not.toHaveProperty('Date');
+      const fetch = vi.fn(
+        async (
+          url: string,
+          init?: { method?: string; redirect?: string; headers?: Record<string, string> },
+        ) => {
+          expect(url).toBe(vector.request.target_uri);
+          expect(init?.method).toBe(vector.request.method);
+          expect(init?.redirect).toBe('error');
+          expect(init?.headers?.['Accept-Signature']).toBe(vector.request.accept_signature);
+          expect(init?.headers?.['Cache-Control']).toBe(vector.request.cache_control);
+          expect(init?.headers).not.toHaveProperty('AID-Challenge');
+          expect(init?.headers).not.toHaveProperty('Date');
 
-        return {
-          ok: false,
-          status: vector.response.status,
-          headers: {
-            get: (name: string) => {
-              const normalized = name.toLowerCase();
-              if (normalized === 'signature-input') return vector.response.signature_input;
-              if (normalized === 'signature') return vector.response.signature;
-              if (normalized === 'cache-control') return vector.response.cache_control;
-              return null;
+          return {
+            ok: false,
+            status: vector.response.status,
+            headers: {
+              get: (name: string) => {
+                const normalized = name.toLowerCase();
+                if (normalized === 'signature-input') return vector.response.signature_input;
+                if (normalized === 'signature') return vector.response.signature;
+                if (normalized === 'cache-control') return vector.response.cache_control;
+                return null;
+              },
             },
-          },
-          text: async () => '',
-        };
-      },
-    );
+            text: async () => '',
+          };
+        },
+      );
 
-    await expect(performPKAHandshake(vector.record.u, vector.record.k)).resolves.toEqual({
-      domainBound: false,
-    });
-  });
+      if (transport === 'global') g.fetch = fetch;
+      else g.fetch = undefined;
+      await expect(
+        performPKAHandshake(
+          vector.record.u,
+          vector.record.k,
+          undefined,
+          undefined,
+          transport === 'injected' ? fetch : undefined,
+        ),
+      ).resolves.toEqual({ domainBound: false });
+    },
+  );
 
   it('canonicalizes uppercase hosts, default ports, query, and fragments for @target-uri', async () => {
     const vector = loadV2Vector('v2-uppercase-host-default-port-canonical-target');
