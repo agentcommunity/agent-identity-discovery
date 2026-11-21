@@ -101,6 +101,11 @@ const TOOLS = [
     href: '/workbench',
   },
   {
+    name: 'ModelMarket interop test',
+    blurb: 'Verify live AID proofs and the ARD server card digest.',
+    href: '/interop/modelmarket',
+  },
+  {
     name: 'More tooling',
     blurb: 'Planned. Open a PR.',
     href: 'https://github.com/agentcommunity/agent-identity-discovery',

@@ -23,6 +23,7 @@
     "upload:cf": "pnpm build:cf:deps && opennextjs-cloudflare upload",
     "preview:cf": "pnpm build:cf:deps && opennextjs-cloudflare preview",
     "start": "next start",
+    "interop:modelmarket": "tsx scripts/modelmarket-interop.ts",
     "lint": "pnpm -w exec eslint --max-warnings 0 packages/web/src packages/web/next.config.js packages/web/postcss.config.js packages/web/tailwind.config.js packages/web/vitest.config.ts",
     "type-check": "tsc --noEmit",
     "test": "pnpm gen:content && vitest run",
@@ -58,7 +59,7 @@
     "lucide-react": "^0.563.0",
     "mermaid": "^11.12.2",
     "nanoid": "^5.0.7",
-    "next": "16.3.8",
+    "next": "16.4.6",
     "next-mdx-remote": "^6.0.0",
     "next-themes": "^0.4.6",
     "react": "^19.2.4",
@@ -75,20 +76,20 @@
     "ws": "^8.16.0"
   },
   "devDependencies": {
-    "@opennextjs/cloudflare": "^1.18.0",
+    "@opennextjs/cloudflare": "1.20.18",
     "@types/node": "^24.10.11",
     "@types/react": "^19.2.13",
     "@types/react-dom": "^19.2.3",
     "@vitest/ui": "^3.2.4",
     "autoprefixer": "^10.4.19",
     "eslint": "^9.39.2",
-    "eslint-config-next": "^16.3.8",
+    "eslint-config-next": "16.4.6",
     "jsdom": "^26.1.0",
     "postcss": "^8.4.38",
     "tailwindcss-animate": "^1.0.7",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4",
-    "wrangler": "^4.80.0"
+    "wrangler": "4.166.0"
   }
 }

@@ -671,7 +671,12 @@ function buildAcceptSignatureV2(keyid: string, nonce: string, domainBound: boole
   return `aid-pka=${covered};created;expires;keyid="${keyid}";alg="ed25519";nonce="${nonce}";tag="${AID_PKA_TAG_V2}"`;
 }
 
-async function performV1PKAHandshake(uri: string, pka: string, kid: string): Promise<void> {
+async function performV1PKAHandshake(
+  uri: string,
+  pka: string,
+  kid: string,
+  fetchImpl: FetchLike | undefined,
+): Promise<void> {
   if (!kid) throw new AidError('ERR_SECURITY', 'Missing kid for PKA');
   const u = new URL(uri);
   const cryptoImpl: CryptoLike =
@@ -680,7 +685,6 @@ async function performV1PKAHandshake(uri: string, pka: string, kid: string): Pro
   const nonce = cryptoImpl.getRandomValues(new Uint8Array(32));
   const challenge = uint8ToBase64Url(nonce);
   const date = new Date().toUTCString();
-  const fetchImpl = (globalThis as unknown as { fetch?: FetchLike }).fetch;
   if (typeof fetchImpl !== 'function') {
     throw new AidError('ERR_SECURITY', 'fetch is not available in this environment');
   }
@@ -732,7 +736,8 @@ async function performV1PKAHandshake(uri: string, pka: string, kid: string): Pro
 async function performV2PKAHandshake(
   uri: string,
   pka: string,
-  domain?: string,
+  domain: string | undefined,
+  fetchImpl: FetchLike | undefined,
 ): Promise<PKAHandshakeResult> {
   const cryptoImpl: CryptoLike =
     (globalThis as unknown as { crypto?: CryptoLike }).crypto ??
@@ -742,7 +747,6 @@ async function performV2PKAHandshake(
   const nonce = uint8ToBase64Url(cryptoImpl.getRandomValues(new Uint8Array(32)));
   const requestUri = normalizeRequestUri(uri);
   const authority = requestAuthority(requestUri);
-  const fetchImpl = (globalThis as unknown as { fetch?: FetchLike }).fetch;
   if (typeof fetchImpl !== 'function') {
     throw new AidError('ERR_SECURITY', 'fetch is not available in this environment');
   }
@@ -817,15 +821,17 @@ async function performV2PKAHandshake(
   return { domainBound: isDomainBound };
 }
 
+/** Verify endpoint proof, optionally using a caller-provided fetch implementation. */
 export async function performPKAHandshake(
   uri: string,
   pka: string,
   kid?: string,
   domain?: string,
+  fetchImpl = (globalThis as unknown as { fetch?: FetchLike }).fetch,
 ): Promise<PKAHandshakeResult> {
   if (kid !== undefined) {
-    await performV1PKAHandshake(uri, pka, kid);
+    await performV1PKAHandshake(uri, pka, kid, fetchImpl);
     return { domainBound: false };
   }
-  return await performV2PKAHandshake(uri, pka, domain);
+  return await performV2PKAHandshake(uri, pka, domain, fetchImpl);
 }

@@ -45,6 +45,7 @@ def test_well_known_fallback_json(monkeypatch):
 
     def _fake_open(req, timeout=2.0):
         assert "/.well-known/agent" in req.full_url
+        assert req.get_header("User-agent") == "aid-discovery"
         headers = {"Content-Type": "application/json"}
         payload = json.dumps({
             "v": "aid1",
