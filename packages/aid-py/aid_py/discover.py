@@ -172,7 +172,9 @@ def discover(
                 return None
 
         url = f"https://{host}/.well-known/agent"
-        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        req = urllib.request.Request(
+            url, headers={"Accept": "application/json", "User-Agent": "aid-discovery"}
+        )
         opener = urllib.request.build_opener(_NoRedirect())
         try:
             # Use custom opener to avoid following redirects
