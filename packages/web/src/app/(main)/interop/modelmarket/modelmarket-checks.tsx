@@ -9,7 +9,7 @@ const labels = new Map([
   ['unbound', 'Proof without a domain'],
   ['bound', 'Proof for modelmarket.dev'],
   ['wrong-domain', 'Refusal for a different domain'],
-  ['card-digest', 'ARD server card digest'],
+  ['card-digest', 'ARD server card'],
   ['stale-endpoint', 'Endpoint mismatch'],
   ['stale-digest', 'Card digest mismatch'],
 ]);
@@ -121,8 +121,7 @@ export function ModelMarketChecks() {
               Stale card fixtures
             </h2>
             <p className="text-sm text-muted-foreground">
-              The live card lists its endpoint in the description. These local examples use a
-              structured endpoint to exercise both stale cases.
+              These local examples use the same Streamable HTTP field as ModelMarket’s live card.
             </p>
             <ResultList results={report.fixtures} />
           </section>

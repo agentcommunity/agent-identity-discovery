@@ -44,7 +44,8 @@ For real-world testing, use the [aid-doctor CLI](aid_doctor.md) to validate your
 
 Open the [ModelMarket interop test](https://aid.agentcommunity.org/interop/modelmarket)
 and select **Run checks**. It verifies three live AID endpoint-proof responses and
-checks the MCP server card against the digest in ModelMarket's ARD catalog.
+checks the MCP server card against the digest in ModelMarket's ARD catalog. It then
+compares the card's Streamable HTTP remote URL with the AID endpoint.
 Copy the JSON report to share the outcome and the proof headers.
 
 See the [interop proposal in the IETF DAWN archive](https://mailarchive.ietf.org/arch/msg/dawn/OIP8iMn_X-JSh_3ZgtBARvNl3eo/)
@@ -58,7 +59,8 @@ pnpm --silent -C packages/web interop:modelmarket
 ```
 
 The command prints the report as JSON and exits with status 1 if a check fails.
-The stale endpoint and stale digest cases use local fixtures.
+The stale endpoint and stale digest cases use local fixtures in the same
+[SEP-2127 server card format](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/seps/2127-mcp-server-cards.md).
 
 ## See also
 

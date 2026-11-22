@@ -23,8 +23,8 @@ vi.mock('@agentcommunity/aid', async (importOriginal) => {
 
 const domain = 'modelmarket.dev';
 const endpoint = 'https://modelmarket.dev/mcp';
-const cardUrl = 'https://modelmarket.dev/.well-known/mcp/server-card.json';
-const card = '{"serverInfo":{"name":"ModelMarket"}}';
+const cardUrl = 'https://modelmarket.dev/mcp/server-card';
+const card = JSON.stringify({ remotes: [{ type: 'streamable-http', url: endpoint }] });
 const digest = 'sha256:' + createHash('sha256').update(card).digest('hex');
 const key = 'JrQLj5P_89iXES9-vFgrIy29clF9CC_oPPsw3c5D0bs';
 
@@ -33,6 +33,7 @@ function mockFetch({
   cardStatus = 200,
   negativeSigned = false,
   cardBody = card,
+  cardDigest = digest,
   cardLocation = cardUrl,
   recordUri = endpoint,
 } = {}) {
@@ -67,7 +68,7 @@ function mockFetch({
             identifier: 'urn:air:modelmarket.dev:mcp:gateway',
             type: 'application/mcp-server-card+json',
             url: cardLocation,
-            digest,
+            digest: cardDigest,
           },
         ],
       });
@@ -127,6 +128,25 @@ describe('ModelMarket interop', () => {
     const report = await runModelMarketInterop(mockFetch({ cardBody: card + '\n' }));
     expect(report.live.map(({ passed }) => passed)).toEqual([true, true, true, false]);
     expect(report.live[3]).toMatchObject({ observed: 'card-digest-mismatch' });
+  });
+
+  it('reports an endpoint mismatch only after verifying the new card digest', async () => {
+    const cardEndpoint = endpoint + '-old';
+    const cardBody = JSON.stringify({
+      remotes: [
+        { type: 'sse', url: endpoint },
+        { type: 'streamable-http', url: cardEndpoint },
+      ],
+    });
+    const cardDigest = 'sha256:' + createHash('sha256').update(cardBody).digest('hex');
+    const report = await runModelMarketInterop(mockFetch({ cardBody, cardDigest }));
+    expect(report.live[3]).toMatchObject({
+      passed: false,
+      observed: 'endpoint-mismatch',
+      expectedEndpoint: endpoint,
+      cardEndpoints: [cardEndpoint],
+      actualDigest: cardDigest,
+    });
   });
 
   it('rejects unexpected upstream URLs before starting any checks against them', async () => {
