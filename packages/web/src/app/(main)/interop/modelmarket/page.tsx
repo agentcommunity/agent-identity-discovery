@@ -17,7 +17,7 @@ export default function ModelMarketInteropPage() {
         <SectionHeader
           as="h1"
           title="ModelMarket interop test"
-          lede="Verify AID endpoint proofs and check the MCP server card against the digest in ModelMarket’s Agent Resource Discovery (ARD) catalog."
+          lede="Verify AID endpoint proofs and compare ModelMarket’s MCP server card with the ARD catalog digest and AID endpoint."
           className="!mb-4"
         />
         <div className="flex flex-wrap gap-x-5 gap-y-2">

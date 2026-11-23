@@ -4,7 +4,7 @@ const domain = 'modelmarket.dev';
 const dnsName = '_agent.modelmarket.dev';
 const endpoint = 'https://modelmarket.dev/mcp';
 const manifestUrl = 'https://modelmarket.dev/.well-known/ard.json';
-const cardUrl = 'https://modelmarket.dev/.well-known/mcp/server-card.json';
+const cardUrl = 'https://modelmarket.dev/mcp/server-card';
 const cardIdentifier = 'urn:air:modelmarket.dev:mcp:gateway';
 const timeout = 5000;
 const maxResponseBytes = 1024 ** 2;
@@ -87,7 +87,7 @@ async function readPublicBody(fetcher: typeof fetch, url: string) {
   return body.buffer;
 }
 
-async function readProofKey(fetcher: typeof fetch) {
+async function readProofRecord(fetcher: typeof fetch) {
   const body = await readPublicBody(fetcher, `https://dns.google/resolve?name=${dnsName}&type=TXT`);
   const { Status, Answer = [] } = JSON.parse(new TextDecoder().decode(body)) as {
     Status: number;
@@ -114,7 +114,7 @@ async function readProofKey(fetcher: typeof fetch) {
   ) {
     throw new Error(`Expected one aid2 record publishing an MCP proof key for ${endpoint}`);
   }
-  return record.pka;
+  return { uri: record.uri, key: record.pka };
 }
 
 async function checkProof(
@@ -185,26 +185,31 @@ async function sha256(bytes: ArrayBuffer) {
   return 'sha256:' + Array.from(hash, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-async function inspectCard(bytes: ArrayBuffer, expectedDigest: string, expectedEndpoint?: string) {
+async function inspectCard(bytes: ArrayBuffer, expectedDigest: string, expectedEndpoint: string) {
   const actualDigest = await sha256(bytes);
   if (actualDigest !== expectedDigest) {
     return { observed: 'card-digest-mismatch', expectedDigest, actualDigest };
   }
-  if (expectedEndpoint) {
-    // The local fixture supplies a structured endpoint. The live card has none.
-    const { endpoint: cardEndpoint } = JSON.parse(new TextDecoder().decode(bytes)) as {
-      endpoint?: string;
-    };
-    if (cardEndpoint !== expectedEndpoint) {
-      return { observed: 'endpoint-mismatch', expectedEndpoint, cardEndpoint };
-    }
-  }
-  return { observed: 'card-digest-match', expectedDigest, actualDigest };
+  const { remotes } = JSON.parse(new TextDecoder().decode(bytes)) as {
+    remotes?: ({ type?: string; url?: string } | null)[];
+  };
+  const cardEndpoints = (Array.isArray(remotes) ? remotes : []).flatMap((remote) =>
+    remote?.type === 'streamable-http' && typeof remote.url === 'string' ? [remote.url] : [],
+  );
+  return {
+    observed: cardEndpoints.includes(expectedEndpoint)
+      ? 'card-endpoint-match'
+      : 'endpoint-mismatch',
+    expectedDigest,
+    actualDigest,
+    expectedEndpoint,
+    cardEndpoints,
+  };
 }
 
-async function checkLiveCard(fetcher: typeof fetch) {
+async function checkLiveCard(fetcher: typeof fetch, record: ReturnType<typeof readProofRecord>) {
   const id = 'card-digest';
-  const expected = 'Fetched card matches the ARD SHA-256 digest';
+  const expected = 'Card digest matches ARD and its Streamable HTTP URL matches AID';
   try {
     const manifest = await readPublicBody(fetcher, manifestUrl);
     const { entries } = JSON.parse(new TextDecoder().decode(manifest)) as {
@@ -222,16 +227,21 @@ async function checkLiveCard(fetcher: typeof fetch) {
       throw new Error('Expected one ModelMarket MCP server card entry with a SHA-256 digest');
     }
     const card = await readPublicBody(fetcher, cardUrl);
-    const result = await inspectCard(card, entry.digest);
-    return { id, expected, passed: result.observed === 'card-digest-match', ...result };
+    const { uri } = await record;
+    const result = await inspectCard(card, entry.digest, uri);
+    return { id, expected, passed: result.observed === 'card-endpoint-match', ...result };
   } catch (error) {
     return { id, expected, passed: false, observed: errorMessage(error) };
   }
 }
 
+function encodeFixtureCard(url: string) {
+  return new TextEncoder().encode(JSON.stringify({ remotes: [{ type: 'streamable-http', url }] }));
+}
+
 async function runStaleFixtures() {
-  const original = new TextEncoder().encode(JSON.stringify({ endpoint }));
-  const stale = new TextEncoder().encode(JSON.stringify({ endpoint: endpoint + '-old' }));
+  const original = encodeFixtureCard(endpoint);
+  const stale = encodeFixtureCard(endpoint + '-old');
   const [endpointMismatch, digestMismatch] = await Promise.all([
     inspectCard(stale.buffer, await sha256(stale.buffer), endpoint),
     inspectCard(stale.buffer, await sha256(original.buffer), endpoint),
@@ -254,9 +264,10 @@ async function runStaleFixtures() {
 
 export async function runModelMarketInterop(fetcher: typeof fetch = globalThis.fetch) {
   const checkedAt = new Date().toISOString();
+  const record = readProofRecord(fetcher);
   const [proofs, liveCard, fixtures] = await Promise.all([
-    readProofKey(fetcher)
-      .then((key) =>
+    record
+      .then(({ key }) =>
         Promise.all(proofCases.map((proofCase) => checkProof(fetcher, proofCase, key))),
       )
       .catch((error) =>
@@ -268,7 +279,7 @@ export async function runModelMarketInterop(fetcher: typeof fetch = globalThis.f
           observed: errorMessage(error),
         })),
       ),
-    checkLiveCard(fetcher),
+    checkLiveCard(fetcher, record),
     runStaleFixtures(),
   ]);
   const live = [...proofs, liveCard];
